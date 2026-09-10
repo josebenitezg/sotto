@@ -16,6 +16,11 @@ export async function GET(request: Request) {
     return new Response(null, { status: 401 });
   if (isDemo() || process.env.QUEUE_DRIVER !== "vercel")
     return new Response(null, { status: 404 });
+  // A production-origin probe exercises queue auth without a Gmail account.
+  if (new URL(request.url).searchParams.get("probe") === "queue") {
+    await enqueueAccount("sotto-installation-probe");
+    return Response.json({ queued: 1, probe: true });
+  }
   const accounts = await query(
     "SELECT id FROM accounts WHERE connected=true AND mode<>'paused' ORDER BY created_at",
   );

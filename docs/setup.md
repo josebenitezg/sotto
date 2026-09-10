@@ -65,6 +65,8 @@ Link the repository to your own Vercel project and attach a dedicated PostgreSQL
 
 The included `vercel.json` configures a private Queue consumer in `iad1` and a daily recovery cron at 08:00 UTC. Each delivery processes a small batch and schedules continuation when needed. Deploy with Vercel Queues enabled on your account; verify an actual queue delivery, Google push and watch renewal before treating the installation as unattended. You do not need a separate process worker in this mode. The daily cron uses the `CRON_SECRET` bearer automatically and is compatible with a once-daily schedule.
 
+To verify Queue delivery before connecting Gmail, call `GET /api/cron/reconcile?probe=queue` with the same `CRON_SECRET` bearer. It publishes an inert installation probe from the production deployment; check its completed delivery in Vercel logs. Do not pin a message published with a local development OIDC token to a production deployment: its acknowledgement uses a different environment namespace. Keep tokens out of logs and shared command history.
+
 ## 6. Review and activate
 
 Keep `ENABLE_MAILBOX_WRITES=false`. Connect the work account first. The initial scan covers messages in Inbox from the last seven days. Review examples and add allowed senders. Validate false positives on examples not used to tune rules.

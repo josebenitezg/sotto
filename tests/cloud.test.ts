@@ -61,6 +61,18 @@ it("rejects unauthenticated daily recovery before database access", async () => 
   ).toBe(401);
   expect(mocks.query).not.toHaveBeenCalled();
 });
+it("allows an authenticated deployment-origin queue probe without mailbox access", async () => {
+  const response = await GET(
+    new Request("https://sotto.example/api/cron/reconcile?probe=queue", {
+      headers: { authorization: "Bearer test-only-secret" },
+    }),
+  );
+  expect(response.status).toBe(200);
+  expect(mocks.send.mock.calls[0][1]).toEqual({
+    accountId: "sotto-installation-probe",
+  });
+  expect(mocks.query).not.toHaveBeenCalled();
+});
 it("daily recovery enqueues every connected account and only purges expired operational records", async () => {
   mocks.query
     .mockResolvedValueOnce([{ id: "work" }, { id: "personal" }])

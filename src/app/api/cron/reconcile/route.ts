@@ -24,14 +24,20 @@ export async function GET(request: Request) {
     return new Response(null, { status: 404 });
   // Operator-only provider check using synthetic mail, never a user's inbox.
   if (new URL(request.url).searchParams.get("probe") === "classifier") {
+    const campaign =
+      new URL(request.url).searchParams.get("sample") === "campaign";
     try {
       const result = await classify(
         {
           id: "probe",
           threadId: "probe",
           from: "sales@vendor.example",
-          subject: "Unsolicited sales pitch",
-          text: "We have never spoken. Would you buy our outbound lead generation service?",
+          subject: campaign
+            ? "Summer offers from our travel brand"
+            : "Unsolicited sales pitch",
+          text: campaign
+            ? "Our seasonal campaign for all subscribers: save on selected holiday fares. Browse offers or manage your promotional subscriptions. No personal sales conversation is requested."
+            : "We have never spoken. Would you buy our outbound lead generation service?",
           labels: ["INBOX"],
           receivedAt: Date.now(),
           headers: {

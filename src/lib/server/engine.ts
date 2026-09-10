@@ -6,6 +6,7 @@ import {
   protection,
   shouldMove,
   authenticatedSender,
+  CLASSIFIER_POLICY_VERSION,
   type Context,
 } from "./classifier";
 import { writesEnabled } from "./config";
@@ -173,8 +174,8 @@ async function classifyJob(accountId: string, messageId: string, gmail: Gmail) {
   const candidate = shouldMove(result, context.policy);
   const id = randomUUID();
   await query(
-    `INSERT INTO decisions(id,account_id,message_id,thread_id,sender,subject,category,confidence,reason,state,ai_decision)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(account_id,message_id) DO NOTHING`,
+    `INSERT INTO decisions(id,account_id,message_id,thread_id,sender,subject,category,confidence,reason,state,ai_decision,policy_version)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(account_id,message_id) DO NOTHING`,
     [
       id,
       accountId,
@@ -187,6 +188,7 @@ async function classifyJob(accountId: string, messageId: string, gmail: Gmail) {
       result.reason,
       candidate ? "suggested" : "kept",
       result.decision,
+      CLASSIFIER_POLICY_VERSION,
     ],
   );
   const [account] = await query(

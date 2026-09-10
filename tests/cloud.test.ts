@@ -3,16 +3,10 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   query: vi.fn(),
   work: vi.fn(),
-  clients: vi.fn(),
 }));
 vi.mock("@vercel/queue", () => ({
-  QueueClient: class {
-    constructor(options: unknown) {
-      mocks.clients(options);
-    }
-    send = mocks.send;
-    handleCallback = (handler: unknown) => handler;
-  },
+  send: mocks.send,
+  handleCallback: (handler: unknown) => handler,
 }));
 vi.mock("../src/lib/server/db", () => ({ query: mocks.query }));
 vi.mock("../src/lib/server/engine", () => ({ workAccount: mocks.work }));
@@ -27,12 +21,6 @@ beforeEach(() => {
   mocks.work.mockReset();
 });
 afterEach(() => vi.unstubAllEnvs());
-it("keeps continuations eligible for the current deployment after a release", () => {
-  expect(mocks.clients).toHaveBeenCalledWith({
-    region: "iad1",
-    deploymentId: null,
-  });
-});
 it("processes bounded batches and durably schedules delayed pending work", async () => {
   mocks.query
     .mockResolvedValueOnce([{ id: "work" }])

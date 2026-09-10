@@ -10,11 +10,23 @@ export async function connectIdentity(
   identity: { sub: string; email: string },
   refreshToken: string | undefined,
   linkedWorkspace: string | null,
+  authorizationStartedAt?: Date | string,
 ) {
   return transaction(async (db) => {
+    // Same key/order as mailbox actions and workers. A reconnect must not
+    // replace credentials while deletion is purging data or revoking access.
+    await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      `sotto:${identity.sub}`,
+    ]);
     await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
       `identity:${identity.sub}`,
     ]);
+    const {
+      rows: [access],
+    } = await db.query(
+      "SELECT workspace_id,gmail_deleted_at FROM workspace_identities WHERE id=$1",
+      [identity.sub],
+    );
     const {
       rows: [existing],
     } = await db.query(
@@ -22,17 +34,33 @@ export async function connectIdentity(
       [identity.sub],
     );
     if (
-      existing &&
-      linkedWorkspace &&
-      existing.workspace_id !== linkedWorkspace
+      (linkedWorkspace &&
+        (access?.workspace_id || existing?.workspace_id) &&
+        (access?.workspace_id || existing?.workspace_id) !== linkedWorkspace) ||
+      (access && existing && access.workspace_id !== existing.workspace_id)
     )
       throw new HttpError(
         409,
         "Esa cuenta ya pertenece a otro espacio de Sotto.",
       );
-    const workspaceId = hosted()
-      ? linkedWorkspace || existing?.workspace_id || randomUUID()
-      : "installation";
+    if (
+      access?.gmail_deleted_at &&
+      (!authorizationStartedAt ||
+        !Number.isFinite(new Date(authorizationStartedAt).getTime()) ||
+        new Date(authorizationStartedAt).getTime() <=
+          new Date(access.gmail_deleted_at).getTime())
+    )
+      throw new HttpError(
+        409,
+        "Los datos de Gmail se eliminaron después de iniciar esta conexión. Volvé a conectar Google para autorizarla de nuevo.",
+      );
+    // Isolation is independent of paid plans. Only an existing identity or
+    // a browser-bound linking session can select an existing workspace.
+    const workspaceId =
+      linkedWorkspace ||
+      access?.workspace_id ||
+      existing?.workspace_id ||
+      randomUUID();
     await db.query(
       "INSERT INTO workspaces(id,email) VALUES($1,$2) ON CONFLICT(id) DO NOTHING",
       [workspaceId, identity.email],
@@ -41,6 +69,10 @@ export async function connectIdentity(
     await db.query("SELECT id FROM workspaces WHERE id=$1 FOR UPDATE", [
       workspaceId,
     ]);
+    await db.query(
+      "INSERT INTO workspace_identities(id,workspace_id) VALUES($1,$2) ON CONFLICT(id) DO NOTHING",
+      [identity.sub, workspaceId],
+    );
     if (hosted() && !existing?.connected) {
       const {
         rows: [count],

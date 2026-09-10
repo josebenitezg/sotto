@@ -8,11 +8,13 @@ Copy `.env.example` to `.env.local`. Generate a 32-byte encryption key:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Keep it in `ENCRYPTION_KEY`, never in Git. Losing it makes stored Google credentials unreadable. Set `APP_URL` to the exact public HTTPS origin (HTTP is allowed only on localhost). Set `ALLOWED_GOOGLE_EMAILS` to an explicit comma-separated list of accounts that belong to this installation's single owner.
+Keep it in `ENCRYPTION_KEY`, never in Git. Losing it makes stored Google credentials unreadable. Set `APP_URL` to the exact public HTTPS origin (HTTP is allowed only on localhost). Set `ALLOWED_GOOGLE_EMAILS` to an explicit comma-separated list of accounts permitted to access this installation.
 
 When `APP_URL` uses a non-`www` HTTPS hostname, the app redirects its `www` alias to that origin before rendering. Attach both domains to your deployment. This keeps Google OAuth state cookies, the callback and the signed-in session on one host; do not relax the request-origin checks to support aliases. Rebuild after changing `APP_URL` so the redirect follows the new origin.
 
-This allowlist is required even though the source code is public. Any allowed account signs in to the same owner's dashboard and can view all connected accounts. Do not list accounts belonging to independent users. For the optional hosted service, enable the isolated workspace and billing configuration in [billing](billing.md). Keep public signup disabled until Google verification and the hosted pilot are complete.
+Keep the allowlist enabled even though the source code is public. Each new Google identity signing in without an existing Sotto session gets its own workspace, including when `BILLING_ENABLED=false`. Workspace isolation does not require Stripe. Existing identities keep their workspace, including accounts migrated into the legacy `installation` workspace. Connecting another Google account while signed in explicitly links it to the current workspace, whose connected accounts and history are visible to that workspace's users. An identity already owned by a different workspace cannot be linked across that boundary.
+
+For an independent reviewer or demo identity, start from a signed-out Sotto session or a separate browser profile; do not connect it from the pilot owner's Cuentas page. Use synthetic demo mail. Adding an allowlist entry does not itself move an account out of an existing workspace. Paid plans are optional and configured separately in [billing](billing.md). Keep public signup disabled until Google verification and the hosted pilot are complete.
 
 ## 2. PostgreSQL
 
@@ -33,7 +35,7 @@ The database is exposed only on `127.0.0.1:5438` for this development path. Use 
 2. Configure Google Auth Platform branding and audience. Use **External** when connecting a consumer Gmail account as well as Workspace. Add your accounts as test users during development.
 3. Create an OAuth client with application type **Web application**.
 4. Add the redirect URI `http://localhost:3000/api/google/callback` for local testing, and your exact production equivalent when deployed. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
-5. Request `openid`, `email`, `profile` and `https://www.googleapis.com/auth/gmail.modify`.
+5. Request `openid`, `email` and `https://www.googleapis.com/auth/gmail.modify`. Sotto does not request `profile` because it does not use the account's photo or display name.
 6. Start Sotto and connect each allowed account separately. Grant offline Gmail access. Workspace administrators may need to allow the application.
 
 External apps left in Google's **Testing** publishing state receive refresh tokens that expire after seven days for these scopes. Configure an appropriate production audience before unattended operation. Limited personal-use apps may qualify for a verification exception; public apps using restricted Gmail scopes have additional verification requirements. Check the current [Google OAuth guidance](https://developers.google.com/identity/protocols/oauth2#expiration), [verification exceptions](https://support.google.com/cloud/answer/13464323?hl=en) and [Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes).

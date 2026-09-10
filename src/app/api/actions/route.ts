@@ -7,7 +7,7 @@ import {
   requireSession,
 } from "@/lib/server/auth";
 import { isDemo, writesEnabled } from "@/lib/server/config";
-import { query } from "@/lib/server/db";
+import { query, transaction } from "@/lib/server/db";
 import { Gmail } from "@/lib/server/google";
 import { classifierConfigured } from "@/lib/server/ai";
 import { enqueueAccount } from "@/lib/server/queue";
@@ -35,6 +35,11 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reviewed"), accountId: z.string() }),
   z.object({ action: z.literal("sync"), accountId: z.string() }),
   z.object({ action: z.literal("disconnect"), accountId: z.string() }),
+  z.object({
+    action: z.literal("deleteGmailData"),
+    accountId: z.string(),
+    confirmEmail: z.email().max(254),
+  }),
   z.object({
     action: z.literal("allow"),
     accountId: z.string(),
@@ -73,10 +78,16 @@ export async function POST(request: Request) {
           409,
           "Conectá y reanudá esta cuenta para sincronizar.",
         );
-      await query(
-        "INSERT INTO mailbox_events(id,account_id,history_id) VALUES($1,$2,'0')",
-        [`manual:${randomUUID()}`, accountId],
+      const [event] = await query(
+        `WITH active AS (
+          SELECT id FROM accounts WHERE id=$2 AND workspace_id=$3
+            AND connected=true AND mode<>'paused' FOR KEY SHARE
+        ) INSERT INTO mailbox_events(id,account_id,history_id)
+          SELECT $1,id,'0' FROM active RETURNING account_id`,
+        [`manual:${randomUUID()}`, accountId, workspaceId],
       );
+      if (!event)
+        throw new HttpError(409, "La cuenta cambió. Volvé a abrir Cuentas.");
       await query(
         "UPDATE jobs SET state='pending',attempts=0,available_at=now() WHERE account_id=$1 AND state='failed'",
         [accountId],
@@ -163,7 +174,18 @@ export async function POST(request: Request) {
         );
       } else if (action.action === "removeRule") {
         await query("DELETE FROM sender_rules WHERE id=$1", [action.ruleId]);
-      } else if (action.action === "disconnect") {
+      } else if (
+        action.action === "disconnect" ||
+        action.action === "deleteGmailData"
+      ) {
+        if (
+          action.action === "deleteGmailData" &&
+          action.confirmEmail.toLowerCase() !== account.email.toLowerCase()
+        )
+          throw new HttpError(
+            400,
+            "Escribí el correo de esta cuenta para confirmar la eliminación.",
+          );
         let gmail: Gmail | undefined;
         if (account.connected) {
           try {
@@ -173,10 +195,37 @@ export async function POST(request: Request) {
           }
         }
         // Persist the local stop before any remote request can fail or time out.
-        await query(
-          "UPDATE accounts SET connected=false,mode='paused',token_cipher='',watch_expires=NULL WHERE id=$1",
-          [accountId],
-        );
+        if (action.action === "deleteGmailData") {
+          await transaction(async (db) => {
+            await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+              `identity:${accountId}`,
+            ]);
+            const { rows: identities } = await db.query(
+              `INSERT INTO workspace_identities(id,workspace_id,gmail_deleted_at)
+                VALUES($1,$2,clock_timestamp()) ON CONFLICT(id) DO UPDATE
+                SET gmail_deleted_at=excluded.gmail_deleted_at
+                WHERE workspace_identities.workspace_id=excluded.workspace_id RETURNING id`,
+              [accountId, workspaceId],
+            );
+            if (!identities.length)
+              throw new HttpError(
+                409,
+                "No pudimos verificar el espacio de esta cuenta.",
+              );
+            // The account lock excludes workers and reconnects. Foreign keys
+            // cascade decisions, jobs, mailbox events and sender rules in the
+            // same commit that removes the credential and Gmail connection.
+            await db.query(
+              "DELETE FROM accounts WHERE id=$1 AND workspace_id=$2",
+              [accountId, workspaceId],
+            );
+          });
+        } else {
+          await query(
+            "UPDATE accounts SET connected=false,mode='paused',token_cipher='',watch_expires=NULL WHERE id=$1",
+            [accountId],
+          );
+        }
         if (gmail) {
           try {
             await gmail.stop();

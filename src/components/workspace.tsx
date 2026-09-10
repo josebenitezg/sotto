@@ -118,6 +118,11 @@ function applyDemo(data: Dashboard, action: Action): Dashboard {
     account.connected = false;
     account.mode = "paused";
   }
+  if (action.action === "deleteGmailData" && account) {
+    next.accounts = next.accounts.filter((a) => a.id !== account.id);
+    next.decisions = next.decisions.filter((d) => d.accountId !== account.id);
+    next.rules = next.rules.filter((r) => r.accountId !== account.id);
+  }
   if (decision && ["keep", "move", "restore"].includes(action.action))
     decision.state =
       action.action === "move"
@@ -954,8 +959,10 @@ export function AccountsPage() {
   const { data, act, busy } = useWorkspace();
   const [confirm, setConfirm] = useState<{
     account: Account;
-    action: "automatic" | "disconnect";
+    action: "automatic" | "disconnect" | "deleteGmailData";
   } | null>(null);
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const confirmEmailId = useId();
   if (!data.accounts.length) return <Onboarding />;
   return (
     <>
@@ -1107,6 +1114,18 @@ export function AccountsPage() {
                   ) : (
                     <ConnectButton outline />
                   )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive"
+                    disabled={busy}
+                    onClick={() => {
+                      setConfirmEmail("");
+                      setConfirm({ account, action: "deleteGmailData" });
+                    }}
+                  >
+                    Eliminar datos de Gmail
+                  </Button>
                 </div>
                 {!data.demo &&
                 !data.writesEnabled &&
@@ -1139,7 +1158,10 @@ export function AccountsPage() {
       <AlertDialog
         open={!!confirm}
         onOpenChange={(open) => {
-          if (!open) setConfirm(null);
+          if (!open && !busy) {
+            setConfirm(null);
+            setConfirmEmail("");
+          }
         }}
       >
         <AlertDialogContent>
@@ -1147,19 +1169,58 @@ export function AccountsPage() {
             <AlertDialogTitle>
               {confirm?.action === "automatic"
                 ? "Activar el filtro"
-                : "Desconectar esta cuenta"}
+                : confirm?.action === "deleteGmailData"
+                  ? "Eliminar datos de Gmail"
+                  : "Desconectar esta cuenta"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirm?.action === "automatic"
                 ? `Confirmás que revisaste las propuestas de ${confirm.account.email}. Desde ahora, Sotto podrá apartar nuevos correos de las categorías que elegiste. Podés pausarlo y deshacer cada movimiento.`
-                : `Sotto dejará de procesar ${confirm?.account.email} y borrará su credencial local. Los correos y etiquetas quedan en Gmail; el registro de decisiones se conserva en Sotto. Si Google no responde, podés revocar el permiso desde tu Cuenta de Google.`}
+                : confirm?.action === "deleteGmailData"
+                  ? `Sotto eliminará de su base de datos activa la conexión, credencial, preferencias, remitentes permitidos y registros de procesamiento de ${confirm.account.email}. Se detendrá el filtro de esta cuenta. Los correos y etiquetas quedarán como están en Gmail; ya no podrás deshacer movimientos desde su historial en Sotto. Esta eliminación no se puede deshacer.`
+                  : `Sotto dejará de procesar ${confirm?.account.email} y borrará su credencial local. Los correos y etiquetas quedan en Gmail; el registro de decisiones se conserva en Sotto. Si Google no responde, podés revocar el permiso desde tu Cuenta de Google.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {confirm?.action === "deleteGmailData" ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Tu acceso, datos del plan y otras cuentas se conservan. Volver a
+                conectar Google autoriza una nueva revisión. Si Google no
+                responde al intento de revocar el permiso, podés revocarlo en tu
+                Cuenta de Google; el borrado local se completa igualmente.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor={confirmEmailId}>
+                  Escribí {confirm.account.email} para confirmar
+                </Label>
+                <Input
+                  id={confirmEmailId}
+                  type="email"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  disabled={busy}
+                  value={confirmEmail}
+                  onChange={(event) => setConfirmEmail(event.target.value)}
+                />
+              </div>
+            </div>
+          ) : null}
           <InlineError />
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              disabled={busy}
+              className={
+                confirm?.action === "deleteGmailData"
+                  ? "bg-destructive text-white hover:bg-destructive/90"
+                  : undefined
+              }
+              disabled={
+                busy ||
+                (confirm?.action === "deleteGmailData" &&
+                  confirmEmail.trim().toLowerCase() !==
+                    confirm.account.email.toLowerCase())
+              }
               onClick={async (event) => {
                 event.preventDefault();
                 if (!confirm) return;
@@ -1182,6 +1243,20 @@ export function AccountsPage() {
                     )
                   )
                     setConfirm(null);
+                } else if (confirm.action === "deleteGmailData") {
+                  if (
+                    await act(
+                      {
+                        action: "deleteGmailData",
+                        accountId: confirm.account.id,
+                        confirmEmail: confirmEmail.trim(),
+                      },
+                      "Datos de Gmail eliminados de Sotto",
+                    )
+                  ) {
+                    setConfirm(null);
+                    setConfirmEmail("");
+                  }
                 } else if (
                   await act(
                     { action: "disconnect", accountId: confirm.account.id },
@@ -1195,7 +1270,9 @@ export function AccountsPage() {
                 ? "Guardando…"
                 : confirm?.action === "automatic"
                   ? "Activar filtro"
-                  : "Desconectar"}
+                  : confirm?.action === "deleteGmailData"
+                    ? "Eliminar datos de Gmail"
+                    : "Desconectar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

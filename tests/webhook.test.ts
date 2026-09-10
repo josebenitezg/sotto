@@ -86,17 +86,17 @@ it("persists the event and exact string cursor before acknowledging", async () =
     idToken: "test-token",
     audience: "https://sotto.example/api/gmail/events",
   });
-  expect(mocks.query.mock.calls[1][1]).toEqual([
+  expect(mocks.query.mock.calls[0][1]).toEqual([
     "pubsub-1",
-    "work",
+    "owner@studio.example",
     "90071992547409999",
   ]);
 });
 it("accepts a numeric Gmail history ID and persists its exact decimal string", async () => {
   expect((await POST(historyRequest(9876543210))).status).toBe(204);
-  expect(mocks.query.mock.calls[1][1]).toEqual([
+  expect(mocks.query.mock.calls[0][1]).toEqual([
     "pubsub-numeric",
-    "work",
+    "owner@studio.example",
     "9876543210",
   ]);
   expect(mocks.enqueue).toHaveBeenCalledWith("work", "gmail:pubsub-numeric");
@@ -112,7 +112,6 @@ it.each([Number.MAX_SAFE_INTEGER + 1, 1.5, -1, true, null, "1e3"])(
 it("does not acknowledge when durable storage fails", async () => {
   mocks.query
     .mockReset()
-    .mockResolvedValueOnce([{ id: "work" }])
     .mockRejectedValueOnce(new Error("Database unavailable"));
   expect((await POST(request())).status).toBe(503);
 });
@@ -124,5 +123,5 @@ it("rejects malformed payloads without writing", async () => {
 it("does not acknowledge a durable event when queue publication fails", async () => {
   mocks.enqueue.mockRejectedValue(new Error("Queue unavailable"));
   expect((await POST(request())).status).toBe(503);
-  expect(mocks.query.mock.calls[1][0]).toContain("INSERT INTO mailbox_events");
+  expect(mocks.query.mock.calls[0][0]).toContain("INSERT INTO mailbox_events");
 });

@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     const url = googleClient().generateAuthUrl({
       access_type: "offline",
       prompt: "consent select_account",
-      scope: ["openid", "email", "profile", gmailScope],
+      scope: ["openid", "email", gmailScope],
       state,
       code_challenge: createHash("sha256").update(verifier).digest("base64url"),
       code_challenge_method: "S256" as never,

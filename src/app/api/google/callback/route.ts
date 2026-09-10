@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     if (!state || !code || !browser || params.has("error"))
       throw new Error("Invalid callback");
     const [pending] = await query(
-      "DELETE FROM oauth_states WHERE state_hash=$1 AND browser_hash=$2 AND expires_at>now() RETURNING verifier_cipher,workspace_id",
+      "DELETE FROM oauth_states WHERE state_hash=$1 AND browser_hash=$2 AND expires_at>now() RETURNING verifier_cipher,workspace_id,created_at",
       [hash(state), hash(browser)],
     );
     if (!pending) throw new Error("Expired state");
@@ -65,6 +65,7 @@ export async function GET(request: Request) {
       { sub: identity.sub, email: identity.email },
       tokens.refresh_token ?? undefined,
       pending.workspace_id,
+      pending.created_at,
     );
     try {
       await enqueueAccount(identity.sub);

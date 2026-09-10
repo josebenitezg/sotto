@@ -53,15 +53,22 @@ export async function POST(request: Request) {
     return new Response(null, { status: 400 });
   }
   try {
+    // Keep the account row until the insert commits. Deletion either removes
+    // this event by cascade or commits first and leaves no account to insert.
     const [account] = await query(
-      "SELECT id FROM accounts WHERE email=$1 AND connected=true",
-      [payload.emailAddress.toLowerCase()],
+      `WITH active AS (
+        SELECT id FROM accounts WHERE email=$2 AND connected=true FOR KEY SHARE
+      ), saved AS (
+        INSERT INTO mailbox_events(id,account_id,history_id)
+          SELECT $1,id,$3 FROM active ON CONFLICT DO NOTHING
+      ) SELECT id FROM active`,
+      [
+        event.message.messageId,
+        payload.emailAddress.toLowerCase(),
+        payload.historyId,
+      ],
     );
     if (account) {
-      await query(
-        "INSERT INTO mailbox_events(id,account_id,history_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",
-        [event.message.messageId, account.id, payload.historyId],
-      );
       await enqueueAccount(account.id, `gmail:${event.message.messageId}`);
     }
     return new Response(null, { status: 204 });

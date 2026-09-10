@@ -95,6 +95,13 @@ export default function PrivacyPage() {
         conexión no pueden acceder a ese Gmail.
       </p>
       <p className="text-muted-foreground">
+        La base de datos de esta instalación tiene una ventana de recuperación
+        de seis horas en Neon. Un registro eliminado de la base activa puede
+        seguir presente en ese historial hasta que venza la ventana. Esto no
+        equivale a eliminar los registros internos que el proveedor conserve
+        conforme a sus propias condiciones.
+      </p>
+      <p className="text-muted-foreground">
         OpenAI puede conservar registros de prevención de abuso durante un
         máximo habitual de 30 días, con las excepciones legales y de seguridad
         indicadas en sus{" "}

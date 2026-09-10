@@ -14,7 +14,7 @@
     "start": "next start",
     "worker": "tsx --env-file=.env.local src/worker.ts",
     "db:migrate": "tsx --env-file=.env.local scripts/migrate.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",

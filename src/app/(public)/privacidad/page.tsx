@@ -75,6 +75,17 @@ export default function PrivacyPage() {
         decisiones de Sotto.
       </p>
       <p className="text-xs text-muted-foreground">
+        Para soporte, consultas de privacidad o solicitudes de eliminación de
+        datos de sotto.email, escribí a{" "}
+        <a
+          href="mailto:support@sotto.email"
+          className="underline underline-offset-4"
+        >
+          support@sotto.email
+        </a>
+        .
+      </p>
+      <p className="text-xs text-muted-foreground">
         Última actualización: septiembre de 2026. El operador de cada
         instalación es responsable de su configuración y tratamiento de datos.
       </p>

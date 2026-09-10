@@ -164,12 +164,24 @@ export async function POST(request: Request) {
       } else if (action.action === "removeRule") {
         await query("DELETE FROM sender_rules WHERE id=$1", [action.ruleId]);
       } else if (action.action === "disconnect") {
+        let gmail: Gmail | undefined;
         if (account.connected) {
-          const gmail = await Gmail.forAccount(accountId);
+          try {
+            gmail = await Gmail.forAccount(accountId);
+          } catch {
+            /* A damaged credential must not prevent local disconnection. */
+          }
+        }
+        // Persist the local stop before any remote request can fail or time out.
+        await query(
+          "UPDATE accounts SET connected=false,mode='paused',token_cipher='',watch_expires=NULL WHERE id=$1",
+          [accountId],
+        );
+        if (gmail) {
           try {
             await gmail.stop();
           } catch {
-            /* Local disconnect still stops processing. */
+            /* Local disconnect already prevents further processing. */
           }
           try {
             await gmail.revoke();
@@ -177,10 +189,6 @@ export async function POST(request: Request) {
             /* Google permissions can also be revoked at myaccount.google.com. */
           }
         }
-        await query(
-          "UPDATE accounts SET connected=false,mode='paused',token_cipher='',watch_expires=NULL WHERE id=$1",
-          [accountId],
-        );
       } else if (action.action === "keep") {
         await query(
           "UPDATE decisions SET state='kept',reason='Elegiste conservar este correo.',updated_at=now() WHERE id=$1 AND state='suggested'",

@@ -200,7 +200,7 @@ describe("conservative classification", () => {
     await expect(classify(mail, context)).rejects.toMatchObject({
       message: "Classifier HTTP 429",
       retryAfterSeconds: 180,
-      source: "gateway",
+      source: "provider",
     });
     expect(fetch).toHaveBeenCalledOnce();
   });

@@ -163,17 +163,11 @@ export async function classify(
     }),
   });
   if (response.status === 429) {
-    const body = await response.json().catch(() => null);
-    // Only identify documented error kinds. Never retain/log a provider body.
-    const source =
-      body?.error?.type === "rate_limit_exceeded"
-        ? "gateway"
-        : body?.error?.type === "rate_limit_error"
-          ? "provider"
-          : "unknown";
+    // The classifier only calls OpenAI directly. Do not read or log error
+    // bodies, which may contain private message data.
     throw new ClassifierRateLimit(
       retryAfterSeconds(response.headers.get("retry-after")),
-      source,
+      "provider",
     );
   }
   if (!response.ok) throw new Error(`Classifier HTTP ${response.status}`);

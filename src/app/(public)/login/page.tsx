@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, ArrowUpRight, LockKeyhole } from "lucide-react";
 import { GoogleMark, SottoMark } from "@/components/brand";
+import { GoogleDataNotice } from "@/components/google-data-notice";
 import { configured, isDemo } from "@/lib/server/config";
 import { sessionWorkspace } from "@/lib/server/auth";
 
@@ -50,12 +51,15 @@ export default async function LoginPage({
             habilitada y aceptá el acceso a Gmail.
           </p>
         )}
-        <form action="/api/google/connect" method="post">
+        <form action="/api/google/connect" method="post" className="space-y-4">
+          <GoogleDataNotice id="google-permission" />
           <button
             type="submit"
             className="google-cta pressable w-full justify-center"
             disabled={!ready}
-            aria-describedby={!ready ? "google-status" : "google-permission"}
+            aria-describedby={
+              !ready ? "google-permission google-status" : "google-permission"
+            }
           >
             <span className="google-cta-icon">
               <GoogleMark />
@@ -69,13 +73,6 @@ export default async function LoginPage({
             podés explorar cómo funciona Sotto.
           </p>
         )}
-        <p
-          id="google-permission"
-          className="mt-5 text-xs leading-5 text-muted-foreground"
-        >
-          Google te pedirá permiso para leer y organizar tu correo. Sotto no
-          envía ni elimina mensajes.
-        </p>
         <div className="login-privacy">
           <LockKeyhole className="mt-0.5 shrink-0" size={14} />
           <p>

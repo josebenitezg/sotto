@@ -5,6 +5,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useId,
   useRef,
   useState,
   type ReactNode,
@@ -63,6 +64,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { GoogleMark, SottoMark } from "./brand";
+import { GoogleDataNotice } from "./google-data-notice";
 import type { Account, Dashboard, Decision, Mode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -397,13 +399,20 @@ function PageTitle({
 }
 function ConnectButton({ outline = false }: { outline?: boolean }) {
   const { data } = useWorkspace();
+  const noticeId = useId();
   return (
-    <form action="/api/google/connect" method="post">
+    <form
+      action="/api/google/connect"
+      method="post"
+      className="w-full max-w-md space-y-3"
+    >
+      <GoogleDataNotice id={noticeId} />
       <Button
         type="submit"
         size="lg"
         variant={outline ? "outline" : "default"}
         disabled={!data.configured || data.demo}
+        aria-describedby={noticeId}
       >
         <GoogleMark />
         Conectar con Google
@@ -1143,7 +1152,7 @@ export function AccountsPage() {
             <AlertDialogDescription>
               {confirm?.action === "automatic"
                 ? `Confirmás que revisaste las propuestas de ${confirm.account.email}. Desde ahora, Sotto podrá apartar nuevos correos de las categorías que elegiste. Podés pausarlo y deshacer cada movimiento.`
-                : `Sotto dejará de acceder a ${confirm?.account.email}. Los correos y etiquetas existentes quedan en Gmail. También podés revisar o revocar el acceso en tu Cuenta de Google.`}
+                : `Sotto dejará de procesar ${confirm?.account.email} y borrará su credencial local. Los correos y etiquetas quedan en Gmail; el registro de decisiones se conserva en Sotto. Si Google no responde, podés revocar el permiso desde tu Cuenta de Google.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <InlineError />

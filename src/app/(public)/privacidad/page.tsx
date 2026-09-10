@@ -12,10 +12,11 @@ export default function PrivacyPage() {
         Tu correo es tuyo.
       </h1>
       <p className="text-muted-foreground">
-        Sotto es una herramienta de código abierto para organizar Gmail. Si usás
-        sotto.email, el servicio procesa los datos en la infraestructura de esta
-        instalación. Si instalás tu propia copia, vos elegís y controlás los
-        proveedores. Cada instalación mantiene su propia base de datos.
+        Sotto es una herramienta de código abierto para organizar Gmail. El
+        servicio de sotto.email es operado por Perception Technologies Inc. y
+        procesa los datos en la infraestructura de esta instalación. Si instalás
+        tu propia copia, vos elegís y controlás los proveedores. Cada
+        instalación mantiene su propia base de datos.
       </p>
       <h2 className="text-base font-semibold">Qué se consulta</h2>
       <p className="text-muted-foreground">
@@ -35,13 +36,14 @@ export default function PrivacyPage() {
         Cuándo se usa inteligencia artificial
       </h2>
       <p className="text-muted-foreground">
-        Los correos que las reglas de protección no resuelven se envían al
-        proveedor configurado. Esta versión utiliza modelos de OpenAI,
-        directamente o a través de AI Gateway de Vercel según la instalación.
-        Reciben el remitente, asunto, tus preferencias y un fragmento acotado
-        del texto. Solicitamos no almacenar la respuesta en el servicio; esto no
-        equivale a una garantía de retención cero del proveedor. Revisá su
-        política y la de tu organización antes de conectar correo de trabajo.
+        Los correos que las protecciones no resuelven se clasifican con OpenAI.
+        En sotto.email, la conexión con OpenAI es directa. Recibe el remitente,
+        el asunto, la dirección de la cuenta destinataria, tus preferencias y
+        hasta 16.000 caracteres de texto normalizado. Solicitamos no almacenar
+        la respuesta en el servicio; esto no equivale a una garantía de
+        retención cero del proveedor. Si instalás tu propia copia, revisá qué
+        proveedor configuraste. Revisá también la política de tu organización
+        antes de conectar correo de trabajo.
       </p>
       <h2 className="text-base font-semibold">Suscripciones y pagos</h2>
       <p className="text-muted-foreground">
@@ -61,8 +63,16 @@ export default function PrivacyPage() {
       <p className="text-muted-foreground">
         Podés pausar una cuenta, desconectarla o revocar el permiso desde tu
         Cuenta de Google. Desconectarla detiene el procesamiento y borra su
-        credencial local; no elimina los correos, etiquetas o decisiones
-        anteriores.
+        credencial local, incluso si Google no responde al intento de revocar el
+        acceso. Podés comprobar o revocar ese permiso directamente en{" "}
+        <a
+          href="https://myaccount.google.com/connections"
+          className="underline underline-offset-4"
+        >
+          las conexiones de tu Cuenta de Google
+        </a>
+        . Desconectar no elimina los correos, las etiquetas ni el registro de
+        decisiones de Sotto.
       </p>
       <p className="text-xs text-muted-foreground">
         Última actualización: septiembre de 2026. El operador de cada

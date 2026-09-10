@@ -154,6 +154,64 @@ it("reports the complete backlog for only the signed-in workspace", async () => 
     retrying: 1,
   });
 });
+it("disconnects locally when the stored Gmail credential cannot be opened", async () => {
+  await h.db.query(
+    "UPDATE accounts SET mode='automatic',watch_expires=now()+interval '1 day' WHERE id='gmail-a'",
+  );
+  h.gmail.mockRejectedValue(new Error("Invalid encrypted credential"));
+
+  const response = await action(
+    request({ action: "disconnect", accountId: "gmail-a" }),
+  );
+
+  expect(response.status).toBe(200);
+  expect(
+    (
+      await h.db.query(
+        "SELECT connected,mode,token_cipher,watch_expires FROM accounts WHERE id='gmail-a'",
+      )
+    ).rows,
+  ).toEqual([
+    { connected: false, mode: "paused", token_cipher: "", watch_expires: null },
+  ]);
+  expect(
+    (await h.db.query("SELECT state FROM decisions WHERE id='d-a'")).rows,
+  ).toEqual([{ state: "suggested" }]);
+  expect(
+    (
+      await h.db.query(
+        "SELECT connected,token_cipher FROM accounts WHERE id='gmail-b'",
+      )
+    ).rows,
+  ).toEqual([{ connected: true, token_cipher: "synthetic" }]);
+});
+it("removes local access before trying Google cleanup and still attempts revocation if stopping the watch fails", async () => {
+  const observedStates: unknown[] = [];
+  const cleanup = async () => {
+    observedStates.push(
+      (
+        await h.db.query(
+          "SELECT connected,mode,token_cipher FROM accounts WHERE id='gmail-a'",
+        )
+      ).rows,
+    );
+    throw new Error("Google unavailable");
+  };
+  const stop = vi.fn(cleanup);
+  const revoke = vi.fn(cleanup);
+  h.gmail.mockResolvedValue({ stop, revoke });
+
+  expect(
+    (await action(request({ action: "disconnect", accountId: "gmail-a" })))
+      .status,
+  ).toBe(200);
+  expect(stop).toHaveBeenCalledOnce();
+  expect(revoke).toHaveBeenCalledOnce();
+  expect(observedStates).toEqual([
+    [{ connected: false, mode: "paused", token_cipher: "" }],
+    [{ connected: false, mode: "paused", token_cipher: "" }],
+  ]);
+});
 it("accepts sync during classification without resetting running jobs", async () => {
   await h.db.query("UPDATE workspaces SET internal=true WHERE id='a'");
   await h.db.query(`INSERT INTO jobs(account_id,message_id,state,attempts)

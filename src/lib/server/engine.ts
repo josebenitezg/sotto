@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { pool, query, transaction } from "./db";
-import { Gmail, GmailError, emailAddress, type RawMessage } from "./google";
+import { Gmail, GmailError, emailAddress } from "./google";
 import {
   classify,
   protection,
@@ -10,6 +10,8 @@ import {
 } from "./classifier";
 import { writesEnabled } from "./config";
 import type { Classification, Policy } from "../types";
+
+export class AccountBusy extends Error {}
 
 export async function withAccountLock<T>(
   accountId: string,
@@ -22,7 +24,7 @@ export async function withAccountLock<T>(
       "SELECT pg_try_advisory_lock(hashtext($1)) AS acquired",
       [lock],
     );
-    if (!result.rows[0].acquired) throw new Error("Account busy");
+    if (!result.rows[0].acquired) throw new AccountBusy("Account busy");
     try {
       return await fn();
     } finally {

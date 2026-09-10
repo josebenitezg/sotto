@@ -1,5 +1,5 @@
 import { pool, query } from "./lib/server/db";
-import { workAccount } from "./lib/server/engine";
+import { workAccount, AccountBusy } from "./lib/server/engine";
 let stopping = false;
 process.on("SIGTERM", () => {
   stopping = true;
@@ -21,7 +21,8 @@ while (!stopping) {
       if (stopping) break;
       try {
         await workAccount(account.id);
-      } catch {
+      } catch (error) {
+        if (error instanceof AccountBusy) continue;
         await query(
           "UPDATE accounts SET last_error='No pudimos sincronizar. Revisá tu conexión con Google.' WHERE id=$1",
           [account.id],

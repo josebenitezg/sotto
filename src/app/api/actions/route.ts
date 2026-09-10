@@ -13,6 +13,7 @@ import {
   withAccountLock,
   moveDecision,
   restoreDecision,
+  AccountBusy,
 } from "@/lib/server/engine";
 
 const actionSchema = z.discriminatedUnion("action", [
@@ -167,9 +168,33 @@ export async function POST(request: Request) {
           await moveDecision(action.decisionId, gmail);
         else await restoreDecision(action.decisionId, gmail);
       }
+      if ("decisionId" in action) {
+        const [current] = await query(
+          "SELECT state FROM decisions WHERE id=$1",
+          [action.decisionId],
+        );
+        const expected =
+          action.action === "move"
+            ? "moved"
+            : action.action === "restore"
+              ? "restored"
+              : "kept";
+        if (current?.state !== expected)
+          throw new HttpError(
+            409,
+            "El correo cambió de estado o quedó protegido. Revisá la decisión actual antes de continuar.",
+          );
+      }
     });
     return Response.json({ ok: true });
   } catch (error) {
+    if (error instanceof AccountBusy)
+      return errorResponse(
+        new HttpError(
+          409,
+          "Esta cuenta se está sincronizando. Intentá de nuevo en un momento.",
+        ),
+      );
     return errorResponse(error);
   }
 }

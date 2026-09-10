@@ -189,8 +189,11 @@ export function Workspace({
           body: JSON.stringify(action),
         });
         const result = await response.json();
-        if (!response.ok)
+        if (!response.ok) {
+          const refreshed = await fetch("/api/dashboard");
+          if (refreshed.ok) setData(await refreshed.json());
           throw new Error(result.error || "No pudimos completar el cambio.");
+        }
         const fresh = await fetch("/api/dashboard");
         if (!fresh.ok)
           throw new Error(

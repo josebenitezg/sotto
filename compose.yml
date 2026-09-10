@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: sotto
+      POSTGRES_USER: sotto
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sotto}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5438:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sotto"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  migrate:
+    build: .
+    env_file: .env.local
+    command: ["npx", "tsx", "scripts/migrate.ts"]
+    depends_on:
+      db:
+        condition: service_healthy
+  web:
+    build: .
+    env_file: .env.local
+    command: ["npm", "start"]
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+  worker:
+    build: .
+    env_file: .env.local
+    command: ["npx", "tsx", "src/worker.ts"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+volumes:
+  postgres-data:

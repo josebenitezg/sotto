@@ -1,0 +1,98 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/geist";
+
+:root {
+  --background: #f8f9f5;
+  --foreground: #1a2826;
+  --card: #ffffff;
+  --card-foreground: #1a2826;
+  --popover: #ffffff;
+  --popover-foreground: #1a2826;
+  --primary: #176254;
+  --primary-foreground: #ffffff;
+  --secondary: #eff1ec;
+  --secondary-foreground: #34433f;
+  --muted: #f0f2ed;
+  --muted-foreground: #65726c;
+  --accent: #e9ede7;
+  --accent-foreground: #1a2826;
+  --destructive: #b33c35;
+  --warning: #956719;
+  --border: #e1e5dd;
+  --input: #d8dfd5;
+  --ring: #176254;
+  --radius: 0.75rem;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --radius-lg: var(--radius);
+  --radius-md: 0.625rem;
+  --radius-sm: 0.5rem;
+}
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  button,
+  a,
+  input {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:not(:disabled),
+  [role="switch"]:not(:disabled) {
+    cursor: pointer;
+  }
+  ::selection {
+    background: var(--accent);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 4px;
+  }
+}
+@layer utilities {
+  .pressable {
+    transition: transform 120ms var(--ease-out);
+  }
+  .pressable:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .pressable:active {
+    transform: none;
+  }
+}

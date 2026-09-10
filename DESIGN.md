@@ -20,6 +20,10 @@ Spanish with voseo. Short verbs, sentence case, no infrastructure jargon. Prefer
 - Lists with hairline dividers are the primary composition. No nested cards, metric tiles, gradients, ornamental shadows or glass.
 - Spacing: 4, 8, 12, 16, 24, 32, 48. Card radius 12px; controls 10px.
 
+## Public pages
+
+The landing and login extend the quiet application with an editorial scale: locally served Instrument Serif display type paired with Geist Sans, a warm cream canvas, deep green panels and generous space. The hero explains the product through a visibly fictional, interactive inbox. Public pages use horizontal navigation; the private workspace retains its sidebar. No invented customer logos, metrics, testimonials, or active-service claims. Google readiness is explicit on the login page.
+
 ## Interaction
 
 - Accessible shadcn/Radix controls. One primary action per surface.

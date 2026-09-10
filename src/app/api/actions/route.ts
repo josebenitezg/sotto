@@ -11,6 +11,7 @@ import { query } from "@/lib/server/db";
 import { Gmail } from "@/lib/server/google";
 import { classifierConfigured } from "@/lib/server/ai";
 import { enqueueAccount } from "@/lib/server/queue";
+import { requireProcessingAccess } from "@/lib/server/entitlements";
 import {
   withAccountLock,
   moveDecision,
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
   try {
     if (isDemo()) throw new HttpError(400, "La demo no modifica Gmail.");
     requireOrigin(request);
-    await requireSession();
+    const workspaceId = await requireSession();
     const raw = await request.text();
     if (raw.length > 4096)
       throw new HttpError(413, "La solicitud es demasiado grande.");
@@ -60,8 +61,8 @@ export async function POST(request: Request) {
     let accountId = "accountId" in action ? action.accountId : "";
     if ("decisionId" in action) {
       const [decision] = await query(
-        "SELECT account_id FROM decisions WHERE id=$1",
-        [action.decisionId],
+        "SELECT d.account_id FROM decisions d JOIN accounts a ON a.id=d.account_id WHERE d.id=$1 AND a.workspace_id=$2",
+        [action.decisionId, workspaceId],
       );
       if (!decision)
         throw new HttpError(404, "Ese correo ya no está en Sotto.");
@@ -69,17 +70,24 @@ export async function POST(request: Request) {
     }
     if (action.action === "removeRule") {
       const [rule] = await query(
-        "SELECT account_id FROM sender_rules WHERE id=$1",
-        [action.ruleId],
+        "SELECT r.account_id FROM sender_rules r JOIN accounts a ON a.id=r.account_id WHERE r.id=$1 AND a.workspace_id=$2",
+        [action.ruleId, workspaceId],
       );
       if (!rule) throw new HttpError(404, "Esa regla ya no existe.");
       accountId = rule.account_id;
     }
     await withAccountLock(accountId, async () => {
-      const [account] = await query("SELECT * FROM accounts WHERE id=$1", [
-        accountId,
-      ]);
+      const [account] = await query(
+        "SELECT * FROM accounts WHERE id=$1 AND workspace_id=$2",
+        [accountId, workspaceId],
+      );
       if (!account) throw new HttpError(404, "No encontramos esa cuenta.");
+      if (
+        action.action === "move" ||
+        action.action === "sync" ||
+        (action.action === "mode" && action.mode !== "paused")
+      )
+        await requireProcessingAccess(workspaceId);
       if (action.action === "mode") {
         if (!account.connected)
           throw new HttpError(409, "Conectá de nuevo esta cuenta.");

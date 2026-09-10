@@ -3,6 +3,7 @@ import { query } from "@/lib/server/db";
 import { workAccount } from "@/lib/server/engine";
 import { enqueueAccount } from "@/lib/server/queue";
 import { isDemo } from "@/lib/server/config";
+import { accountProcessingAllowed } from "@/lib/server/entitlements";
 export async function consumeMailbox(
   payload: unknown,
   metadata: { messageId: string },
@@ -21,8 +22,10 @@ export async function consumeMailbox(
     });
     return;
   }
+  if (!(await accountProcessingAllowed(accountId))) return;
   // Small batches stay within the function's execution window.
   await workAccount(accountId, 3);
+  if (!(await accountProcessingAllowed(accountId))) return;
   const [pending] = await query(
     "SELECT min(available_at) AS next_at FROM jobs WHERE account_id=$1 AND state IN ('pending','running')",
     [accountId],

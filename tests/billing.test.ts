@@ -1,0 +1,352 @@
+import { readFile } from "node:fs/promises";
+import { PGlite } from "@electric-sql/pglite";
+import {
+  beforeAll,
+  beforeEach,
+  afterAll,
+  afterEach,
+  describe,
+  it,
+  expect,
+  vi,
+} from "vitest";
+import type Stripe from "stripe";
+const h = vi.hoisted(() => ({
+  db: null as unknown as PGlite,
+  failSave: false,
+  subscriptions: [] as any[],
+  checkouts: new Map<string, any>(),
+  customers: new Map<string, any>(),
+  create: vi.fn(),
+  retrieve: vi.fn(),
+  customer: vi.fn(),
+  price: vi.fn(),
+  portal: vi.fn(),
+  list: vi.fn(),
+  enqueue: vi.fn(),
+}));
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: () => undefined }),
+}));
+vi.mock("../src/lib/server/db", () => ({
+  query: async (sql: string, params: unknown[] = []) =>
+    (await h.db.query(sql, params)).rows,
+  transaction: async (fn: (db: any) => Promise<unknown>) =>
+    h.db.transaction((tx) =>
+      fn({
+        query: async (sql: string, params: unknown[] = []) => {
+          if (
+            h.failSave &&
+            sql.startsWith("UPDATE workspaces SET checkout_id=$2")
+          ) {
+            h.failSave = false;
+            throw new Error("Lost database connection");
+          }
+          return tx.query(sql, params);
+        },
+      }),
+    ),
+}));
+vi.mock("../src/lib/server/queue", () => ({ enqueueAccount: h.enqueue }));
+vi.mock("stripe", async (importOriginal) => {
+  const { default: RealStripe } =
+    await importOriginal<typeof import("stripe")>();
+  return {
+    default: class {
+      prices = { retrieve: h.price };
+      customers = { create: h.customer };
+      subscriptions = { list: h.list };
+      checkout = { sessions: { create: h.create, retrieve: h.retrieve } };
+      billingPortal = { sessions: { create: h.portal } };
+      webhooks = new RealStripe("sk_test_synthetic").webhooks;
+    },
+  };
+});
+import {
+  checkout,
+  portal,
+  processStripeEvent,
+  reconcileCustomer,
+} from "../src/lib/server/billing";
+import {
+  hasAccess,
+  accountProcessingAllowed,
+} from "../src/lib/server/entitlements";
+import { POST as webhook } from "../src/app/api/stripe/webhook/route";
+import { stripe } from "../src/lib/server/billing";
+
+beforeAll(async () => {
+  h.db = new PGlite();
+  for (const name of ["001_initial.sql", "002_billing.sql"])
+    await h.db.exec(
+      await readFile(new URL(`../db/${name}`, import.meta.url), "utf8"),
+    );
+});
+afterAll(async () => h.db.close());
+beforeEach(async () => {
+  vi.resetAllMocks();
+  h.subscriptions = [];
+  h.checkouts.clear();
+  h.customers.clear();
+  h.failSave = false;
+  for (const [key, value] of Object.entries({
+    BILLING_ENABLED: "true",
+    DEMO_MODE: "false",
+    CHECKOUT_ENABLED: "true",
+    APP_URL: "https://sotto.example",
+    DATABASE_URL: "postgres://synthetic",
+    ENCRYPTION_KEY: "11".repeat(32),
+    ALLOWED_GOOGLE_EMAILS: "owner@example.com",
+    GOOGLE_CLIENT_ID: "synthetic",
+    GOOGLE_CLIENT_SECRET: "synthetic",
+    STRIPE_SECRET_KEY: "sk_test_synthetic",
+    STRIPE_PRICE_ID: "price_sotto",
+    STRIPE_WEBHOOK_SECRET: "whsec_synthetic",
+    STRIPE_PORTAL_CONFIGURATION_ID: "bpc_sotto",
+    STRIPE_MODE: "test",
+    PLAN_PRICE_CENTS: "900",
+    TRIAL_REQUIRE_CARD: "false",
+  }))
+    vi.stubEnv(key, value);
+  await h.db.exec("TRUNCATE workspaces, stripe_events CASCADE");
+  await h.db.query(
+    "INSERT INTO workspaces(id,email) VALUES('a','owner@example.com'),('b','second@example.com')",
+  );
+  await h.db.query(
+    "INSERT INTO accounts(id,email,name,token_cipher,workspace_id) VALUES('gmail-a','owner@example.com','Trabajo','synthetic','a'),('gmail-b','second@example.com','Personal','synthetic','b')",
+  );
+  h.price.mockResolvedValue({
+    id: "price_sotto",
+    active: true,
+    currency: "usd",
+    unit_amount: 900,
+    recurring: { interval: "month", interval_count: 1 },
+  });
+  h.customer.mockImplementation(async (_params, opts) => {
+    if (!h.customers.has(opts.idempotencyKey))
+      h.customers.set(opts.idempotencyKey, { id: "cus_a" });
+    return h.customers.get(opts.idempotencyKey);
+  });
+  h.create.mockImplementation(async (params, opts) => {
+    if (!h.checkouts.has(opts.idempotencyKey))
+      h.checkouts.set(opts.idempotencyKey, {
+        id: "cs_a",
+        url: "https://checkout.stripe.com/c/pay/synthetic",
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        params,
+      });
+    return h.checkouts.get(opts.idempotencyKey);
+  });
+  h.retrieve.mockResolvedValue({
+    status: "open",
+    url: "https://checkout.stripe.com/c/pay/synthetic",
+  });
+  h.list.mockImplementation(async () => ({
+    data: h.subscriptions,
+    has_more: false,
+  }));
+  h.portal.mockResolvedValue({
+    url: "https://billing.stripe.com/p/session/synthetic",
+  });
+  h.enqueue.mockResolvedValue(undefined);
+});
+afterEach(() => vi.unstubAllEnvs());
+function subscription(
+  status = "trialing",
+  trialEnd = Date.now() / 1000 + 86400,
+) {
+  return {
+    id: "sub_a",
+    customer: "cus_a",
+    created: 100,
+    metadata: { application: "sotto", sotto_workspace_id: "a" },
+    status,
+    trial_start: 100,
+    trial_end: trialEnd,
+    cancel_at_period_end: false,
+    latest_invoice: { status: "paid" },
+    items: {
+      data: [
+        {
+          price: { id: "price_sotto" },
+          quantity: 1,
+          current_period_end: Date.now() / 1000 + 86400,
+        },
+      ],
+    },
+  };
+}
+function event(id = "evt_a", live = false) {
+  return {
+    id,
+    type: "customer.subscription.updated",
+    livemode: live,
+    data: {
+      object: {
+        customer: "cus_a",
+        status: "trialing",
+        trial_end: Date.now() / 1000 + 864000,
+      },
+    },
+  } as unknown as Stripe.Event;
+}
+describe("billing access and checkout recovery", () => {
+  it("stops access at the exact trial deadline and fails closed for non-paying states", () => {
+    const end = Date.now() + 3 * 86400000;
+    const access = {
+      subscription_status: "trialing",
+      trial_end: new Date(end),
+      paid_until: null,
+    };
+    expect(hasAccess(access, end - 1)).toBe(true);
+    expect(hasAccess(access, end)).toBe(false);
+    for (const status of [
+      "canceled",
+      "past_due",
+      "unpaid",
+      "paused",
+      "incomplete",
+      "none",
+    ])
+      expect(
+        hasAccess({ ...access, subscription_status: status }, end - 1),
+      ).toBe(false);
+    expect(
+      hasAccess({ ...access, subscription_status: "active", paid_until: null }),
+    ).toBe(false);
+    expect(hasAccess(undefined)).toBe(false);
+  });
+  it("creates a three-day no-card trial and reuses an open checkout", async () => {
+    expect(await checkout("a")).toContain("checkout.stripe.com");
+    const params = h.create.mock.calls[0][0];
+    expect(params.customer).toBe("cus_a");
+    expect(params.subscription_data.trial_period_days).toBe(3);
+    expect(
+      params.subscription_data.trial_settings.end_behavior
+        .missing_payment_method,
+    ).toBe("cancel");
+    expect(params.payment_method_collection).toBe("if_required");
+    await checkout("a");
+    expect(h.checkouts.size).toBe(1);
+    expect(h.customer).toHaveBeenCalledTimes(1);
+    expect(h.create).toHaveBeenCalledTimes(1);
+  });
+  it("recovers a successful Stripe call followed by database failure without a duplicate", async () => {
+    h.failSave = true;
+    await expect(checkout("a")).rejects.toThrow("Lost database");
+    await checkout("a");
+    expect(h.customers.size).toBe(1);
+    expect(h.checkouts.size).toBe(1);
+    expect(h.create.mock.calls[0][1].idempotencyKey).toBe(
+      h.create.mock.calls[1][1].idempotencyKey,
+    );
+  });
+  it("uses provider history to prevent a second trial even if the webhook was missed", async () => {
+    h.subscriptions = [subscription("canceled", 1000)];
+    await checkout("a");
+    expect(
+      h.create.mock.calls[0][0].subscription_data.trial_period_days,
+    ).toBeUndefined();
+    expect(h.create.mock.calls[0][0].payment_method_collection).toBe("always");
+  });
+  it("rejects price mismatch and disconnected mailboxes before creating a customer", async () => {
+    h.price.mockResolvedValueOnce({
+      active: true,
+      currency: "usd",
+      unit_amount: 9000,
+      recurring: { interval: "month", interval_count: 1 },
+    });
+    await expect(checkout("a")).rejects.toThrow("published monthly plan");
+    await h.db.query(
+      "UPDATE accounts SET connected=false WHERE workspace_id='a'",
+    );
+    await expect(checkout("a")).rejects.toMatchObject({ status: 409 });
+    expect(h.customer).not.toHaveBeenCalled();
+  });
+  it("sends existing subscriptions to the customer portal and never creates a second subscription", async () => {
+    h.subscriptions = [subscription()];
+    expect(await checkout("a")).toContain("billing.stripe.com");
+    expect(h.create).not.toHaveBeenCalled();
+  });
+  it("binds the portal to the authenticated workspace customer", async () => {
+    await h.db.query(
+      "UPDATE workspaces SET stripe_customer_id='cus_b' WHERE id='b'",
+    );
+    await portal("b");
+    expect(h.portal.mock.calls[0][0].customer).toBe("cus_b");
+    await expect(portal("a")).rejects.toMatchObject({ status: 409 });
+  });
+});
+describe("signed events and provider-authoritative access", () => {
+  beforeEach(async () => {
+    await h.db.query(
+      "UPDATE workspaces SET stripe_customer_id='cus_a' WHERE id='a'",
+    );
+  });
+  it("does not revive an expired subscription from a delayed active event", async () => {
+    h.subscriptions = [subscription("canceled", 1000)];
+    await processStripeEvent(event());
+    expect(await accountProcessingAllowed("gmail-a")).toBe(false);
+    expect(
+      (
+        await h.db.query(
+          "SELECT subscription_status,trial_used FROM workspaces WHERE id='a'",
+        )
+      ).rows,
+    ).toEqual([{ subscription_status: "canceled", trial_used: true }]);
+    expect(h.enqueue).not.toHaveBeenCalled();
+  });
+  it("grants only the matching workspace, deduplicates events, retries failed publication", async () => {
+    h.subscriptions = [subscription()];
+    h.enqueue.mockRejectedValueOnce(new Error("Queue unavailable"));
+    await expect(processStripeEvent(event())).rejects.toThrow(
+      "Queue unavailable",
+    );
+    expect((await h.db.query("SELECT * FROM stripe_events")).rows).toHaveLength(
+      0,
+    );
+    await processStripeEvent(event());
+    const calls = h.list.mock.calls.length;
+    await processStripeEvent(event());
+    expect(h.list).toHaveBeenCalledTimes(calls);
+    expect(h.enqueue.mock.calls.every(([id]) => id === "gmail-a")).toBe(true);
+    expect(await accountProcessingAllowed("gmail-a")).toBe(true);
+    expect(await accountProcessingAllowed("gmail-b")).toBe(false);
+  });
+  it("does not grant access for an unpaid invoice, wrong price or live event", async () => {
+    h.subscriptions = [
+      { ...subscription("active"), latest_invoice: { status: "open" } },
+    ];
+    expect(await reconcileCustomer("cus_a")).toBeNull();
+    h.subscriptions = [
+      {
+        ...subscription(),
+        items: { data: [{ price: { id: "price_other" }, quantity: 1 }] },
+      },
+    ];
+    await expect(reconcileCustomer("cus_a")).rejects.toThrow(
+      "Unexpected subscription product",
+    );
+    await expect(processStripeEvent(event("evt_live", true))).rejects.toThrow(
+      "environment mismatch",
+    );
+  });
+  it("verifies the raw request signature before touching billing state", async () => {
+    const payload = JSON.stringify(event("evt_signed"));
+    const signature = stripe().webhooks.generateTestHeaderString({
+      payload,
+      secret: "whsec_synthetic",
+    });
+    const request = (body: string, sig?: string) =>
+      new Request("https://sotto.example/api/stripe/webhook", {
+        method: "POST",
+        body,
+        headers: sig ? { "stripe-signature": sig } : {},
+      });
+    expect((await webhook(request(payload))).status).toBe(400);
+    expect((await webhook(request(payload + " ", signature))).status).toBe(400);
+    expect(h.list).not.toHaveBeenCalled();
+    h.subscriptions = [subscription()];
+    expect((await webhook(request(payload, signature))).status).toBe(200);
+  });
+});

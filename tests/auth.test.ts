@@ -31,7 +31,7 @@ describe("owner session and request boundaries", () => {
   });
   it("looks up only hashed session credentials", async () => {
     state.cookie = "opaque-private-token";
-    state.query.mockResolvedValue([{ exists: true }]);
+    state.query.mockResolvedValue([{ workspace_id: "workspace-a" }]);
     expect(await authenticated()).toBe(true);
     expect(state.query.mock.calls[0][1][0]).not.toBe(state.cookie);
     expect(state.query.mock.calls[0][0]).toContain("expires_at>now()");

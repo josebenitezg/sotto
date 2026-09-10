@@ -10,31 +10,33 @@ export const cookieOptions = () => ({
   sameSite: "lax" as const,
   path: "/",
 });
-export async function authenticated() {
+export async function sessionWorkspace(): Promise<string | null> {
   const value = (await cookies()).get(sessionCookie)?.value;
-  if (!value) return false;
-  return (
-    (
-      await query(
-        "SELECT 1 FROM sessions WHERE token_hash=$1 AND expires_at>now()",
-        [hash(value)],
-      )
-    ).length > 0
+  if (!value) return null;
+  const [session] = await query(
+    "SELECT workspace_id FROM sessions WHERE token_hash=$1 AND expires_at>now()",
+    [hash(value)],
   );
+  return session?.workspace_id ?? null;
+}
+export async function authenticated() {
+  return !!(await sessionWorkspace());
 }
 export async function requireSession() {
-  if (!(await authenticated()))
+  const workspaceId = await sessionWorkspace();
+  if (!workspaceId)
     throw new HttpError(401, "Ingresá con tu cuenta para continuar.");
+  return workspaceId;
 }
 export function requireOrigin(request: Request) {
   if (request.headers.get("origin") !== appUrl())
     throw new HttpError(403, "Volvé a abrir Sotto e intentá de nuevo.");
 }
-export async function createSession() {
+export async function createSession(workspaceId = "installation") {
   const value = opaque();
   await query(
-    "INSERT INTO sessions(token_hash,expires_at) VALUES($1,now()+interval '7 days')",
-    [hash(value)],
+    "INSERT INTO sessions(token_hash,expires_at,workspace_id) VALUES($1,now()+interval '7 days',$2)",
+    [hash(value), workspaceId],
   );
   return value;
 }

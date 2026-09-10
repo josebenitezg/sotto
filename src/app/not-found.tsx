@@ -7,7 +7,7 @@ export default function NotFound() {
         Esta página no está.
       </h1>
       <Button className="mt-6" asChild>
-        <Link href="/">Volver a revisión</Link>
+        <Link href="/revision">Volver a revisión</Link>
       </Button>
     </main>
   );

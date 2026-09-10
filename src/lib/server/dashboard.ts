@@ -1,13 +1,14 @@
 import type { Account, Dashboard, Decision, Rule } from "../types";
 import { demoDashboard } from "../demo";
-import { authenticated } from "./auth";
+import { sessionWorkspace } from "./auth";
 import { configured, isDemo, writesEnabled } from "./config";
 import { query } from "./db";
 const iso = (date: Date | null) => date?.toISOString() ?? null;
 export async function dashboard(): Promise<Dashboard> {
   if (isDemo()) return structuredClone(demoDashboard);
   const ready = configured();
-  const loggedIn = ready && (await authenticated());
+  const workspaceId = ready ? await sessionWorkspace() : null;
+  const loggedIn = !!workspaceId;
   const empty: Dashboard = {
     accounts: [],
     decisions: [],
@@ -20,12 +21,17 @@ export async function dashboard(): Promise<Dashboard> {
   if (!loggedIn) return empty;
   const [rawAccounts, rawDecisions, rawRules] = await Promise.all([
     query(
-      "SELECT id,email,name,mode,policy,connected,last_sync,watch_expires,last_error,reviewed_at FROM accounts ORDER BY CASE WHEN name='Trabajo' THEN 0 ELSE 1 END,created_at",
+      "SELECT id,email,name,mode,policy,connected,last_sync,watch_expires,last_error,reviewed_at FROM accounts WHERE workspace_id=$1 ORDER BY CASE WHEN name='Trabajo' THEN 0 ELSE 1 END,created_at",
+      [workspaceId],
     ),
     query(
-      "SELECT d.*,a.email FROM decisions d JOIN accounts a ON a.id=d.account_id ORDER BY d.created_at DESC LIMIT 200",
+      "SELECT d.*,a.email FROM decisions d JOIN accounts a ON a.id=d.account_id WHERE a.workspace_id=$1 ORDER BY d.created_at DESC LIMIT 200",
+      [workspaceId],
     ),
-    query("SELECT * FROM sender_rules ORDER BY created_at DESC"),
+    query(
+      "SELECT r.* FROM sender_rules r JOIN accounts a ON a.id=r.account_id WHERE a.workspace_id=$1 ORDER BY r.created_at DESC",
+      [workspaceId],
+    ),
   ]);
   const accounts = rawAccounts.map((a) => ({
     id: a.id,

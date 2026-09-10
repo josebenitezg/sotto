@@ -1,8 +1,15 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { googleClient, gmailScope } from "@/lib/server/google";
-import { allowedEmail, appUrl, isDemo } from "@/lib/server/config";
-import { hash, seal, unseal } from "@/lib/server/crypto";
+import {
+  allowedEmail,
+  appUrl,
+  isDemo,
+  publicSignup,
+  hosted,
+} from "@/lib/server/config";
+import { hash, unseal } from "@/lib/server/crypto";
+import { connectIdentity } from "@/lib/server/workspaces";
 import { query } from "@/lib/server/db";
 import { enqueueAccount } from "@/lib/server/queue";
 import {
@@ -10,6 +17,7 @@ import {
   cookieOptions,
   oauthCookie,
   sessionCookie,
+  sessionWorkspace,
 } from "@/lib/server/auth";
 export async function GET(request: Request) {
   try {
@@ -21,10 +29,15 @@ export async function GET(request: Request) {
     if (!state || !code || !browser || params.has("error"))
       throw new Error("Invalid callback");
     const [pending] = await query(
-      "DELETE FROM oauth_states WHERE state_hash=$1 AND browser_hash=$2 AND expires_at>now() RETURNING verifier_cipher",
+      "DELETE FROM oauth_states WHERE state_hash=$1 AND browser_hash=$2 AND expires_at>now() RETURNING verifier_cipher,workspace_id",
       [hash(state), hash(browser)],
     );
     if (!pending) throw new Error("Expired state");
+    if (
+      pending.workspace_id &&
+      pending.workspace_id !== (await sessionWorkspace())
+    )
+      throw new Error("Linking session changed");
     const client = googleClient();
     const { tokens } = await client.getToken({
       code,
@@ -42,30 +55,16 @@ export async function GET(request: Request) {
       !identity?.sub ||
       !identity.email ||
       !identity.email_verified ||
-      !allowedEmail(identity.email)
+      (!publicSignup() && !allowedEmail(identity.email))
     )
       throw new Error("Account not allowed");
     const info = await client.getTokenInfo(tokens.access_token);
     if (!info.scopes.includes(gmailScope))
       throw new Error("Gmail permission missing");
-    const [existing] = await query(
-      "SELECT token_cipher FROM accounts WHERE id=$1",
-      [identity.sub],
-    );
-    if (!tokens.refresh_token && !existing?.token_cipher)
-      throw new Error("Offline access missing");
-    const tokenCipher = tokens.refresh_token
-      ? seal(tokens.refresh_token, `gmail:${identity.sub}`)
-      : existing.token_cipher;
-    await query(
-      `INSERT INTO accounts(id,email,name,token_cipher,start_at) VALUES($1,$2,$3,$4,now()-interval '7 days')
-      ON CONFLICT(id) DO UPDATE SET email=excluded.email,name=excluded.name,token_cipher=excluded.token_cipher,connected=true,last_error=NULL`,
-      [
-        identity.sub,
-        identity.email.toLowerCase(),
-        identity.email.endsWith("@gmail.com") ? "Personal" : "Trabajo",
-        tokenCipher,
-      ],
+    const workspaceId = await connectIdentity(
+      { sub: identity.sub, email: identity.email },
+      tokens.refresh_token ?? undefined,
+      pending.workspace_id,
     );
     try {
       await enqueueAccount(identity.sub);
@@ -75,8 +74,10 @@ export async function GET(request: Request) {
         [identity.sub],
       );
     }
-    const session = await createSession();
-    const response = NextResponse.redirect(`${appUrl()}/cuentas?connected=1`);
+    const session = await createSession(workspaceId);
+    const response = NextResponse.redirect(
+      `${appUrl()}/${hosted() ? "planes" : "cuentas"}?connected=1`,
+    );
     response.cookies.set(sessionCookie, session, {
       ...cookieOptions(),
       maxAge: 7 * 86400,
@@ -84,7 +85,9 @@ export async function GET(request: Request) {
     response.cookies.delete(oauthCookie);
     return response;
   } catch {
-    const response = NextResponse.redirect(`${appUrl()}/?connection_error=1`);
+    const response = NextResponse.redirect(
+      `${appUrl()}/login?connection_error=1`,
+    );
     response.cookies.delete(oauthCookie);
     return response;
   }

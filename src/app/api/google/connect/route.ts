@@ -10,6 +10,7 @@ import {
   requireOrigin,
   errorResponse,
   HttpError,
+  sessionWorkspace,
 } from "@/lib/server/auth";
 export async function POST(request: Request) {
   try {
@@ -23,8 +24,13 @@ export async function POST(request: Request) {
       browser = opaque(),
       verifier = opaque();
     await query(
-      "INSERT INTO oauth_states(state_hash,verifier_cipher,browser_hash,expires_at) VALUES($1,$2,$3,now()+interval '10 minutes')",
-      [hash(state), seal(verifier, `oauth:${hash(state)}`), hash(browser)],
+      "INSERT INTO oauth_states(state_hash,verifier_cipher,browser_hash,expires_at,workspace_id) VALUES($1,$2,$3,now()+interval '10 minutes',$4)",
+      [
+        hash(state),
+        seal(verifier, `oauth:${hash(state)}`),
+        hash(browser),
+        await sessionWorkspace(),
+      ],
     );
     const url = googleClient().generateAuthUrl({
       access_type: "offline",

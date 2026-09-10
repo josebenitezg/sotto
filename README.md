@@ -6,9 +6,9 @@ Connect your work and personal Google accounts, review the proposed decisions, t
 
 ## Status
 
-Early implementation, intended for **one owner with multiple accounts** per installation. The interface is in Spanish. It includes OAuth connection, AI classification with per-account preferences, Pub/Sub event ingestion, durable processing, review mode, label changes and undo.
+Early implementation. Self-hosted installations support one owner with multiple accounts. An optional hosted mode isolates each person’s workspace and adds subscription billing. The interface is in Spanish. It includes OAuth connection, AI classification with per-account preferences, Pub/Sub event ingestion, durable processing, review mode, label changes and undo.
 
-Local checks use synthetic messages, mocked Gmail calls and an embedded PostgreSQL engine. They do **not** certify live Google OAuth, Pub/Sub delivery, real-mail classification accuracy or deployment reliability. Run a review pilot on your installation before enabling writes. Public signup is not supported; deploy your own installation.
+Local checks use synthetic messages, mocked Gmail calls and an embedded PostgreSQL engine. They do **not** certify live Google OAuth, Pub/Sub delivery, real-mail classification accuracy or deployment reliability. Run a review pilot on your installation before enabling writes. Public signup and payments are disabled by default. Hosted billing and signup require the additional setup in [billing](docs/billing.md).
 
 ## Try the interface
 
@@ -19,7 +19,7 @@ npm ci
 DEMO_MODE=true npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000). Demo messages are fictional, controls only change local browser state, and refreshing resets the demo. No Google account or API key is needed.
+Open [the landing](http://localhost:3000) or [the demo workspace](http://localhost:3000/revision). Demo messages are fictional, controls only change local browser state, and refreshing resets the demo. No Google account or API key is needed.
 
 ## Run with Gmail
 
@@ -71,4 +71,4 @@ Built with Next.js, React, PostgreSQL, Google APIs and shadcn/Radix primitives. 
 
 ## License
 
-[MIT](LICENSE). shadcn/ui components are used under their MIT license; Geist is used under its bundled SIL Open Font License.
+[MIT](LICENSE). shadcn/ui components are used under their MIT license; Geist and Instrument Serif are used under their bundled SIL Open Font Licenses.

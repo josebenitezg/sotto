@@ -15,6 +15,7 @@ import {
   Check,
   ChevronRight,
   CircleHelp,
+  CreditCard,
   ExternalLink,
   Github,
   Inbox,
@@ -76,10 +77,11 @@ type ContextValue = {
 const WorkspaceContext = createContext<ContextValue | null>(null);
 const useWorkspace = () => useContext(WorkspaceContext)!;
 const nav = [
-  { href: "/", label: "Revisión", icon: Inbox },
+  { href: "/revision", label: "Revisión", icon: Inbox },
   { href: "/cuentas", label: "Cuentas", icon: Mail },
   { href: "/permitidos", label: "Permitidos", icon: ShieldCheck },
   { href: "/ajustes", label: "Ajustes", icon: Settings2 },
+  { href: "/planes", label: "Plan", icon: CreditCard },
 ];
 const modeLabels = {
   review: "En prueba",

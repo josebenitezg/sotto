@@ -1,20 +1,21 @@
 import Link from "next/link";
 export default function PrivacyPage() {
   return (
-    <article className="max-w-[65ch] space-y-6">
+    <main id="contenido" className="public-document space-y-6">
       <Link
-        href="/ajustes"
+        href="/"
         className="text-sm text-muted-foreground underline underline-offset-4"
       >
-        Volver a ajustes
+        Volver al inicio
       </Link>
       <h1 className="text-[28px] leading-8 font-semibold tracking-tight">
         Tu correo es tuyo.
       </h1>
       <p className="text-muted-foreground">
-        Sotto es una herramienta de código abierto que se instala en una cuenta
-        de infraestructura controlada por su operador. No hay un servicio
-        central de Sotto que reciba el correo de todas las instalaciones.
+        Sotto es una herramienta de código abierto para organizar Gmail. Si usás
+        sotto.email, el servicio procesa los datos en la infraestructura de esta
+        instalación. Si instalás tu propia copia, vos elegís y controlás los
+        proveedores. Cada instalación mantiene su propia base de datos.
       </p>
       <h2 className="text-base font-semibold">Qué se consulta</h2>
       <p className="text-muted-foreground">
@@ -42,6 +43,13 @@ export default function PrivacyPage() {
         equivale a una garantía de retención cero del proveedor. Revisá su
         política y la de tu organización antes de conectar correo de trabajo.
       </p>
+      <h2 className="text-base font-semibold">Suscripciones y pagos</h2>
+      <p className="text-muted-foreground">
+        Cuando la suscripción está habilitada, Stripe procesa los pagos y recibe
+        tu correo de cuenta y un identificador de tu espacio. No enviamos a
+        Stripe tus mensajes. Sotto guarda los identificadores y el estado de la
+        suscripción; no guarda los datos de tu tarjeta.
+      </p>
       <h2 className="text-base font-semibold">Qué permiso pide Google</h2>
       <p className="text-muted-foreground">
         Google agrupa lectura, modificación y envío en el permiso necesario para
@@ -60,6 +68,6 @@ export default function PrivacyPage() {
         Última actualización: septiembre de 2026. El operador de cada
         instalación es responsable de su configuración y tratamiento de datos.
       </p>
-    </article>
+    </main>
   );
 }

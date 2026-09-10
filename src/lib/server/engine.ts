@@ -9,6 +9,7 @@ import {
   type Context,
 } from "./classifier";
 import { writesEnabled } from "./config";
+import { accountProcessingAllowed } from "./entitlements";
 import type { Classification, Policy } from "../types";
 
 export class AccountBusy extends Error {}
@@ -52,6 +53,7 @@ export function historyCandidates(
   ];
 }
 export async function syncMailbox(accountId: string, gmail: Gmail) {
+  if (!(await accountProcessingAllowed(accountId))) return;
   const [account] = await query(
     "SELECT * FROM accounts WHERE id=$1 AND connected=true",
     [accountId],
@@ -207,6 +209,7 @@ export async function moveDecision(
     decisionId,
   ]);
   if (!decision || !["suggested", "moving"].includes(decision.state)) return;
+  if (!(await accountProcessingAllowed(decision.account_id))) return;
   const [account] = await query(
     "SELECT * FROM accounts WHERE id=$1 AND connected=true",
     [decision.account_id],
@@ -304,6 +307,7 @@ export async function workAccount(accountId: string, maxJobs = 30) {
       [accountId],
     );
     if (!account) return;
+    if (!(await accountProcessingAllowed(accountId))) return;
     const gmail = await Gmail.forAccount(accountId);
     if (
       process.env.GOOGLE_PUBSUB_TOPIC &&
@@ -338,6 +342,7 @@ export async function workAccount(accountId: string, maxJobs = 30) {
     );
     let failed = false;
     for (const job of jobs) {
+      if (!(await accountProcessingAllowed(accountId))) break;
       await query(
         "UPDATE jobs SET state='running',attempts=attempts+1,locked_at=now() WHERE id=$1",
         [job.id],

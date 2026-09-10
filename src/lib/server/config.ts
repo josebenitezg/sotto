@@ -23,10 +23,13 @@ export function configured() {
   ].every((key) => !!process.env[key]?.trim());
 }
 export const isDemo = () => process.env.DEMO_MODE === "true";
+export const hosted = () => process.env.BILLING_ENABLED === "true";
+export const publicSignup = () =>
+  hosted() && process.env.PUBLIC_SIGNUP === "true";
 export const writesEnabled = () =>
   process.env.ENABLE_MAILBOX_WRITES === "true" && !isDemo();
 export function allowedEmail(email: string) {
-  return required("ALLOWED_GOOGLE_EMAILS")
+  return (process.env.ALLOWED_GOOGLE_EMAILS || "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .includes(email.toLowerCase());

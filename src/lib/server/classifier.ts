@@ -114,6 +114,11 @@ export async function classify(
         listMail: !!mail.headers["list-unsubscribe"],
         context: {
           preferences: context.policy.instructions || "",
+          enabledCategories: {
+            cold: true,
+            marketing: context.policy.marketing,
+            newsletter: context.policy.newsletters,
+          },
           hasReply: context.hasReply,
           previouslyContacted: context.previouslyContacted,
         },

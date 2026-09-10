@@ -123,6 +123,10 @@ describe("conservative classification", () => {
       JSON.parse(JSON.parse(fetch.mock.calls[0][1].body).input).context
         .preferences,
     ).toContain("posibles clientes");
+    expect(
+      JSON.parse(JSON.parse(fetch.mock.calls[0][1].body).input).context
+        .enabledCategories,
+    ).toEqual({ cold: true, marketing: false, newsletter: false });
   });
   it("does not move sign-up follow-ups or newsletters by default", () => {
     const result = {

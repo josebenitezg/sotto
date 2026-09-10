@@ -145,7 +145,7 @@ describe("durable mailbox synchronization", () => {
 describe("reversible message-level operations", () => {
   async function setup() {
     await harness.db.query(
-      "INSERT INTO decisions(id,account_id,message_id,thread_id,sender,subject,category,confidence,reason,state) VALUES('d','work','m','t','sales@vendor.example','Pitch','cold',0.99,'Sales','suggested')",
+      "INSERT INTO decisions(id,account_id,message_id,thread_id,sender,subject,category,confidence,reason,state,ai_decision) VALUES('d','work','m','t','sales@vendor.example','Pitch','cold',0.99,'Sales','suggested','move')",
     );
     let labels = ["INBOX", "UNREAD"];
     const gmail = {

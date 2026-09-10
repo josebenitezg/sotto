@@ -4,6 +4,7 @@ import { googleClient, gmailScope } from "@/lib/server/google";
 import { allowedEmail, appUrl, isDemo } from "@/lib/server/config";
 import { hash, seal, unseal } from "@/lib/server/crypto";
 import { query } from "@/lib/server/db";
+import { enqueueAccount } from "@/lib/server/queue";
 import {
   createSession,
   cookieOptions,
@@ -66,6 +67,14 @@ export async function GET(request: Request) {
         tokenCipher,
       ],
     );
+    try {
+      await enqueueAccount(identity.sub);
+    } catch {
+      await query(
+        "UPDATE accounts SET last_error='La cuenta está conectada. Reintentá Sincronizar para iniciar la revisión.' WHERE id=$1",
+        [identity.sub],
+      );
+    }
     const session = await createSession();
     const response = NextResponse.redirect(`${appUrl()}/cuentas?connected=1`);
     response.cookies.set(sessionCookie, session, {

@@ -2,9 +2,17 @@ import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import { required } from "./config";
 const globalDb = globalThis as unknown as { sottoPool?: Pool };
 export function pool() {
+  const url = new URL(
+    process.env.DATABASE_URL_UNPOOLED || required("DATABASE_URL"),
+  );
+  if (url.searchParams.get("sslmode") === "require")
+    url.searchParams.set("sslmode", "verify-full");
   globalDb.sottoPool ??= new Pool({
-    connectionString: required("DATABASE_URL"),
+    // Account advisory locks require a session, not a transaction pooler.
+    connectionString: url.toString(),
     max: 8,
+    idleTimeoutMillis: 20000,
+    allowExitOnIdle: true,
     connectionTimeoutMillis: 8000,
     statement_timeout: 15000,
   });

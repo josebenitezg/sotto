@@ -1,11 +1,16 @@
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ verify: vi.fn(), query: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  verify: vi.fn(),
+  query: vi.fn(),
+  enqueue: vi.fn(),
+}));
 vi.mock("google-auth-library", () => ({
   OAuth2Client: class {
     verifyIdToken = mocks.verify;
   },
 }));
 vi.mock("../src/lib/server/db", () => ({ query: mocks.query }));
+vi.mock("../src/lib/server/queue", () => ({ enqueueAccount: mocks.enqueue }));
 import { POST } from "../src/app/api/gmail/events/route";
 function request(
   headers = { authorization: "Bearer test-token" },
@@ -35,6 +40,7 @@ beforeEach(() => {
     "push@project.iam.gserviceaccount.com",
   );
   mocks.verify.mockReset();
+  mocks.enqueue.mockReset().mockResolvedValue(undefined);
   mocks.query.mockReset();
   mocks.verify.mockResolvedValue({
     getPayload: () => ({
@@ -83,4 +89,10 @@ it("does not acknowledge when durable storage fails", async () => {
 it("rejects malformed payloads without writing", async () => {
   expect((await POST(request(undefined, "not-json"))).status).toBe(400);
   expect(mocks.query).not.toHaveBeenCalled();
+});
+
+it("does not acknowledge a durable event when queue publication fails", async () => {
+  mocks.enqueue.mockRejectedValue(new Error("Queue unavailable"));
+  expect((await POST(request())).status).toBe(503);
+  expect(mocks.query.mock.calls[1][0]).toContain("INSERT INTO mailbox_events");
 });

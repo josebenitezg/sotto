@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "regions": ["iad1"],
+  "functions": {
+    "src/app/api/queues/mailbox/route.ts": {
+      "experimentalTriggers": [
+        { "type": "queue/v2beta", "topic": "sotto-mailboxes" }
+      ]
+    }
+  },
+  "crons": [{ "path": "/api/cron/reconcile", "schedule": "0 8 * * *" }]
+}

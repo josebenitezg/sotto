@@ -166,8 +166,8 @@ async function classifyJob(accountId: string, messageId: string, gmail: Gmail) {
   const candidate = shouldMove(result, context.policy);
   const id = randomUUID();
   await query(
-    `INSERT INTO decisions(id,account_id,message_id,thread_id,sender,subject,category,confidence,reason,state)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(account_id,message_id) DO NOTHING`,
+    `INSERT INTO decisions(id,account_id,message_id,thread_id,sender,subject,category,confidence,reason,state,ai_decision)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(account_id,message_id) DO NOTHING`,
     [
       id,
       accountId,
@@ -179,6 +179,7 @@ async function classifyJob(accountId: string, messageId: string, gmail: Gmail) {
       result.confidence,
       result.reason,
       candidate ? "suggested" : "kept",
+      result.decision,
     ],
   );
   const [account] = await query(
@@ -246,6 +247,7 @@ export async function moveDecision(
     return;
   }
   const result: Classification = {
+    decision: decision.ai_decision,
     category: decision.category,
     confidence: decision.confidence,
     protected: false,
@@ -295,7 +297,7 @@ export async function restoreDecision(decisionId: string, gmail: Gmail) {
     [decisionId],
   );
 }
-export async function workAccount(accountId: string) {
+export async function workAccount(accountId: string, maxJobs = 30) {
   await withAccountLock(accountId, async () => {
     const [account] = await query(
       "SELECT * FROM accounts WHERE id=$1 AND connected=true",
@@ -331,8 +333,8 @@ export async function workAccount(accountId: string) {
       [accountId],
     );
     const jobs = await query(
-      "SELECT * FROM jobs WHERE account_id=$1 AND state='pending' AND available_at<=now() ORDER BY id LIMIT 30",
-      [accountId],
+      "SELECT * FROM jobs WHERE account_id=$1 AND state='pending' AND available_at<=now() ORDER BY id LIMIT $2",
+      [accountId, maxJobs],
     );
     let failed = false;
     for (const job of jobs) {

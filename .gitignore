@@ -12,3 +12,5 @@ data/
 .vercel/
 test-results/
 private/
+.agents/
+skills-lock.json

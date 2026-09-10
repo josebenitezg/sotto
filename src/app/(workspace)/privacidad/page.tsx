@@ -35,11 +35,12 @@ export default function PrivacyPage() {
       </h2>
       <p className="text-muted-foreground">
         Los correos que las reglas de protección no resuelven se envían al
-        proveedor configurado. Esta versión utiliza la API de OpenAI: recibe el
-        remitente, asunto y un fragmento acotado del texto. Solicitamos no
-        almacenar la respuesta en el servicio; esto no equivale a una garantía
-        de retención cero del proveedor. Revisá su política y la de tu
-        organización antes de conectar correo de trabajo.
+        proveedor configurado. Esta versión utiliza modelos de OpenAI,
+        directamente o a través de AI Gateway de Vercel según la instalación.
+        Reciben el remitente, asunto, tus preferencias y un fragmento acotado
+        del texto. Solicitamos no almacenar la respuesta en el servicio; esto no
+        equivale a una garantía de retención cero del proveedor. Revisá su
+        política y la de tu organización antes de conectar correo de trabajo.
       </p>
       <h2 className="text-base font-semibold">Qué permiso pide Google</h2>
       <p className="text-muted-foreground">

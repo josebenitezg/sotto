@@ -2,6 +2,7 @@ import { OAuth2Client } from "google-auth-library";
 import { z } from "zod";
 import { required, isDemo } from "@/lib/server/config";
 import { query } from "@/lib/server/db";
+import { enqueueAccount } from "@/lib/server/queue";
 const verifier = new OAuth2Client();
 export async function POST(request: Request) {
   if (isDemo()) return new Response(null, { status: 404 });
@@ -48,11 +49,13 @@ export async function POST(request: Request) {
       "SELECT id FROM accounts WHERE email=$1 AND connected=true",
       [payload.emailAddress.toLowerCase()],
     );
-    if (account)
+    if (account) {
       await query(
         "INSERT INTO mailbox_events(id,account_id,history_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",
         [event.message.messageId, account.id, payload.historyId],
       );
+      await enqueueAccount(account.id, `gmail:${event.message.messageId}`);
+    }
     return new Response(null, { status: 204 });
   } catch {
     return new Response(null, { status: 503 });

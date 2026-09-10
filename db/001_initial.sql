@@ -76,3 +76,5 @@ CREATE TABLE IF NOT EXISTS mailbox_events (
 CREATE INDEX IF NOT EXISTS jobs_ready ON jobs(state, available_at);
 CREATE INDEX IF NOT EXISTS decisions_account_date ON decisions(account_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS events_pending ON mailbox_events(account_id) WHERE processed_at IS NULL;
+
+ALTER TABLE decisions ADD COLUMN IF NOT EXISTS ai_decision text NOT NULL DEFAULT 'review' CHECK(ai_decision IN ('keep','review','move'));

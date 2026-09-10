@@ -56,16 +56,6 @@ describe("conservative classification", () => {
       mail: { ...mail, labels: ["INBOX", "STARRED"] },
     },
     {
-      name: "security alert",
-      context,
-      mail: { ...mail, subject: "Alerta de seguridad" },
-    },
-    {
-      name: "invoice",
-      context,
-      mail: { ...mail, subject: "Invoice for September" },
-    },
-    {
       name: "protected domain",
       context: {
         ...context,
@@ -87,8 +77,56 @@ describe("conservative classification", () => {
       ),
     ).toBeNull();
   });
+  it("uses AI to distinguish a real invoice from a sales pitch mentioning invoices", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "test-only-key");
+    vi.stubEnv("AI_PROVIDER", "openai");
+    const answer = {
+      decision: "move",
+      category: "cold",
+      confidence: 0.87,
+      protected: false,
+      reason: "Ofrece vender un servicio de facturación.",
+    };
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: "completed",
+          output: [
+            {
+              content: [{ type: "output_text", text: JSON.stringify(answer) }],
+            },
+          ],
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const result = await classify(
+      { ...mail, subject: "Invoice automation for your business" },
+      {
+        ...context,
+        policy: {
+          ...defaultPolicy,
+          instructions: "Conservá consultas de posibles clientes.",
+        },
+      },
+    );
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(result.category).toBe("cold");
+    expect(shouldMove(result, defaultPolicy)).toBe(true);
+    expect(
+      shouldMove(
+        { ...result, decision: "review", confidence: 1 },
+        defaultPolicy,
+      ),
+    ).toBe(false);
+    expect(
+      JSON.parse(JSON.parse(fetch.mock.calls[0][1].body).input).context
+        .preferences,
+    ).toContain("posibles clientes");
+  });
   it("does not move sign-up follow-ups or newsletters by default", () => {
     const result = {
+      decision: "move" as const,
       category: "marketing" as const,
       confidence: 1,
       protected: false,
@@ -106,6 +144,7 @@ describe("conservative classification", () => {
     expect(
       shouldMove(
         {
+          decision: "review",
           category: "uncertain",
           confidence: 1,
           protected: false,

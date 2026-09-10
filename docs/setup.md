@@ -14,7 +14,7 @@ This allowlist is required even though the source code is public. Any allowed ac
 
 ## 2. PostgreSQL
 
-Use a dedicated database with a restricted application role. Configure `DATABASE_URL` and run `npm run db:migrate`. Back up the database and encryption key separately. PostgreSQL must verify TLS when the connection crosses an untrusted network; follow the provider's certificate instructions rather than disabling verification.
+Use a dedicated database with a restricted application role. Configure `DATABASE_URL` and run `npm run db:migrate`. If your provider gives a transaction-pooled URL, also set `DATABASE_URL_UNPOOLED` to its direct connection URL; account advisory locks require a pinned session. Back up the database and encryption key separately. PostgreSQL must verify TLS when the connection crosses an untrusted network; follow the provider's certificate instructions rather than disabling verification.
 
 For local development with Docker:
 
@@ -40,9 +40,11 @@ Do not reuse another application's OAuth client or copy its refresh tokens. Conn
 
 ## 4. Classifier
 
-Set `OPENAI_API_KEY` and optionally `OPENAI_MODEL`. The default is `gpt-5-mini`. Use a model that supports the Responses API and strict JSON schema output. Verify model access and set a provider budget before running a real pilot.
+Choose `AI_PROVIDER=openai` with `OPENAI_API_KEY`, or `AI_PROVIDER=vercel` for Vercel AI Gateway. Gateway mode uses the deployment's OIDC identity; outside Vercel, provide `AI_GATEWAY_API_KEY` or a valid development OIDC token. No shared key from another application is needed. Set `OPENAI_MODEL` if desired; the default is `gpt-5-mini`. Use a model that supports the Responses API and strict JSON schema output. Verify model access and set a provider budget before running a real pilot.
 
-Messages resolved by protection rules are not sent to the model. Remaining messages include sender, subject and up to 16,000 characters of normalized text. Attachments are excluded and links are not opened. Confirm this data handling is acceptable for the account and organization.
+Under **Preferencias**, describe what matters for each account in natural language. The AI receives these preferences and chooses keep, review or move from the message's meaning. Relationship protections still apply. No keyword list or confidence threshold decides whether a vendor pitch is cold.
+
+Messages resolved by relationship protections are not sent to the model. Remaining messages include sender, recipient account, subject, account preferences and up to 16,000 characters of normalized text. Attachments are excluded and links are not opened. Confirm this data handling is acceptable for the account and organization.
 
 ## 5. Gmail push
 
@@ -51,23 +53,29 @@ Messages resolved by protection rules are not sent to the model. Remaining messa
 3. Put the full `projects/PROJECT_ID/topics/TOPIC` name in `GOOGLE_PUBSUB_TOPIC`.
 4. Create an authenticated push subscription targeting `https://YOUR_HOST/api/gmail/events`.
 5. Choose a dedicated push service account. Set its exact email in `PUBSUB_SERVICE_ACCOUNT_EMAIL` and the configured OIDC audience in `PUBSUB_AUDIENCE`. Allow Pub/Sub to mint an ID token for that account using Google's documented permissions.
-6. Start the worker. It registers/renews each account's Gmail watch and persists incoming events before acknowledging them.
+6. Start the worker or enable Vercel Queue processing below. Processing registers/renews each account's Gmail watch and persists incoming events before acknowledging them.
 
 The endpoint validates the Google token, exact audience and service-account email before accepting a payload. Do not replace these checks with an unguessable URL. Notification IDs are not Gmail message IDs. Gmail notifications carry a history cursor, and several message changes may be batched behind one event. See [Gmail push](https://developers.google.com/workspace/gmail/api/guides/push) and [authenticated push subscriptions](https://docs.cloud.google.com/pubsub/docs/authenticate-push-subscriptions).
 
-Without a configured topic, the worker can poll at 15-minute intervals. Keep the continuously running worker healthy in either mode. Cloud Run deployments require a worker execution model that continues outside requests; a default request-only web service is not sufficient.
+Without a configured topic, the supervised worker polls at 15-minute intervals; the Vercel recovery cron runs daily. For near-real-time processing on Vercel, configure Gmail push. Cloud Run deployments require a worker execution model that continues outside requests; a default request-only web service is not sufficient.
+
+### Vercel deployment
+
+Link the repository to your own Vercel project and attach a dedicated PostgreSQL database. Set the production environment variables, including `QUEUE_DRIVER=vercel`, `DEMO_MODE=false`, your exact `APP_URL`, account allowlist and a random `CRON_SECRET`. Run the database migration before deploying. Keep an independent secure backup of `ENCRYPTION_KEY`; sensitive Vercel values cannot be recovered with an environment pull.
+
+The included `vercel.json` configures a private Queue consumer in `iad1` and a daily recovery cron at 08:00 UTC. Each delivery processes a small batch and schedules continuation when needed. Deploy with Vercel Queues enabled on your account; verify an actual queue delivery, Google push and watch renewal before treating the installation as unattended. You do not need a separate process worker in this mode. The daily cron uses the `CRON_SECRET` bearer automatically and is compatible with a once-daily schedule.
 
 ## 6. Review and activate
 
 Keep `ENABLE_MAILBOX_WRITES=false`. Connect the work account first. The initial scan covers messages in Inbox from the last seven days. Review examples and add allowed senders. Validate false positives on examples not used to tune rules.
 
-Once satisfied, set `ENABLE_MAILBOX_WRITES=true`, restart the web and worker, and activate the filter for that account from **Cuentas**. The confirmation records that the sample was reviewed. Start with unsolicited sales only. Enabling an optional category changes future decisions; it does not replay prior decisions automatically.
+Once satisfied, set `ENABLE_MAILBOX_WRITES=true`, redeploy or restart the web and worker, and activate the filter for that account from **Cuentas**. The confirmation records that the sample was reviewed. Start with unsolicited sales only. Enabling an optional category changes future decisions; it does not replay prior decisions automatically.
 
 For a manual move from review mode, the account must be connected, unpaused, and the global write gate must be enabled. All message changes are reversible; no bulk historical cleanup is performed.
 
 ## 7. Operate
 
-Supervise the worker and web separately. The worker renews watches roughly daily, retries incomplete jobs with backoff, and polls missed events. Check last-sync timestamps and visible account errors. **Sincronizar** queues a fresh sync and retries failed jobs. It requires a running worker.
+For process deployments, supervise the worker and web separately. For Vercel, monitor Queue deliveries and the daily cron. Both modes renew watches, retry incomplete jobs with backoff and recover missed events. Check last-sync timestamps and visible account errors. **Sincronizar** queues a fresh sync and retries failed jobs; processing must be healthy for it to finish.
 
 For full Docker deployment, use `docker compose --env-file .env.local up --build -d`. Set `DATABASE_URL` to use host `db` inside the containers; local host commands instead use `localhost:5438`. Configure a TLS proxy in front of the web service and keep PostgreSQL private. Monitor provider usage and persistent-disk capacity.
 

@@ -1,16 +1,18 @@
 # Architecture
 
-Sotto is a single-owner, multiple-account application. A web process serves the interface, handles OAuth and validates authenticated Pub/Sub deliveries. A separate, continuously running worker synchronizes Gmail and processes durable jobs in PostgreSQL.
+Sotto is a single-owner, multiple-account application. A web process serves the interface, handles OAuth and validates authenticated Pub/Sub deliveries. Gmail synchronization and durable PostgreSQL jobs run either in a supervised worker process or in bounded Vercel Queue deliveries.
 
 ```mermaid
 flowchart LR
   Gmail -->|watch notification| PubSub
   PubSub -->|verified OIDC| Web
   Web -->|durable event| Postgres
+  Web -->|account ID only| Queue
+  Queue --> Worker
   Postgres --> Worker
   Worker -->|history and message reads| Gmail
-  Worker --> Rules
-  Rules -->|unresolved text only| Classifier
+  Worker --> Protections
+  Protections -->|unresolved text and preferences| Classifier
   Classifier --> Policy
   Policy -->|allowed label changes| Gmail
 ```
@@ -28,10 +30,10 @@ The baseline `start_at` is seven days before first connection. A long-lived acco
 ## Decision and action boundaries
 
 1. Fetch a message; skip sent, draft, spam, trash or non-Inbox messages.
-2. Apply explicit sender/domain rules, own-organization checks, stars and clear operational protections.
+2. Apply explicit sender/domain rules, own-organization checks and stars. Operational meaning is assessed by AI, not subject keywords.
 3. Check actual SENT messages in the thread and previous outgoing correspondence, rather than trusting a `Re:` subject.
 4. Classify only unresolved text with a strict schema. No tool access is given to the model.
-5. Keep uncertain/protected messages. Optional categories are off by default. A high model score is only a conservative heuristic.
+5. Require an explicit AI `move` decision for eligible categories. Keep uncertain/protected messages. Optional categories are off by default. The model's confidence is informational, not a calibrated probability or a threshold for moving mail.
 6. Record the decision. Automatic mode affects eligible messages received after activation.
 7. Before moving, reread the message and current rules, verify sender authentication and policy, and persist a `moving` intent.
 8. Add the destination label and remove `INBOX` on that individual message. Persist `moved`. Never remove `UNREAD`.
@@ -44,7 +46,9 @@ A restored decision is terminal for that message; duplicate events cannot rearch
 
 An unavailable classifier throws; it does not fabricate a keep/move result. Jobs retry with bounded backoff and eventually show a pending-processing error. Provider response bodies and tokens are not logged. The mailbox remains untouched if classification or context reads fail. Account errors are shown alongside last-sync timestamps.
 
-Watch renewals do not overwrite the last processed history cursor. Polling provides recovery when notifications are delayed or dropped. The worker must actually be running; receiving webhooks alone cannot complete jobs. Pub/Sub ingestion acknowledges only after durable storage.
+Watch renewals do not overwrite the last processed history cursor. The process worker polls every 15 minutes. Vercel mode uses incoming pushes plus a daily authenticated recovery cron, which also renews watches. Receiving webhooks alone cannot complete jobs.
+
+In Vercel mode, Pub/Sub ingestion acknowledges only after durable database storage and awaited queue publication. Publishing failures return 503 so Pub/Sub retries. Queue payloads contain only the internal account ID. A delivery processes at most three classification jobs, then publishes a delayed continuation for pending work. Account locks prevent overlapping workers; failures propagate for queue retry. The daily recovery run also deletes expired sessions, OAuth states and processed events older than seven days.
 
 ## Known limits
 

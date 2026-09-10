@@ -9,6 +9,8 @@ import {
 import { isDemo, writesEnabled } from "@/lib/server/config";
 import { query } from "@/lib/server/db";
 import { Gmail } from "@/lib/server/google";
+import { classifierConfigured } from "@/lib/server/ai";
+import { enqueueAccount } from "@/lib/server/queue";
 import {
   withAccountLock,
   moveDecision,
@@ -27,6 +29,7 @@ const actionSchema = z.discriminatedUnion("action", [
     accountId: z.string(),
     marketing: z.boolean(),
     newsletters: z.boolean(),
+    instructions: z.string().max(1500).optional(),
   }),
   z.object({ action: z.literal("reviewed"), accountId: z.string() }),
   z.object({ action: z.literal("sync"), accountId: z.string() }),
@@ -82,9 +85,7 @@ export async function POST(request: Request) {
           throw new HttpError(409, "Conectá de nuevo esta cuenta.");
         if (
           action.mode === "automatic" &&
-          (!writesEnabled() ||
-            !account.reviewed_at ||
-            !process.env.OPENAI_API_KEY)
+          (!writesEnabled() || !account.reviewed_at || !classifierConfigured())
         )
           throw new HttpError(
             409,
@@ -103,6 +104,11 @@ export async function POST(request: Request) {
             JSON.stringify(action.newsletters),
           ],
         );
+        if (action.instructions !== undefined)
+          await query(
+            "UPDATE accounts SET policy=jsonb_set(policy,'{instructions}',$2::jsonb) WHERE id=$1",
+            [accountId, JSON.stringify(action.instructions)],
+          );
       } else if (action.action === "reviewed") {
         const [count] = await query(
           "SELECT count(*)::int AS n FROM decisions WHERE account_id=$1",
@@ -186,6 +192,11 @@ export async function POST(request: Request) {
           );
       }
     });
+    if (
+      action.action === "sync" ||
+      (action.action === "mode" && action.mode !== "paused")
+    )
+      await enqueueAccount(accountId);
     return Response.json({ ok: true });
   } catch (error) {
     if (error instanceof AccountBusy)

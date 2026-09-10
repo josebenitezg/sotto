@@ -34,6 +34,7 @@ import { toast, Toaster } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -102,6 +103,8 @@ function applyDemo(data: Dashboard, action: Action): Dashboard {
   if (action.action === "policy" && account) {
     account.policy.marketing = !!action.marketing;
     account.policy.newsletters = !!action.newsletters;
+    if (typeof action.instructions === "string")
+      account.policy.instructions = action.instructions;
   }
   if (action.action === "reviewed" && account)
     account.reviewedAt = new Date().toISOString();
@@ -1341,6 +1344,7 @@ export function SettingsPage() {
       <p className="mt-3 text-xs text-muted-foreground">
         Las ventas van a Sotto/Cold. Las otras categorías, a Sotto/Lectura.
       </p>
+      {account && <PreferencesEditor key={account.id} account={account} />}
       <h2 className="mt-10 mb-4 text-base font-semibold">
         Siempre bajo tu control
       </h2>
@@ -1400,6 +1404,54 @@ export function SettingsPage() {
         )}
       </div>
     </>
+  );
+}
+function PreferencesEditor({ account }: { account: Account }) {
+  const { act, busy } = useWorkspace();
+  const [instructions, setInstructions] = useState(
+    account.policy.instructions || "",
+  );
+  return (
+    <form
+      className="mt-10 space-y-3"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        await act(
+          {
+            action: "policy",
+            accountId: account.id,
+            marketing: account.policy.marketing,
+            newsletters: account.policy.newsletters,
+            instructions,
+          },
+          "Preferencias guardadas",
+        );
+      }}
+    >
+      <Label htmlFor="ai-preferences" className="text-base font-semibold">
+        Qué es importante para vos
+      </Label>
+      <p id="ai-preferences-help" className="text-[13px] text-muted-foreground">
+        Contale a la IA qué hacés y qué propuestas te interesan. Lo tendrá en
+        cuenta al leer los próximos correos.
+      </p>
+      <Textarea
+        id="ai-preferences"
+        aria-describedby="ai-preferences-help"
+        maxLength={1500}
+        rows={4}
+        placeholder="Por ejemplo: conservo consultas de posibles clientes e inversores. Prefiero apartar ofertas de agencias y servicios de prospección."
+        value={instructions}
+        onChange={(event) => setInstructions(event.target.value)}
+      />
+      <InlineError />
+      <Button
+        type="submit"
+        disabled={busy || instructions === (account.policy.instructions || "")}
+      >
+        Guardar preferencias
+      </Button>
+    </form>
   );
 }
 function SettingRow({

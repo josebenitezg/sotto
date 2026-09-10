@@ -12,6 +12,7 @@ export type Policy = {
   marketing: boolean;
   newsletters: boolean;
   protectedDomains: string[];
+  instructions?: string;
 };
 export const defaultPolicy: Policy = {
   marketing: false,
@@ -70,6 +71,7 @@ export type Mail = {
   receivedAt: number;
 };
 export type Classification = {
+  decision: "keep" | "review" | "move";
   category: Category;
   confidence: number;
   reason: string;

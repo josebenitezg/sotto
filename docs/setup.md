@@ -10,6 +10,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 Keep it in `ENCRYPTION_KEY`, never in Git. Losing it makes stored Google credentials unreadable. Set `APP_URL` to the exact public HTTPS origin (HTTP is allowed only on localhost). Set `ALLOWED_GOOGLE_EMAILS` to an explicit comma-separated list of accounts that belong to this installation's single owner.
 
+When `APP_URL` uses a non-`www` HTTPS hostname, the app redirects its `www` alias to that origin before rendering. Attach both domains to your deployment. This keeps Google OAuth state cookies, the callback and the signed-in session on one host; do not relax the request-origin checks to support aliases. Rebuild after changing `APP_URL` so the redirect follows the new origin.
+
 This allowlist is required even though the source code is public. Any allowed account signs in to the same owner's dashboard and can view all connected accounts. Do not list accounts belonging to independent users. For the optional hosted service, enable the isolated workspace and billing configuration in [billing](billing.md). Keep public signup disabled until Google verification and the hosted pilot are complete.
 
 ## 2. PostgreSQL

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { emailAddress } from "./google";
 import { aiConnection } from "./ai";
+import { ClassifierRateLimit, retryAfterSeconds } from "./processing-error";
 import type { Classification, Mail, Policy } from "../types";
 
 const classificationSchema = z.object({
@@ -160,6 +161,20 @@ export async function classify(
       },
     }),
   });
+  if (response.status === 429) {
+    const body = await response.json().catch(() => null);
+    // Only identify documented error kinds. Never retain/log a provider body.
+    const source =
+      body?.error?.type === "rate_limit_exceeded"
+        ? "gateway"
+        : body?.error?.type === "rate_limit_error"
+          ? "provider"
+          : "unknown";
+    throw new ClassifierRateLimit(
+      retryAfterSeconds(response.headers.get("retry-after")),
+      source,
+    );
+  }
   if (!response.ok) throw new Error(`Classifier HTTP ${response.status}`);
   const data = (await response.json()) as {
     status?: string;

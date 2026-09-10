@@ -46,6 +46,8 @@ Choose `AI_PROVIDER=openai` with `OPENAI_API_KEY`, or `AI_PROVIDER=vercel` for V
 
 Under **Preferencias**, describe what matters for each account in natural language. The AI receives these preferences and chooses keep, review or move from the message's meaning. Relationship protections still apply. No keyword list or confidence threshold decides whether a vendor pitch is cold.
 
+To verify the deployed classifier independently of Gmail, call `GET /api/cron/reconcile?probe=classifier` with the `CRON_SECRET` bearer in Vercel queue mode. This classifies one synthetic vendor pitch and returns only its category/decision or a fixed diagnostic code; it never reads a mailbox. A `classifier_http_429` means the provider is rate limiting requests. Sotto honors `Retry-After` (seconds or HTTP date), stops the current batch, defers the mailbox backlog, and retries without marking mail as classified or exhausting its retry budget. Without a usable header it waits five minutes. Ordinary processing errors still stop after eight attempts. Review [AI Gateway rate limits](https://vercel.com/docs/ai-gateway/rate-limits) if limits persist; purchasing credits changes the team's billing tier and requires an explicit spending decision.
+
 Messages resolved by relationship protections are not sent to the model. Remaining messages include sender, recipient account, subject, account preferences and up to 16,000 characters of normalized text. Attachments are excluded and links are not opened. Confirm this data handling is acceptable for the account and organization.
 
 ## 5. Gmail push
@@ -72,6 +74,8 @@ To verify Queue delivery before connecting Gmail, call `GET /api/cron/reconcile?
 ## 6. Review and activate
 
 Keep `ENABLE_MAILBOX_WRITES=false`. Connect the work account first. The initial scan covers messages in Inbox from the last seven days. Review examples and add allowed senders. Validate false positives on examples not used to tune rules.
+
+Existing mail starts processing immediately after connection; no new email is required. **Cuentas** and **Revisión** show processed, pending, retrying and failed counts for the complete backlog, including the start date. The initial review continues with the browser closed. Without configured Gmail push, new mail is picked up by the daily recovery cron or **Sincronizar**, not instantly. A timestamp means Gmail changes were discovered, not that all classification jobs have finished.
 
 Once satisfied, set `ENABLE_MAILBOX_WRITES=true`, redeploy or restart the web and worker, and activate the filter for that account from **Cuentas**. The confirmation records that the sample was reviewed. Start with unsolicited sales only. Enabling an optional category changes future decisions; it does not replay prior decisions automatically.
 

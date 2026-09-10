@@ -10,7 +10,7 @@ import {
 } from "./classifier";
 import { writesEnabled } from "./config";
 import { accountProcessingAllowed } from "./entitlements";
-import { processingErrorCode } from "./processing-error";
+import { processingErrorCode, retryPlan } from "./processing-error";
 import type { Classification, Policy } from "../types";
 
 export class AccountBusy extends Error {}
@@ -363,15 +363,24 @@ export async function workAccount(accountId: string, maxJobs = 30) {
         const code = processingErrorCode(error);
         console.warn("Sotto classification retry", { code });
         const attempts = job.attempts + 1;
+        const retry = retryPlan(error, attempts);
         await query(
           "UPDATE jobs SET state=$2,available_at=now()+($3 * interval '1 second'),last_error=$4 WHERE id=$1",
-          [
-            job.id,
-            attempts >= 8 ? "failed" : "pending",
-            Math.min(3600, 30 * 2 ** attempts),
-            code,
-          ],
+          [job.id, retry.state, retry.delay, code],
         );
+        if (retry.deferMailbox) {
+          // A provider limit applies to the mailbox's remaining work too.
+          // Stop this batch instead of hammering the provider once per email.
+          await query(
+            "UPDATE jobs SET available_at=GREATEST(available_at,now()+($2 * interval '1 second')) WHERE account_id=$1 AND state='pending'",
+            [accountId, retry.delay],
+          );
+          await query("UPDATE accounts SET last_error=$2 WHERE id=$1", [
+            accountId,
+            "El servicio de IA alcanzó su límite temporal. Los correos siguen pendientes; Sotto reintentará automáticamente.",
+          ]);
+          return;
+        }
       }
     }
     const [pendingFailure] = await query(

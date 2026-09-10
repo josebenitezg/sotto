@@ -180,6 +180,30 @@ describe("conservative classification", () => {
     vi.stubEnv("OPENAI_API_KEY", "");
     await expect(classify(mail, context)).rejects.toThrow("not configured");
   });
+  it("preserves provider retry timing and never fabricates a decision after a 429", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "test-only-key");
+    vi.stubEnv("AI_PROVIDER", "openai");
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              type: "rate_limit_exceeded",
+              message: "private content must not escape",
+            },
+          }),
+          { status: 429, headers: { "retry-after": "180" } },
+        ),
+      );
+    vi.stubGlobal("fetch", fetch);
+    await expect(classify(mail, context)).rejects.toMatchObject({
+      message: "Classifier HTTP 429",
+      retryAfterSeconds: 180,
+      source: "gateway",
+    });
+    expect(fetch).toHaveBeenCalledOnce();
+  });
   it("sends untrusted email as data with no tools and rejects incomplete output", async () => {
     vi.stubEnv("OPENAI_API_KEY", "test-only-key");
     const fetch = vi

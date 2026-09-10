@@ -3,7 +3,10 @@ import { query } from "@/lib/server/db";
 import { enqueueAccount } from "@/lib/server/queue";
 import { isDemo } from "@/lib/server/config";
 import { classify } from "@/lib/server/classifier";
-import { processingErrorCode } from "@/lib/server/processing-error";
+import {
+  ClassifierRateLimit,
+  processingErrorCode,
+} from "@/lib/server/processing-error";
 import { defaultPolicy } from "@/lib/types";
 
 export const maxDuration = 60;
@@ -51,7 +54,16 @@ export async function GET(request: Request) {
       });
     } catch (error) {
       return Response.json(
-        { ok: false, code: processingErrorCode(error) },
+        {
+          ok: false,
+          code: processingErrorCode(error),
+          ...(error instanceof ClassifierRateLimit
+            ? {
+                retryAfterSeconds: error.retryAfterSeconds,
+                source: error.source,
+              }
+            : {}),
+        },
         { status: 502 },
       );
     }

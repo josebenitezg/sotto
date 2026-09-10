@@ -15,7 +15,12 @@ export async function consumeMailbox(
     "SELECT id FROM accounts WHERE id=$1 AND connected=true AND mode<>'paused'",
     [accountId],
   );
-  if (!account) return;
+  if (!account) {
+    console.info("Sotto queue delivery completed: account inactive", {
+      queueMessageId: metadata.messageId,
+    });
+    return;
+  }
   // Small batches stay within the function's execution window.
   await workAccount(accountId, 3);
   const [pending] = await query(
@@ -32,4 +37,8 @@ export async function consumeMailbox(
     );
     await enqueueAccount(accountId, `${metadata.messageId}:next`, delay);
   }
+  console.info("Sotto mailbox batch completed", {
+    queueMessageId: metadata.messageId,
+    continuation: !!pending?.next_at,
+  });
 }

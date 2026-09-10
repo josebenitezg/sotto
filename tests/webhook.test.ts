@@ -32,6 +32,19 @@ function request(
     body,
   });
 }
+function historyRequest(historyId: unknown) {
+  return request(
+    undefined,
+    JSON.stringify({
+      message: {
+        messageId: "pubsub-numeric",
+        data: Buffer.from(
+          JSON.stringify({ emailAddress: "owner@studio.example", historyId }),
+        ).toString("base64"),
+      },
+    }),
+  );
+}
 beforeEach(() => {
   vi.stubEnv("DEMO_MODE", "false");
   vi.stubEnv("PUBSUB_AUDIENCE", "https://sotto.example/api/gmail/events");
@@ -79,6 +92,23 @@ it("persists the event and exact string cursor before acknowledging", async () =
     "90071992547409999",
   ]);
 });
+it("accepts a numeric Gmail history ID and persists its exact decimal string", async () => {
+  expect((await POST(historyRequest(9876543210))).status).toBe(204);
+  expect(mocks.query.mock.calls[1][1]).toEqual([
+    "pubsub-numeric",
+    "work",
+    "9876543210",
+  ]);
+  expect(mocks.enqueue).toHaveBeenCalledWith("work", "gmail:pubsub-numeric");
+});
+it.each([Number.MAX_SAFE_INTEGER + 1, 1.5, -1, true, null, "1e3"])(
+  "rejects an invalid or imprecise history ID (%s) without writing",
+  async (historyId) => {
+    expect((await POST(historyRequest(historyId))).status).toBe(400);
+    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+  },
+);
 it("does not acknowledge when durable storage fails", async () => {
   mocks.query
     .mockReset()

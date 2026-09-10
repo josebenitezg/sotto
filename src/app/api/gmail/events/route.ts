@@ -35,7 +35,15 @@ export async function POST(request: Request) {
       })
       .parse(JSON.parse(raw));
     payload = z
-      .object({ emailAddress: z.email(), historyId: z.string().regex(/^\d+$/) })
+      .object({
+        emailAddress: z.email(),
+        // Keep large string cursors exact; accept numeric JSON only when it
+        // can be converted without losing integer precision.
+        historyId: z.union([
+          z.string().regex(/^\d+$/),
+          z.number().int().nonnegative().transform(String),
+        ]),
+      })
       .parse(
         JSON.parse(
           Buffer.from(event.message.data, "base64url").toString("utf8"),

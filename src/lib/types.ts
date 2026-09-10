@@ -26,6 +26,7 @@ export type Account = {
   mode: Mode;
   policy: Policy;
   connected: boolean;
+  writesEnabled: boolean;
   lastSync: string | null;
   watchExpires: string | null;
   lastError: string | null;

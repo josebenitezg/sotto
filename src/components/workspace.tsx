@@ -593,6 +593,11 @@ export function ReviewPage() {
         : d.state === "suggested",
   );
   const selected = data.decisions.find((d) => d.id === selectedId);
+  const selectedAccount = data.accounts.find(
+    (a) => a.id === selected?.accountId,
+  );
+  const selectedWritesEnabled =
+    data.demo || selectedAccount?.writesEnabled === true;
   const anyReview = data.accounts.some(
     (a) => a.connected && a.mode === "review",
   );
@@ -620,7 +625,7 @@ export function ReviewPage() {
             <div>
               <p className="font-medium">Probá el criterio de Sotto</p>
               <p className="mt-0.5 text-[13px] text-muted-foreground">
-                En modo de prueba, todos los correos siguen en tu bandeja.
+                En modo de prueba, Sotto propone y vos decidís qué apartar.
               </p>
             </div>
           </div>
@@ -804,7 +809,7 @@ export function ReviewPage() {
                     <>
                       <Button
                         className="w-full"
-                        disabled={busy || (!data.demo && !data.writesEnabled)}
+                        disabled={busy || !selectedWritesEnabled}
                         onClick={async () => {
                           if (
                             await act(
@@ -835,17 +840,17 @@ export function ReviewPage() {
                         <Check />
                         Conservar en mi bandeja
                       </Button>
-                      {!data.demo && !data.writesEnabled ? (
+                      {!selectedWritesEnabled ? (
                         <p className="text-xs text-warning">
-                          El movimiento de correos está desactivado en esta
-                          instalación.
+                          El movimiento de correos está desactivado para esta
+                          cuenta.
                         </p>
                       ) : null}
                     </>
                   ) : selected.state === "moved" ? (
                     <Button
                       className="w-full"
-                      disabled={busy || (!data.demo && !data.writesEnabled)}
+                      disabled={busy || !selectedWritesEnabled}
                       onClick={async () => {
                         if (
                           await act(
@@ -1058,7 +1063,7 @@ export function AccountsPage() {
                             !data.decisions.some(
                               (d) => d.accountId === account.id,
                             ) ||
-                            (!data.demo && !data.writesEnabled)
+                            (!data.demo && !account.writesEnabled)
                           }
                           onClick={() =>
                             setConfirm({ account, action: "automatic" })
@@ -1128,10 +1133,10 @@ export function AccountsPage() {
                   </Button>
                 </div>
                 {!data.demo &&
-                !data.writesEnabled &&
+                !account.writesEnabled &&
                 account.mode === "review" ? (
                   <p className="mt-3 text-xs text-warning">
-                    Esta instalación todavía está en modo de prueba.
+                    El movimiento de correos está desactivado para esta cuenta.
                   </p>
                 ) : null}
                 <p className="mt-4 text-xs text-muted-foreground">

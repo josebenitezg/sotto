@@ -81,7 +81,19 @@ Existing mail starts processing immediately after connection; no new email is re
 
 Once satisfied, set `ENABLE_MAILBOX_WRITES=true`, redeploy or restart the web and worker, and activate the filter for that account from **Cuentas**. The confirmation records that the sample was reviewed. Start with unsolicited sales only. Enabling an optional category changes future decisions; it does not replay prior decisions automatically.
 
-For a manual move from review mode, the account must be connected, unpaused, and the global write gate must be enabled. All message changes are reversible; no bulk historical cleanup is performed.
+For a manual move from review mode, the account must be connected, unpaused, and permitted by the write gates. All message changes are reversible; no bulk historical cleanup is performed.
+
+### Enable writes only for an isolated demo account
+
+Keep `DEMO_MODE=false` for an actual OAuth/Gmail demonstration. `DEMO_MODE=true` is only an in-memory UI preview and cannot demonstrate Gmail access or message changes. Keep billing and public signup disabled for the private review.
+
+1. Connect the synthetic Gmail account from a separate browser profile with no Sotto pilot session. Confirm that its workspace contains only the synthetic account and none of the pilot's accounts/history. It must be allowed both by Sotto's email allowlist and by Google's test-user settings while OAuth is in Testing.
+2. Read that account's exact `accounts.id` (Google `sub`) from the authenticated dashboard or a scoped operator database lookup. Configure `MAILBOX_WRITE_ACCOUNT_IDS` with only that ID, then enable `ENABLE_MAILBOX_WRITES=true` in the same deployment. Never substitute an email address, workspace ID or a wildcard.
+3. Redeploy/restart both web and workers with the same configuration. The global switch remains an unconditional off switch: when false, the list cannot enable writes. If the list is absent, global true keeps the original installation-wide behavior. If the list is present but empty, malformed, or contains an empty entry, writes are disabled for every account. IDs are exact and case-sensitive.
+4. Confirm the demo's controls are enabled and pilot accounts remain read-only. The API, automatic/recovery workers and Gmail label adapter enforce the same account gate. A blocked account still synchronizes and receives review suggestions; it cannot move or restore mail through Sotto.
+5. In the synthetic account, first move and restore a reviewed message manually; then activate its filter after reviewing proposals and demonstrate a new synthetic email. Pausing/disconnecting and deleting Sotto's stored Gmail data remain available regardless of the write gate. Before ending the demo, restore any messages you want back in Inbox; disabling writes also disables restore until that account is permitted again.
+
+This setting does not grant access to another workspace, create an account, change a pilot account's mode, or approve OAuth verification. Existing pilot identities remain in their original workspace; never link the reviewer from their Cuentas page.
 
 ## 7. Operate
 

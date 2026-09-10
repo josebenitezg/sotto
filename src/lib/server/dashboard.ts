@@ -16,7 +16,7 @@ export async function dashboard(): Promise<Dashboard> {
     demo: false,
     configured: ready,
     authenticated: !!loggedIn,
-    writesEnabled: writesEnabled(),
+    writesEnabled: false,
   };
   if (!loggedIn) return empty;
   const [rawAccounts, rawDecisions, rawRules] = await Promise.all([
@@ -50,6 +50,7 @@ export async function dashboard(): Promise<Dashboard> {
     mode: a.mode,
     policy: a.policy,
     connected: a.connected,
+    writesEnabled: a.connected && writesEnabled(a.id),
     lastSync: iso(a.last_sync),
     watchExpires: iso(a.watch_expires),
     lastError: a.last_error,
@@ -83,5 +84,11 @@ export async function dashboard(): Promise<Dashboard> {
     sender: r.sender,
     createdAt: iso(r.created_at),
   })) as Rule[];
-  return { ...empty, accounts, decisions, rules };
+  return {
+    ...empty,
+    accounts,
+    decisions,
+    rules,
+    writesEnabled: accounts.some((a) => a.writesEnabled),
+  };
 }

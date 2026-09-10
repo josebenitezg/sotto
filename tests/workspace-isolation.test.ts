@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   gmail: vi.fn(),
   enqueue: vi.fn(),
   restore: vi.fn(),
+  move: vi.fn(),
   work: vi.fn(),
   lock: vi.fn(),
   verifyPush: vi.fn(),
@@ -44,7 +45,7 @@ vi.mock("../src/lib/server/db", () => ({
 vi.mock("../src/lib/server/engine", () => ({
   withAccountLock: h.lock,
   restoreDecision: h.restore,
-  moveDecision: vi.fn(),
+  moveDecision: h.move,
   workAccount: h.work,
   AccountBusy: class extends Error {},
 }));
@@ -102,6 +103,7 @@ beforeEach(async () => {
     PUBSUB_SERVICE_ACCOUNT_EMAIL: "push@project.iam.gserviceaccount.com",
   }))
     vi.stubEnv(key, value);
+  vi.stubEnv("MAILBOX_WRITE_ACCOUNT_IDS", undefined);
   await h.db.exec("TRUNCATE workspaces CASCADE");
   await h.db.query(
     "INSERT INTO workspaces(id,email) VALUES('a','a@example.com'),('b','b@example.com')",
@@ -183,6 +185,74 @@ it("reports the complete backlog for only the signed-in workspace", async () => 
     retrying: 1,
   });
 });
+it("allows only the listed account to move, restore or enable automation within the same workspace", async () => {
+  vi.stubEnv("MAILBOX_WRITE_ACCOUNT_IDS", "demo-a");
+  vi.stubEnv("OPENAI_API_KEY", "synthetic");
+  await h.db.query("UPDATE workspaces SET internal=true WHERE id='a'");
+  await h.db.query("UPDATE accounts SET reviewed_at=now() WHERE id='gmail-a'");
+  await h.db.query(
+    "INSERT INTO accounts(id,email,name,token_cipher,workspace_id,reviewed_at) VALUES('demo-a','demo@example.com','Demo','synthetic','a',now())",
+  );
+  await h.db.query(
+    "INSERT INTO decisions(id,account_id,message_id,thread_id,sender,subject,category,confidence,reason,state,ai_decision) VALUES('d-demo','demo-a','demo-message','demo-thread','sales@example.com','Synthetic pitch','cold',0.9,'Pitch','suggested','move')",
+  );
+  expect(
+    (await action(request({ action: "move", decisionId: "d-a" }))).status,
+  ).toBe(409);
+  await h.db.query("UPDATE decisions SET state='moved' WHERE id='d-a'");
+  expect(
+    (await action(request({ action: "restore", decisionId: "d-a" }))).status,
+  ).toBe(409);
+  expect(
+    (
+      await action(
+        request({ action: "mode", accountId: "gmail-a", mode: "automatic" }),
+      )
+    ).status,
+  ).toBe(409);
+  expect(h.gmail).not.toHaveBeenCalled();
+  h.gmail.mockResolvedValue({});
+  h.move.mockImplementation(async (id: string) =>
+    h.db.query("UPDATE decisions SET state='moved' WHERE id=$1", [id]),
+  );
+  h.restore.mockImplementation(async (id: string) =>
+    h.db.query("UPDATE decisions SET state='restored' WHERE id=$1", [id]),
+  );
+  expect(
+    (await action(request({ action: "move", decisionId: "d-demo" }))).status,
+  ).toBe(200);
+  expect(
+    (await action(request({ action: "restore", decisionId: "d-demo" }))).status,
+  ).toBe(200);
+  expect(
+    (
+      await action(
+        request({ action: "mode", accountId: "demo-a", mode: "automatic" }),
+      )
+    ).status,
+  ).toBe(200);
+  expect(h.gmail.mock.calls).toEqual([["demo-a"], ["demo-a"]]);
+  expect(
+    (await h.db.query("SELECT mode FROM accounts WHERE id='gmail-a'")).rows,
+  ).toEqual([{ mode: "review" }]);
+  const data = await dashboard();
+  expect(data.accounts.map((a) => [a.id, a.writesEnabled]).sort()).toEqual([
+    ["demo-a", true],
+    ["gmail-a", false],
+  ]);
+});
+it.each(["", "gmail-a,", "*"])(
+  "denies API writes for a configured invalid list (%s)",
+  async (list) => {
+    vi.stubEnv("MAILBOX_WRITE_ACCOUNT_IDS", list);
+    await h.db.query("UPDATE workspaces SET internal=true WHERE id='a'");
+    expect(
+      (await action(request({ action: "move", decisionId: "d-a" }))).status,
+    ).toBe(409);
+    expect(h.gmail).not.toHaveBeenCalled();
+    expect((await dashboard()).accounts[0].writesEnabled).toBe(false);
+  },
+);
 it("disconnects locally when the stored Gmail credential cannot be opened", async () => {
   await h.db.query(
     "UPDATE accounts SET mode='automatic',watch_expires=now()+interval '1 day' WHERE id='gmail-a'",

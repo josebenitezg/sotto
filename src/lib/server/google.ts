@@ -73,7 +73,10 @@ export function normalizeMessage(raw: RawMessage): Mail {
 
 export class Gmail {
   private client: OAuth2Client;
-  constructor(token: string) {
+  constructor(
+    token: string,
+    private readonly accountId?: string,
+  ) {
     this.client = googleClient();
     this.client.setCredentials({ refresh_token: token });
   }
@@ -83,7 +86,7 @@ export class Gmail {
       [id],
     );
     if (!account?.token_cipher) throw new Error("Account disconnected");
-    return new Gmail(unseal(account.token_cipher, `gmail:${id}`));
+    return new Gmail(unseal(account.token_cipher, `gmail:${id}`), id);
   }
   async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const { token } = await this.client.getAccessToken();
@@ -130,7 +133,8 @@ export class Gmail {
     return !!result.messages?.length;
   }
   async ensureLabel(name: "Sotto/Cold" | "Sotto/Lectura") {
-    if (!writesEnabled()) throw new Error("Mailbox writes disabled");
+    if (!writesEnabled(this.accountId))
+      throw new Error("Mailbox writes disabled");
     const { labels } = await this.request<{
       labels: { id: string; name: string }[];
     }>("labels");
@@ -148,7 +152,8 @@ export class Gmail {
     ).id;
   }
   async modify(id: string, addLabelIds: string[], removeLabelIds: string[]) {
-    if (!writesEnabled()) throw new Error("Mailbox writes disabled");
+    if (!writesEnabled(this.accountId))
+      throw new Error("Mailbox writes disabled");
     // This adapter deliberately exposes no send, trash, delete, or arbitrary mutation tools to the classifier.
     if (
       [...addLabelIds, ...removeLabelIds].some((label) =>

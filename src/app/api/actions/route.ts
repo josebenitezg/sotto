@@ -128,7 +128,9 @@ export async function POST(request: Request) {
           throw new HttpError(409, "Conectá de nuevo esta cuenta.");
         if (
           action.mode === "automatic" &&
-          (!writesEnabled() || !account.reviewed_at || !classifierConfigured())
+          (!writesEnabled(accountId) ||
+            !account.reviewed_at ||
+            !classifierConfigured())
         )
           throw new HttpError(
             409,
@@ -244,10 +246,10 @@ export async function POST(request: Request) {
           [action.decisionId],
         );
       } else if (action.action === "move" || action.action === "restore") {
-        if (!writesEnabled())
+        if (!writesEnabled(accountId))
           throw new HttpError(
             409,
-            "El movimiento de correos todavía está desactivado en esta instalación.",
+            "El movimiento de correos está desactivado para esta cuenta.",
           );
         const gmail = await Gmail.forAccount(accountId);
         if (action.action === "move")

@@ -36,6 +36,7 @@ beforeEach(async () => {
     "INSERT INTO accounts(id,email,name,token_cipher,history_id) VALUES('work','owner@studio.example','Work','test','100'),('personal','owner@gmail.example','Personal','test','200')",
   );
   vi.stubEnv("ENABLE_MAILBOX_WRITES", "true");
+  vi.stubEnv("MAILBOX_WRITE_ACCOUNT_IDS", undefined);
   vi.stubEnv("DEMO_MODE", "false");
 });
 afterEach(async () => {
@@ -213,5 +214,21 @@ describe("reversible message-level operations", () => {
       "disabled",
     );
     expect(gmail.modify).not.toHaveBeenCalled();
+  });
+  it("enforces the account gate for direct move and restore calls before Gmail reads", async () => {
+    const { gmail } = await setup();
+    vi.stubEnv("MAILBOX_WRITE_ACCOUNT_IDS", "personal");
+    await expect(moveDecision("d", gmail as unknown as Gmail)).rejects.toThrow(
+      "disabled",
+    );
+    await harness.db.query("UPDATE decisions SET state='moved' WHERE id='d'");
+    await expect(
+      restoreDecision("d", gmail as unknown as Gmail),
+    ).rejects.toThrow("disabled");
+    expect(gmail.message).not.toHaveBeenCalled();
+    expect(gmail.modify).not.toHaveBeenCalled();
+    expect(
+      (await harness.db.query("SELECT state FROM decisions WHERE id='d'")).rows,
+    ).toEqual([{ state: "moved" }]);
   });
 });

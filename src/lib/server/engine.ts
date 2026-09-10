@@ -197,7 +197,7 @@ async function classifyJob(accountId: string, messageId: string, gmail: Gmail) {
   );
   if (
     candidate &&
-    writesEnabled() &&
+    writesEnabled(accountId) &&
     account?.mode === "automatic" &&
     account.auto_after &&
     mail.receivedAt >= new Date(account.auto_after).getTime()
@@ -211,11 +211,12 @@ export async function moveDecision(
   gmail: Gmail,
   automatic = false,
 ) {
-  if (!writesEnabled()) throw new Error("Mailbox writes disabled");
   const [decision] = await query("SELECT * FROM decisions WHERE id=$1", [
     decisionId,
   ]);
   if (!decision || !["suggested", "moving"].includes(decision.state)) return;
+  if (!writesEnabled(decision.account_id))
+    throw new Error("Mailbox writes disabled");
   if (!(await accountProcessingAllowed(decision.account_id))) return;
   const [account] = await query(
     "SELECT * FROM accounts WHERE id=$1 AND connected=true",
@@ -284,12 +285,13 @@ export async function moveDecision(
   );
 }
 export async function restoreDecision(decisionId: string, gmail: Gmail) {
-  if (!writesEnabled()) throw new Error("Mailbox writes disabled");
   const [decision] = await query("SELECT * FROM decisions WHERE id=$1", [
     decisionId,
   ]);
   if (!decision || !["moved", "moving", "restoring"].includes(decision.state))
     return;
+  if (!writesEnabled(decision.account_id))
+    throw new Error("Mailbox writes disabled");
   const mail = await gmail.message(decision.message_id);
   if (mail.labels.some((l) => ["TRASH", "SPAM"].includes(l)))
     throw new Error("Message moved elsewhere; restore it in Gmail");
@@ -339,6 +341,9 @@ export async function workAccount(accountId: string, maxJobs = 30) {
         [accountId],
       );
       for (const decision of interrupted) {
+        // Keep pending recovery durable while this account's write access is
+        // disabled, without blocking ordinary review/classification work.
+        if (!writesEnabled(accountId)) break;
         if (decision.state === "restoring")
           await restoreDecision(decision.id, gmail);
         else await moveDecision(decision.id, gmail, false);

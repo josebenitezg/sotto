@@ -59,6 +59,31 @@ export async function POST(request: Request) {
       throw new HttpError(400, "Revisá los datos del cambio.");
     const action = parsed.data;
     let accountId = "accountId" in action ? action.accountId : "";
+    // Requesting work does not mutate Gmail and must remain available while
+    // the worker holds the mailbox lock. The worker serializes actual work.
+    if (action.action === "sync") {
+      const [account] = await query(
+        "SELECT connected,mode FROM accounts WHERE id=$1 AND workspace_id=$2",
+        [accountId, workspaceId],
+      );
+      if (!account) throw new HttpError(404, "No encontramos esa cuenta.");
+      await requireProcessingAccess(workspaceId);
+      if (!account.connected || account.mode === "paused")
+        throw new HttpError(
+          409,
+          "Conectá y reanudá esta cuenta para sincronizar.",
+        );
+      await query(
+        "INSERT INTO mailbox_events(id,account_id,history_id) VALUES($1,$2,'0')",
+        [`manual:${randomUUID()}`, accountId],
+      );
+      await query(
+        "UPDATE jobs SET state='pending',attempts=0,available_at=now() WHERE account_id=$1 AND state='failed'",
+        [accountId],
+      );
+      await enqueueAccount(accountId);
+      return Response.json({ ok: true }, { status: 202 });
+    }
     if ("decisionId" in action) {
       const [decision] = await query(
         "SELECT d.account_id FROM decisions d JOIN accounts a ON a.id=d.account_id WHERE d.id=$1 AND a.workspace_id=$2",
@@ -84,7 +109,6 @@ export async function POST(request: Request) {
       if (!account) throw new HttpError(404, "No encontramos esa cuenta.");
       if (
         action.action === "move" ||
-        action.action === "sync" ||
         (action.action === "mode" && action.mode !== "paused")
       )
         await requireProcessingAccess(workspaceId);
@@ -127,15 +151,6 @@ export async function POST(request: Request) {
         await query("UPDATE accounts SET reviewed_at=now() WHERE id=$1", [
           accountId,
         ]);
-      } else if (action.action === "sync") {
-        await query(
-          "INSERT INTO mailbox_events(id,account_id,history_id) VALUES($1,$2,'0')",
-          [`manual:${randomUUID()}`, accountId],
-        );
-        await query(
-          "UPDATE jobs SET state='pending',attempts=0,available_at=now() WHERE account_id=$1 AND state='failed'",
-          [accountId],
-        );
       } else if (action.action === "allow") {
         const sender = action.sender.toLowerCase();
         await query(
@@ -200,10 +215,7 @@ export async function POST(request: Request) {
           );
       }
     });
-    if (
-      action.action === "sync" ||
-      (action.action === "mode" && action.mode !== "paused")
-    )
+    if (action.action === "mode" && action.mode !== "paused")
       await enqueueAccount(accountId);
     return Response.json({ ok: true });
   } catch (error) {

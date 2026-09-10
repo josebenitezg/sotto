@@ -30,6 +30,14 @@ export type Account = {
   watchExpires: string | null;
   lastError: string | null;
   reviewedAt: string | null;
+  sync?: {
+    since: string;
+    total: number;
+    done: number;
+    pending: number;
+    failed: number;
+    retrying: number;
+  };
 };
 export type Decision = {
   id: string;

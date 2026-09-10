@@ -10,6 +10,7 @@ import {
 } from "./classifier";
 import { writesEnabled } from "./config";
 import { accountProcessingAllowed } from "./entitlements";
+import { processingErrorCode } from "./processing-error";
 import type { Classification, Policy } from "../types";
 
 export class AccountBusy extends Error {}
@@ -359,13 +360,16 @@ export async function workAccount(accountId: string, maxJobs = 30) {
           continue;
         }
         failed = true;
+        const code = processingErrorCode(error);
+        console.warn("Sotto classification retry", { code });
         const attempts = job.attempts + 1;
         await query(
-          "UPDATE jobs SET state=$2,available_at=now()+($3 * interval '1 second'),last_error='processing_failed' WHERE id=$1",
+          "UPDATE jobs SET state=$2,available_at=now()+($3 * interval '1 second'),last_error=$4 WHERE id=$1",
           [
             job.id,
             attempts >= 8 ? "failed" : "pending",
             Math.min(3600, 30 * 2 ** attempts),
+            code,
           ],
         );
       }

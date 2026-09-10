@@ -16,6 +16,7 @@ const h = vi.hoisted(() => ({
   enqueue: vi.fn(),
   restore: vi.fn(),
   work: vi.fn(),
+  lock: vi.fn(),
 }));
 vi.mock("next/headers", () => ({
   cookies: async () => ({
@@ -37,7 +38,7 @@ vi.mock("../src/lib/server/db", () => ({
 }));
 // Embedded PostgreSQL tests data boundaries, not production advisory locking.
 vi.mock("../src/lib/server/engine", () => ({
-  withAccountLock: async (_id: string, fn: () => Promise<unknown>) => fn(),
+  withAccountLock: h.lock,
   restoreDecision: h.restore,
   moveDecision: vi.fn(),
   workAccount: h.work,
@@ -60,6 +61,9 @@ beforeAll(async () => {
 afterAll(async () => h.db.close());
 beforeEach(async () => {
   vi.resetAllMocks();
+  h.lock.mockImplementation(async (_id: string, fn: () => Promise<unknown>) =>
+    fn(),
+  );
   h.cookie = "token-a";
   for (const [key, value] of Object.entries({
     BILLING_ENABLED: "true",
@@ -119,6 +123,7 @@ it("loads only the signed-in workspace, including decisions and sender rules", a
 it("rejects foreign account, decision and rule IDs before any Gmail access", async () => {
   for (const body of [
     { action: "disconnect", accountId: "gmail-b" },
+    { action: "sync", accountId: "gmail-b" },
     { action: "move", decisionId: "d-b" },
     { action: "restore", decisionId: "d-b" },
     { action: "removeRule", ruleId: "r-b" },
@@ -135,6 +140,46 @@ it("rejects foreign account, decision and rule IDs before any Gmail access", asy
   expect(
     (await h.db.query("SELECT state FROM decisions WHERE id='d-b'")).rows,
   ).toEqual([{ state: "suggested" }]);
+});
+it("reports the complete backlog for only the signed-in workspace", async () => {
+  await h.db.query(`INSERT INTO jobs(account_id,message_id,state,last_error)
+    VALUES('gmail-a','done','done',NULL),('gmail-a','pending','pending',NULL),
+    ('gmail-a','retry','pending','classifier_http_429'),('gmail-a','running','running',NULL),
+    ('gmail-a','failed','failed','provider_timeout'),('gmail-b','private','pending',NULL)`);
+  expect((await dashboard()).accounts[0].sync).toMatchObject({
+    total: 5,
+    done: 1,
+    pending: 3,
+    failed: 1,
+    retrying: 1,
+  });
+});
+it("accepts sync during classification without resetting running jobs", async () => {
+  await h.db.query("UPDATE workspaces SET internal=true WHERE id='a'");
+  await h.db.query(`INSERT INTO jobs(account_id,message_id,state,attempts)
+    VALUES('gmail-a','running','running',2),('gmail-a','failed','failed',8)`);
+  h.lock.mockRejectedValue(new Error("Worker holds the mailbox lock"));
+  expect(
+    (await action(request({ action: "sync", accountId: "gmail-a" }))).status,
+  ).toBe(202);
+  expect(h.lock).not.toHaveBeenCalled();
+  expect(h.enqueue).toHaveBeenCalledWith("gmail-a");
+  expect(
+    (
+      await h.db.query(
+        "SELECT message_id,state,attempts FROM jobs ORDER BY message_id",
+      )
+    ).rows,
+  ).toEqual([
+    { message_id: "failed", state: "pending", attempts: 0 },
+    { message_id: "running", state: "running", attempts: 2 },
+  ]);
+  for (const update of ["mode='paused'", "mode='review',connected=false"]) {
+    await h.db.query(`UPDATE accounts SET ${update} WHERE id='gmail-a'`);
+    expect(
+      (await action(request({ action: "sync", accountId: "gmail-a" }))).status,
+    ).toBe(409);
+  }
 });
 it("expired users can keep or restore mail but cannot process or enable automatic mode", async () => {
   expect(

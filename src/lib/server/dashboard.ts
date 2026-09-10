@@ -21,7 +21,17 @@ export async function dashboard(): Promise<Dashboard> {
   if (!loggedIn) return empty;
   const [rawAccounts, rawDecisions, rawRules] = await Promise.all([
     query(
-      "SELECT id,email,name,mode,policy,connected,last_sync,watch_expires,last_error,reviewed_at FROM accounts WHERE workspace_id=$1 ORDER BY CASE WHEN name='Trabajo' THEN 0 ELSE 1 END,created_at",
+      `SELECT a.id,a.email,a.name,a.mode,a.policy,a.connected,a.last_sync,a.watch_expires,a.last_error,a.reviewed_at,a.start_at,
+        j.total,j.done,j.pending,j.failed,j.retrying
+       FROM accounts a LEFT JOIN LATERAL (
+         SELECT count(*)::int AS total,
+           count(*) FILTER (WHERE state='done')::int AS done,
+           count(*) FILTER (WHERE state IN ('pending','running'))::int AS pending,
+           count(*) FILTER (WHERE state='failed')::int AS failed,
+           count(*) FILTER (WHERE state IN ('pending','running') AND last_error IS NOT NULL)::int AS retrying
+         FROM jobs WHERE account_id=a.id
+       ) j ON true WHERE a.workspace_id=$1
+       ORDER BY CASE WHEN a.name='Trabajo' THEN 0 ELSE 1 END,a.created_at`,
       [workspaceId],
     ),
     query(
@@ -44,6 +54,14 @@ export async function dashboard(): Promise<Dashboard> {
     watchExpires: iso(a.watch_expires),
     lastError: a.last_error,
     reviewedAt: iso(a.reviewed_at),
+    sync: {
+      since: iso(a.start_at),
+      total: a.total,
+      done: a.done,
+      pending: a.pending,
+      failed: a.failed,
+      retrying: a.retrying,
+    },
   })) as Account[];
   const decisions = rawDecisions.map((d) => ({
     id: d.id,

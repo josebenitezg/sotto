@@ -582,6 +582,14 @@ export function ReviewPage() {
   const anyReview = data.accounts.some(
     (a) => a.connected && a.mode === "review",
   );
+  const syncing = data.accounts.filter(
+    (a) =>
+      (accountId === "all" || a.id === accountId) &&
+      a.connected &&
+      a.mode !== "paused" &&
+      a.sync &&
+      (a.sync.pending > 0 || a.sync.failed > 0),
+  );
   return (
     <>
       <PageTitle
@@ -616,6 +624,21 @@ export function ReviewPage() {
           {scoped.length} correos en esta vista
         </span>
       </div>
+      {syncing.length > 0 ? (
+        <div
+          className="mb-5 space-y-3 rounded-xl border bg-card p-4"
+          role="status"
+        >
+          <p className="text-sm font-medium">Estamos revisando tu bandeja</p>
+          {syncing.map((account) => (
+            <SyncProgress key={account.id} account={account} />
+          ))}
+          <p className="text-xs text-muted-foreground">
+            Podés cerrar esta página. La revisión continúa y los resultados
+            aparecen acá.
+          </p>
+        </div>
+      ) : null}
       <div
         className="mb-4 flex flex-wrap gap-1"
         role="group"
@@ -690,7 +713,9 @@ export function ReviewPage() {
           <Empty
             title={
               filter === "suggested"
-                ? "Nada para revisar por ahora"
+                ? syncing.length > 0
+                  ? "La revisión sigue en curso"
+                  : "Nada para revisar por ahora"
                 : filter === "moved"
                   ? "Todavía no apartamos correos"
                   : "Acá vas a ver lo que se conserva"
@@ -868,6 +893,43 @@ export function ReviewPage() {
         </SheetContent>
       </Sheet>
     </>
+  );
+}
+
+function SyncProgress({ account }: { account: Account }) {
+  if (!account.sync) return null;
+  const { total, done, pending, failed, retrying, since } = account.sync;
+  return (
+    <div className="space-y-1.5 text-xs text-muted-foreground">
+      <p>
+        <span className="font-medium text-foreground">{account.name}</span> ·{" "}
+        {done} de {total} correos procesados
+        {pending > 0 ? ` · ${pending} pendientes` : ""}
+      </p>
+      {total > 0 ? (
+        <progress
+          className="h-1.5 w-full accent-primary"
+          value={done}
+          max={total}
+          aria-label={`Avance de ${account.name}`}
+        />
+      ) : null}
+      {retrying > 0 || failed > 0 ? (
+        <p className="text-warning">
+          {retrying > 0 ? `${retrying} correos esperando un reintento. ` : ""}
+          {failed > 0 ? `${failed} necesitan reintentar Sincronizar.` : ""}
+        </p>
+      ) : null}
+      <p>
+        Correo de Recibidos desde el{" "}
+        {new Date(since).toLocaleDateString("es", {
+          day: "numeric",
+          month: "long",
+          timeZone: "UTC",
+        })}
+        .
+      </p>
+    </div>
   );
 }
 function InlineError() {
@@ -1049,6 +1111,9 @@ export function AccountsPage() {
                     ? `Última sincronización: ${new Date(account.lastSync).toLocaleString("es", { dateStyle: "short", timeStyle: "short", timeZone: "UTC" })} UTC`
                     : "Esperando la primera sincronización"}
                 </p>
+                <div className="mt-3">
+                  <SyncProgress account={account} />
+                </div>
               </div>
             </li>
           ))}

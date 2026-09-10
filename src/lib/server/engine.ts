@@ -18,15 +18,19 @@ export class AccountBusy extends Error {}
 export async function withAccountLock<T>(
   accountId: string,
   fn: () => Promise<T>,
+  wait = false,
 ) {
   const client = await pool().connect();
   const lock = `sotto:${accountId}`;
   try {
     const result = await client.query(
-      "SELECT pg_try_advisory_lock(hashtext($1)) AS acquired",
+      wait
+        ? "SELECT pg_advisory_lock(hashtext($1))"
+        : "SELECT pg_try_advisory_lock(hashtext($1)) AS acquired",
       [lock],
     );
-    if (!result.rows[0].acquired) throw new AccountBusy("Account busy");
+    if (!wait && !result.rows[0].acquired)
+      throw new AccountBusy("Account busy");
     try {
       return await fn();
     } finally {
@@ -302,95 +306,102 @@ export async function restoreDecision(decisionId: string, gmail: Gmail) {
   );
 }
 export async function workAccount(accountId: string, maxJobs = 30) {
-  await withAccountLock(accountId, async () => {
-    const [account] = await query(
-      "SELECT * FROM accounts WHERE id=$1 AND connected=true",
-      [accountId],
-    );
-    if (!account) return;
-    if (!(await accountProcessingAllowed(accountId))) return;
-    const gmail = await Gmail.forAccount(accountId);
-    if (
-      process.env.GOOGLE_PUBSUB_TOPIC &&
-      (!account.last_watch ||
-        Date.now() - new Date(account.last_watch).getTime() > 20 * 3600000)
-    ) {
-      const watch = await gmail.watch();
-      await query(
-        "UPDATE accounts SET watch_expires=$2,last_watch=now() WHERE id=$1",
-        [accountId, new Date(Number(watch.expiration))],
+  // Queued workers wait their turn, including while an older deployment is
+  // draining. The pool's statement timeout bounds this wait to 15 seconds.
+  // Interactive actions still use the immediate, non-blocking lock above.
+  await withAccountLock(
+    accountId,
+    async () => {
+      const [account] = await query(
+        "SELECT * FROM accounts WHERE id=$1 AND connected=true",
+        [accountId],
       );
-    }
-    if (account.mode === "paused") return;
-    await syncMailbox(accountId, gmail);
-    const interrupted = await query(
-      "SELECT id,state FROM decisions WHERE account_id=$1 AND state IN ('moving','restoring')",
-      [accountId],
-    );
-    for (const decision of interrupted) {
-      if (decision.state === "restoring")
-        await restoreDecision(decision.id, gmail);
-      else await moveDecision(decision.id, gmail, false);
-    }
-    // Holding the account lock means no other worker owns these jobs.
-    await query(
-      "UPDATE jobs SET state='pending' WHERE account_id=$1 AND state='running'",
-      [accountId],
-    );
-    const jobs = await query(
-      "SELECT * FROM jobs WHERE account_id=$1 AND state='pending' AND available_at<=now() ORDER BY id LIMIT $2",
-      [accountId, maxJobs],
-    );
-    let failed = false;
-    for (const job of jobs) {
-      if (!(await accountProcessingAllowed(accountId))) break;
-      await query(
-        "UPDATE jobs SET state='running',attempts=attempts+1,locked_at=now() WHERE id=$1",
-        [job.id],
-      );
-      try {
-        await classifyJob(accountId, job.message_id, gmail);
+      if (!account) return;
+      if (!(await accountProcessingAllowed(accountId))) return;
+      const gmail = await Gmail.forAccount(accountId);
+      if (
+        process.env.GOOGLE_PUBSUB_TOPIC &&
+        (!account.last_watch ||
+          Date.now() - new Date(account.last_watch).getTime() > 20 * 3600000)
+      ) {
+        const watch = await gmail.watch();
         await query(
-          "UPDATE jobs SET state='done',last_error=NULL WHERE id=$1",
+          "UPDATE accounts SET watch_expires=$2,last_watch=now() WHERE id=$1",
+          [accountId, new Date(Number(watch.expiration))],
+        );
+      }
+      if (account.mode === "paused") return;
+      await syncMailbox(accountId, gmail);
+      const interrupted = await query(
+        "SELECT id,state FROM decisions WHERE account_id=$1 AND state IN ('moving','restoring')",
+        [accountId],
+      );
+      for (const decision of interrupted) {
+        if (decision.state === "restoring")
+          await restoreDecision(decision.id, gmail);
+        else await moveDecision(decision.id, gmail, false);
+      }
+      // Holding the account lock means no other worker owns these jobs.
+      await query(
+        "UPDATE jobs SET state='pending' WHERE account_id=$1 AND state='running'",
+        [accountId],
+      );
+      const jobs = await query(
+        "SELECT * FROM jobs WHERE account_id=$1 AND state='pending' AND available_at<=now() ORDER BY id LIMIT $2",
+        [accountId, maxJobs],
+      );
+      let failed = false;
+      for (const job of jobs) {
+        if (!(await accountProcessingAllowed(accountId))) break;
+        await query(
+          "UPDATE jobs SET state='running',attempts=attempts+1,locked_at=now() WHERE id=$1",
           [job.id],
         );
-      } catch (error) {
-        if (error instanceof GmailError && error.status === 404) {
-          await query("UPDATE jobs SET state='done' WHERE id=$1", [job.id]);
-          continue;
-        }
-        failed = true;
-        const code = processingErrorCode(error);
-        console.warn("Sotto classification retry", { code });
-        const attempts = job.attempts + 1;
-        const retry = retryPlan(error, attempts);
-        await query(
-          "UPDATE jobs SET state=$2,available_at=now()+($3 * interval '1 second'),last_error=$4 WHERE id=$1",
-          [job.id, retry.state, retry.delay, code],
-        );
-        if (retry.deferMailbox) {
-          // A provider limit applies to the mailbox's remaining work too.
-          // Stop this batch instead of hammering the provider once per email.
+        try {
+          await classifyJob(accountId, job.message_id, gmail);
           await query(
-            "UPDATE jobs SET available_at=GREATEST(available_at,now()+($2 * interval '1 second')) WHERE account_id=$1 AND state='pending'",
-            [accountId, retry.delay],
+            "UPDATE jobs SET state='done',last_error=NULL WHERE id=$1",
+            [job.id],
           );
-          await query("UPDATE accounts SET last_error=$2 WHERE id=$1", [
-            accountId,
-            "El servicio de IA alcanzó su límite temporal. Los correos siguen pendientes; Sotto reintentará automáticamente.",
-          ]);
-          return;
+        } catch (error) {
+          if (error instanceof GmailError && error.status === 404) {
+            await query("UPDATE jobs SET state='done' WHERE id=$1", [job.id]);
+            continue;
+          }
+          failed = true;
+          const code = processingErrorCode(error);
+          console.warn("Sotto classification retry", { code });
+          const attempts = job.attempts + 1;
+          const retry = retryPlan(error, attempts);
+          await query(
+            "UPDATE jobs SET state=$2,available_at=now()+($3 * interval '1 second'),last_error=$4 WHERE id=$1",
+            [job.id, retry.state, retry.delay, code],
+          );
+          if (retry.deferMailbox) {
+            // A provider limit applies to the mailbox's remaining work too.
+            // Stop this batch instead of hammering the provider once per email.
+            await query(
+              "UPDATE jobs SET available_at=GREATEST(available_at,now()+($2 * interval '1 second')) WHERE account_id=$1 AND state='pending'",
+              [accountId, retry.delay],
+            );
+            await query("UPDATE accounts SET last_error=$2 WHERE id=$1", [
+              accountId,
+              "El servicio de IA alcanzó su límite temporal. Los correos siguen pendientes; Sotto reintentará automáticamente.",
+            ]);
+            return;
+          }
         }
       }
-    }
-    const [pendingFailure] = await query(
-      "SELECT 1 FROM jobs WHERE account_id=$1 AND state='failed' LIMIT 1",
-      [accountId],
-    );
-    if (failed || pendingFailure)
-      await query("UPDATE accounts SET last_error=$2 WHERE id=$1", [
-        accountId,
-        "Hay correos pendientes de procesar. Revisá la conexión o reintentá la sincronización.",
-      ]);
-  });
+      const [pendingFailure] = await query(
+        "SELECT 1 FROM jobs WHERE account_id=$1 AND state='failed' LIMIT 1",
+        [accountId],
+      );
+      if (failed || pendingFailure)
+        await query("UPDATE accounts SET last_error=$2 WHERE id=$1", [
+          accountId,
+          "Hay correos pendientes de procesar. Revisá la conexión o reintentá la sincronización.",
+        ]);
+    },
+    true,
+  );
 }

@@ -32,4 +32,8 @@ The public static Payment Link is a **sandbox demonstration only**. It is not us
 
 Automated tests cover cross-workspace reads and actions, linking and mailbox limits, exact trial expiry, duplicate/reordered events, failed queue delivery, unpaid invoices, signature tampering and Checkout retry recovery. They use synthetic data, an embedded PostgreSQL engine and a mocked Stripe API with the real Stripe signature verifier. Production locking, Google OAuth, Stripe test clocks and a complete sandbox browser checkout still need integration validation.
 
+Provider validation on September 10, 2026 used Stripe MCP in test mode: a synthetic customer with no email or payment method received a subscription with exactly 259,200 seconds of trial. Ending that trial through Stripe returned `canceled`, with no new invoice. This checks Stripe's trial settings; it does not replace the pending Google-to-Checkout integration test. The test portal was also read back from Stripe: payment-method updates and invoice history enabled, cancellation at period end, and subscription quantity/product changes disabled.
+
+The test product, monthly price, demonstration Payment Link and customer portal are configured. The webhook is registered but disabled until the application has its dedicated runtime credential. Checkout and public signup remain disabled while Google setup and the end-to-end pilot are pending.
+
 Before live billing, confirm the launch price, legal/operator details, tax setup, Gmail restricted-scope approval, a commercial hosting plan and observed variable cost. Do not activate a paid trial before the mailbox service works.

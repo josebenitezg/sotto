@@ -10,7 +10,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 Keep it in `ENCRYPTION_KEY`, never in Git. Losing it makes stored Google credentials unreadable. Set `APP_URL` to the exact public HTTPS origin (HTTP is allowed only on localhost). Set `ALLOWED_GOOGLE_EMAILS` to an explicit comma-separated list of accounts that belong to this installation's single owner.
 
-This allowlist is required even though the source code is public. Any allowed account signs in to the same owner's dashboard and can view all connected accounts. Do not list accounts belonging to independent users. Public multi-user hosting is not supported.
+This allowlist is required even though the source code is public. Any allowed account signs in to the same owner's dashboard and can view all connected accounts. Do not list accounts belonging to independent users. For the optional hosted service, enable the isolated workspace and billing configuration in [billing](billing.md). Keep public signup disabled until Google verification and the hosted pilot are complete.
 
 ## 2. PostgreSQL
 

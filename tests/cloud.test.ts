@@ -9,7 +9,11 @@ vi.mock("@vercel/queue", () => ({
   handleCallback: (handler: unknown) => handler,
 }));
 vi.mock("../src/lib/server/db", () => ({ query: mocks.query }));
-vi.mock("../src/lib/server/engine", () => ({ workAccount: mocks.work }));
+vi.mock("../src/lib/server/engine", () => ({
+  workAccount: mocks.work,
+  AccountBusy: class extends Error {},
+}));
+import { AccountBusy } from "../src/lib/server/engine";
 import { consumeMailbox as consume } from "../src/lib/server/cloud-worker";
 import { GET } from "../src/app/api/cron/reconcile/route";
 beforeEach(() => {
@@ -48,12 +52,25 @@ it("retries the parent delivery if scheduling the remaining work fails", async (
     consume({ accountId: "work" }, { messageId: "queue-1" }),
   ).rejects.toThrow("Queue unavailable");
 });
-it("does not acknowledge a locked or failed account run", async () => {
+it("does not acknowledge a failed account run", async () => {
   mocks.query.mockResolvedValueOnce([{ id: "work" }]);
   mocks.work.mockRejectedValue(new Error("Account busy"));
   await expect(
     consume({ accountId: "work" }, { messageId: "queue-1" }),
   ).rejects.toThrow("Account busy");
+});
+it("releases a busy delivery only after durably scheduling its retry", async () => {
+  mocks.query.mockResolvedValue([{ id: "work" }]);
+  mocks.work.mockRejectedValue(new AccountBusy());
+  await consume({ accountId: "work" }, { messageId: "queue-busy" });
+  expect(mocks.send).toHaveBeenCalledTimes(1);
+  expect(mocks.send.mock.calls[0][1]).toEqual({ accountId: "work" });
+  expect(mocks.send.mock.calls[0][2]).toMatchObject({ delaySeconds: 15 });
+  expect(mocks.query).toHaveBeenCalledTimes(1);
+  mocks.send.mockRejectedValue(new Error("Queue unavailable"));
+  await expect(
+    consume({ accountId: "work" }, { messageId: "queue-busy" }),
+  ).rejects.toThrow("Queue unavailable");
 });
 it("rejects unauthenticated daily recovery before database access", async () => {
   expect(

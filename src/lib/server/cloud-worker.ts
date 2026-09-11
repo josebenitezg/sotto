@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { query } from "@/lib/server/db";
-import { workAccount } from "@/lib/server/engine";
+import { AccountBusy, workAccount } from "@/lib/server/engine";
 import { enqueueAccount } from "@/lib/server/queue";
 import { isDemo } from "@/lib/server/config";
 import { accountProcessingAllowed } from "@/lib/server/entitlements";
@@ -24,7 +24,15 @@ export async function consumeMailbox(
   }
   if (!(await accountProcessingAllowed(accountId))) return;
   // Small batches stay within the function's execution window.
-  await workAccount(accountId, 3);
+  try {
+    await workAccount(accountId, 3);
+  } catch (error) {
+    if (!(error instanceof AccountBusy)) throw error;
+    // Acknowledge only once a delayed replacement is durable. If scheduling
+    // fails, the original delivery remains retryable through the queue.
+    await enqueueAccount(accountId, `${metadata.messageId}:busy`, 15);
+    return;
+  }
   if (!(await accountProcessingAllowed(accountId))) return;
   const [pending] = await query(
     "SELECT min(available_at) AS next_at FROM jobs WHERE account_id=$1 AND state IN ('pending','running')",

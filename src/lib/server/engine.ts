@@ -336,9 +336,8 @@ export async function restoreDecision(decisionId: string, gmail: Gmail) {
   );
 }
 export async function workAccount(accountId: string, maxJobs = 30) {
-  // Queued workers wait their turn, including while an older deployment is
-  // draining. The pool's statement timeout bounds this wait to 15 seconds.
-  // Interactive actions still use the immediate, non-blocking lock above.
+  // A busy delivery retries through the queue. Waiting here holds a database
+  // connection and can starve the worker that already owns the account lock.
   await withAccountLock(
     accountId,
     async () => {
@@ -435,6 +434,5 @@ export async function workAccount(accountId: string, maxJobs = 30) {
           "Some emails are still pending. Check the connection or try syncing again.",
         ]);
     },
-    true,
   );
 }

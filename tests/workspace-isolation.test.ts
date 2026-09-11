@@ -167,7 +167,7 @@ it("displays an English explanation without changing its audit source and ignore
     "Sender added to the allowlist.",
   );
 });
-it("keeps the latest 200 decisions per account without hiding an older personal inbox or leaking another workspace", async () => {
+it("keeps the latest 200 activities per account, including newly moved older mail, without leaking another workspace", async () => {
   await h.db.query("DELETE FROM decisions");
   await h.db.query(
     "INSERT INTO accounts(id,email,name,token_cipher,workspace_id) VALUES('personal-a','personal@example.com','Personal','synthetic','a')",
@@ -187,6 +187,7 @@ it("keeps the latest 200 decisions per account without hiding an older personal 
       ('foreign-new','gmail-b','2026-10-01')
     ) AS seeds(id,account_id,created_at)`);
 
+  await h.db.query("UPDATE decisions SET updated_at=created_at");
   const data = await dashboard();
   expect(data.decisions.map((d) => d.id)).toEqual([
     ...Array.from({ length: 200 }, (_, i) => `work-${230 - i}`),
@@ -196,6 +197,14 @@ it("keeps the latest 200 decisions per account without hiding an older personal 
   expect(
     data.decisions.filter((d) => d.accountId === "personal-a"),
   ).toHaveLength(2);
+  await h.db.query(
+    "UPDATE decisions SET state='moved',updated_at='2026-10-02' WHERE id='work-1'",
+  );
+  const moved = await dashboard();
+  expect(moved.decisions[0]).toMatchObject({ id: "work-1", state: "moved" });
+  expect(moved.decisions.filter((d) => d.accountId === "gmail-a")).toHaveLength(
+    200,
+  );
   h.cookie = "token-b";
   expect((await dashboard()).decisions.map((d) => d.id)).toEqual([
     "foreign-new",

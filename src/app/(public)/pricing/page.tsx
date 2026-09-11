@@ -103,7 +103,8 @@ export default async function PlansPage({
               Connect with Google
             </Button>
             <p className="mt-3 text-xs text-muted-foreground">
-              Your trial starts after you connect.
+              Connect Gmail first. The trial starts when you activate it in the
+              next step.
             </p>
           </form>
         ) : active ? (

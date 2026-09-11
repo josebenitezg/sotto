@@ -63,6 +63,9 @@ export function checkoutParameters(
 ): Stripe.Checkout.SessionCreateParams {
   return {
     mode: "subscription",
+    // Keep Sotto as the seller even if this Stripe account defaults to Managed Payments.
+    // Managed Payments rejects our allowance disclosure and changes the billing model.
+    managed_payments: { enabled: false },
     customer,
     client_reference_id: workspaceId,
     line_items: [{ price: priceId(plan), quantity: 1 }],

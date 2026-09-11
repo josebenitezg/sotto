@@ -44,7 +44,9 @@ export default function TermsPage() {
         remain in Gmail, and existing history and Undo stay available. A paid
         renewal starts the next allowance. Trial allowance renews only when the
         paid subscription starts successfully. Hosted plans check for new mail
-        every 30 minutes while access and allowance are available.
+        every {process.env.COMPOSIO_NOTIFICATION_MODE === "poll" ? 30 : 15}{" "}
+        minutes while access and allowance are available. Provider delays can
+        affect delivery; this interval is not a guaranteed deadline.
       </p>
       <h2 className="text-lg font-medium">Renewal and cancellation</h2>
       <p>

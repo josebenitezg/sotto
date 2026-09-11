@@ -168,7 +168,7 @@ export default async function PlansPage({
                 `${plan.mailboxes} Gmail account${plan.mailboxes === 1 ? "" : "s"}`,
                 `${plan.emails} emails checked / month`,
                 `${plan.trialEmails} emails in your 3-day trial`,
-                "Automatic checks every 30 minutes",
+                `Automatic checks every ${process.env.COMPOSIO_NOTIFICATION_MODE === "poll" ? 30 : 15} minutes`,
                 "A reason for every move",
                 "Undo anytime in Sotto",
               ].map((line) => (

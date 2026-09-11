@@ -215,6 +215,7 @@ describe("billing access and checkout recovery", () => {
     expect(h.price).toHaveBeenCalledWith("price_solo");
     const params = h.create.mock.calls[0][0];
     expect(params.line_items).toEqual([{ price: "price_solo", quantity: 1 }]);
+    expect(params.managed_payments).toEqual({ enabled: false });
     expect(params.payment_method_collection).toBe("always");
     expect(params.subscription_data.trial_period_days).toBe(3);
     expect(params.subscription_data.metadata.plan).toBe("solo");

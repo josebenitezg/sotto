@@ -8,7 +8,7 @@ Help someone connect their work inbox, understand the proposed decisions, and ke
 
 ## Voice
 
-Spanish with voseo. Short verbs, sentence case, no infrastructure jargon. Prefer “Conectar con Google”, “Apartar”, “Conservar”, “Deshacer”, and “Permitidos”. A button and its feedback use the same language. No uppercase eyebrows or filler. Errors explain the next useful step.
+English throughout the product. Short verbs, sentence case, no infrastructure jargon. Prefer “Connect with Google”, “Start filtering”, “Keep”, “Undo”, and “Open in Gmail”. A button and its feedback use the same language. No uppercase eyebrows or filler. Errors explain the next useful step.
 
 ## Appearance
 
@@ -27,7 +27,7 @@ The landing and login extend the quiet application with an editorial scale: loca
 ## Interaction
 
 - Accessible shadcn/Radix controls. One primary action per surface.
-- Details and forms open in a sheet. Destructive or automatic-mode transitions use a confirmation dialog.
+- Details and forms open in a sheet. Destructive transitions use a confirmation dialog. Connecting with the visible automatic-filtering notice starts filtering directly; existing accounts use one Start filtering button with the same scope explained inline.
 - Settings save on change with inline “Guardado” feedback. Errors persist near the control.
 - Press feedback is subtle, 120ms. Only transform and opacity animate. No animation on navigation; no movement with reduced motion. Nothing exceeds 300ms.
 - Empty states show what happens next. Demo mode is visibly synthetic and cannot touch Gmail.

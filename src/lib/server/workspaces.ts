@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { hosted } from "./config";
+import { hosted, writesEnabled } from "./config";
+import { classifierConfigured } from "./ai";
+import { startFiltering } from "./filtering";
 import { transaction } from "./db";
 import { HttpError } from "./auth";
 import { seal } from "./crypto";
@@ -11,6 +13,7 @@ export async function connectIdentity(
   refreshToken: string | undefined,
   linkedWorkspace: string | null,
   authorizationStartedAt?: Date | string,
+  filteringRequested = false,
 ) {
   return transaction(async (db) => {
     // Same key/order as mailbox actions and workers. A reconnect must not
@@ -30,7 +33,7 @@ export async function connectIdentity(
     const {
       rows: [existing],
     } = await db.query(
-      "SELECT workspace_id,token_cipher,connected FROM accounts WHERE id=$1",
+      "SELECT workspace_id,token_cipher,connected,mode_changed_at FROM accounts WHERE id=$1",
       [identity.sub],
     );
     if (
@@ -100,6 +103,18 @@ export async function connectIdentity(
         workspaceId,
       ],
     );
+    const intentIsCurrent =
+      !existing?.mode_changed_at ||
+      (authorizationStartedAt &&
+        new Date(authorizationStartedAt).getTime() >=
+          new Date(existing.mode_changed_at).getTime());
+    if (
+      filteringRequested &&
+      intentIsCurrent &&
+      writesEnabled(identity.sub) &&
+      classifierConfigured()
+    )
+      await startFiltering(db, identity.sub);
     return workspaceId as string;
   });
 }

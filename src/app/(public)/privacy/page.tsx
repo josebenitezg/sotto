@@ -24,6 +24,14 @@ export default function PrivacyPage() {
         also checks whether you have previously emailed the sender. Attachments,
         links, and remote images are not opened.
       </p>
+      <h2 className="text-base font-semibold">When filtering starts</h2>
+      <p className="text-muted-foreground">
+        Connecting through the automatic-filtering notice authorizes Sotto to
+        organize cold outreach in your Inbox from the last seven days and new
+        incoming messages. You can pause filtering or restore moved messages.
+        Sotto records this authorization. Reconnecting without this notice
+        preserves your existing filtering choice.
+      </p>
       <h2 className="text-base font-semibold">What we store</h2>
       <p className="text-muted-foreground">
         The encrypted Google connection, rules, message identifiers, sender,

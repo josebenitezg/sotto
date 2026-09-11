@@ -71,6 +71,7 @@ beforeAll(async () => {
     "002_billing.sql",
     "003_mailbox_deletion.sql",
     "004_english_explanations.sql",
+    "005_automatic_connection.sql",
   ])
     await h.db.exec(
       await readFile(new URL(`../db/${f}`, import.meta.url), "utf8"),
@@ -872,4 +873,164 @@ it("isolates a new signup and limits linked active mailboxes while allowing repl
       "a",
     ),
   ).rejects.toMatchObject({ status: 409 });
+});
+
+it("starts filtering on explicitly authorized connections without a pretend review, and preserves old OAuth behavior", async () => {
+  vi.stubEnv("BILLING_ENABLED", "false");
+  vi.stubEnv("OPENAI_API_KEY", "synthetic");
+  const startedAt = new Date();
+  await connectIdentity(
+    { sub: "new-auto", email: "auto@example.com" },
+    "refresh",
+    null,
+    startedAt,
+    true,
+  );
+  const {
+    rows: [account],
+  } = await h.db.query(`SELECT mode,reviewed_at,automatic_authorized_at,
+    auto_after= start_at AS includes_initial_scan FROM accounts WHERE id='new-auto'`);
+  expect(account).toEqual({
+    mode: "automatic",
+    reviewed_at: null,
+    automatic_authorized_at: expect.any(Date),
+    includes_initial_scan: true,
+  });
+  expect(
+    (await h.db.query("SELECT account_id FROM mailbox_events")).rows,
+  ).toEqual([{ account_id: "new-auto" }]);
+  await connectIdentity(
+    { sub: "old-oauth", email: "old@example.com" },
+    "refresh",
+    null,
+    startedAt,
+  );
+  expect(
+    (await h.db.query("SELECT mode FROM accounts WHERE id='old-oauth'")).rows,
+  ).toEqual([{ mode: "review" }]);
+});
+
+it("does not let an earlier OAuth flow undo a later pause or bypass account write restrictions", async () => {
+  vi.stubEnv("BILLING_ENABLED", "false");
+  vi.stubEnv("OPENAI_API_KEY", "synthetic");
+  const beforePause = new Date(0);
+  await h.db.query(
+    "UPDATE accounts SET mode='paused',mode_changed_at=now() WHERE id='gmail-a'",
+  );
+  await connectIdentity(
+    { sub: "gmail-a", email: "a@example.com" },
+    "refresh",
+    null,
+    beforePause,
+    true,
+  );
+  expect(
+    (await h.db.query("SELECT mode FROM accounts WHERE id='gmail-a'")).rows,
+  ).toEqual([{ mode: "paused" }]);
+  vi.stubEnv("MAILBOX_WRITE_ACCOUNT_IDS", "gmail-a");
+  await connectIdentity(
+    { sub: "blocked", email: "blocked@example.com" },
+    "refresh",
+    null,
+    new Date(),
+    true,
+  );
+  expect(
+    (
+      await h.db.query(
+        "SELECT mode,automatic_authorized_at FROM accounts WHERE id='blocked'",
+      )
+    ).rows,
+  ).toEqual([{ mode: "review", automatic_authorized_at: null }]);
+});
+
+it("starts an existing inbox in one action, queues suggestions durably and leaves user decisions and other accounts alone", async () => {
+  vi.stubEnv("OPENAI_API_KEY", "synthetic");
+  await h.db.query("UPDATE workspaces SET internal=true WHERE id='a'");
+  await h.db.query(
+    "UPDATE accounts SET start_at=now()-interval '30 days' WHERE id='gmail-a'",
+  );
+  await h.db
+    .query(`INSERT INTO decisions(id,account_id,message_id,thread_id,sender,subject,category,confidence,reason,state)
+    VALUES('kept','gmail-a','kept','t','x@example.com','Kept','cold',0.9,'Mine','kept'),
+          ('restored','gmail-a','restored','t','x@example.com','Restored','cold',0.9,'Mine','restored')`);
+  await h.db.query(
+    "INSERT INTO jobs(account_id,message_id,state) VALUES('gmail-a','m-a','done'),('gmail-a','kept','done'),('gmail-a','restored','done')",
+  );
+  const result = await action(
+    request({ action: "startFiltering", accountId: "gmail-a" }),
+  );
+  expect(result.status).toBe(200);
+  const {
+    rows: [account],
+  } = await h.db.query<{
+    auto_after: Date;
+  }>(`SELECT mode,reviewed_at,automatic_authorized_at,auto_after,history_id,
+    auto_after > now()-interval '8 days' AND auto_after < now()-interval '6 days' AS recent_only FROM accounts WHERE id='gmail-a'`);
+  expect(account).toMatchObject({
+    mode: "automatic",
+    reviewed_at: null,
+    automatic_authorized_at: expect.any(Date),
+    history_id: null,
+    recent_only: true,
+  });
+  expect(
+    (await h.db.query("SELECT message_id,state FROM jobs ORDER BY message_id"))
+      .rows,
+  ).toEqual([
+    { message_id: "kept", state: "done" },
+    { message_id: "m-a", state: "pending" },
+    { message_id: "restored", state: "done" },
+  ]);
+  expect(
+    (await h.db.query("SELECT mode FROM accounts WHERE id='gmail-b'")).rows,
+  ).toEqual([{ mode: "review" }]);
+  expect(h.enqueue).toHaveBeenCalledWith("gmail-a");
+  expect(
+    (await action(request({ action: "startFiltering", accountId: "gmail-a" })))
+      .status,
+  ).toBe(200);
+  expect(
+    (
+      await h.db.query<{ auto_after: Date }>(
+        "SELECT auto_after FROM accounts WHERE id='gmail-a'",
+      )
+    ).rows[0].auto_after,
+  ).toEqual(account.auto_after);
+  expect(
+    (await h.db.query("SELECT count(*)::int AS n FROM mailbox_events")).rows,
+  ).toEqual([{ n: 1 }]);
+  h.cookie = "token-b";
+  expect(
+    (await action(request({ action: "startFiltering", accountId: "gmail-a" })))
+      .status,
+  ).toBe(404);
+});
+
+it("keeps activation durable after queue publication fails and refuses filtering without AI or write access", async () => {
+  await h.db.query("UPDATE workspaces SET internal=true WHERE id='a'");
+  vi.stubEnv("OPENAI_API_KEY", "");
+  expect(
+    (await action(request({ action: "startFiltering", accountId: "gmail-a" })))
+      .status,
+  ).toBe(409);
+  vi.stubEnv("OPENAI_API_KEY", "synthetic");
+  vi.stubEnv("MAILBOX_WRITE_ACCOUNT_IDS", "gmail-b");
+  expect(
+    (await action(request({ action: "startFiltering", accountId: "gmail-a" })))
+      .status,
+  ).toBe(409);
+  vi.stubEnv("MAILBOX_WRITE_ACCOUNT_IDS", "gmail-a");
+  h.enqueue.mockRejectedValueOnce(new Error("Synthetic queue unavailable"));
+  expect(
+    (await action(request({ action: "startFiltering", accountId: "gmail-a" })))
+      .status,
+  ).toBe(500);
+  expect(
+    (await h.db.query("SELECT mode FROM accounts WHERE id='gmail-a'")).rows,
+  ).toEqual([{ mode: "automatic" }]);
+  expect(
+    (await h.db.query("SELECT account_id,processed_at FROM mailbox_events"))
+      .rows,
+  ).toEqual([{ account_id: "gmail-a", processed_at: null }]);
 });

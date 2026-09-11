@@ -189,3 +189,96 @@ it("automatically moves only the permitted account and keeps blocked recovery fr
     vi.unstubAllEnvs();
   }
 });
+
+it("filters recent existing suggestions and new mail, retries failed label creation, and never moves old, kept or restored mail", async () => {
+  vi.stubEnv("BILLING_ENABLED", "false");
+  vi.stubEnv("DEMO_MODE", "false");
+  vi.stubEnv("GOOGLE_PUBSUB_TOPIC", "");
+  vi.stubEnv("ENABLE_MAILBOX_WRITES", "true");
+  vi.stubEnv("MAILBOX_WRITE_ACCOUNT_IDS", "work");
+  h.db = new PGlite();
+  h.gmail.mockReset();
+  h.classify
+    .mockReset()
+    .mockResolvedValue({
+      decision: "move",
+      category: "cold",
+      confidence: 0.9,
+      protected: false,
+      reason: "Synthetic sales outreach",
+    });
+  try {
+    await h.db.exec(
+      await readFile(new URL("../db/001_initial.sql", import.meta.url), "utf8"),
+    );
+    await h.db
+      .exec(`INSERT INTO accounts(id,email,name,token_cipher,history_id,mode,auto_after)
+      VALUES('work','owner@studio.example','Work','synthetic','100','automatic',now()-interval '7 days');
+      INSERT INTO jobs(account_id,message_id) VALUES('work','recent'),('work','old'),('work','kept'),('work','restored'),('work','new');`);
+    for (const [id, state] of [
+      ["recent", "suggested"],
+      ["old", "suggested"],
+      ["kept", "kept"],
+      ["restored", "restored"],
+    ])
+      await h.db.query(
+        `INSERT INTO decisions(id,account_id,message_id,thread_id,sender,subject,category,confidence,reason,state,ai_decision)
+        VALUES($1,'work',$1,$1,'sales@vendor.example','Synthetic pitch','cold',0.9,'Pitch',$2,'move')`,
+        [id, state],
+      );
+    const modify = vi.fn(async () => ({}));
+    const ensureLabel = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Temporary label failure"))
+      .mockResolvedValue("Label_Cold");
+    const message = vi.fn(async (id: string) => ({
+      id,
+      threadId: id,
+      from: "sales@vendor.example",
+      subject: "Synthetic pitch",
+      text: "Sales",
+      labels: ["INBOX", "UNREAD"],
+      receivedAt: Date.now() - (id === "old" ? 8 : 1) * 86400000,
+      headers: {
+        "authentication-results":
+          "mx.google.com; dmarc=pass header.from=vendor.example",
+      },
+    }));
+    h.gmail.mockResolvedValue({
+      request: async () => ({ historyId: "101", history: [] }),
+      message,
+      modify,
+      ensureLabel,
+      threadHasReply: async () => false,
+      hasWrittenTo: async () => false,
+    });
+    await workAccount("work", 10);
+    expect(modify.mock.calls.map((c: any[]) => c[0])).toEqual(["new"]);
+    expect(message.mock.calls.map((c) => c[0])).not.toContain("kept");
+    expect(message.mock.calls.map((c) => c[0])).not.toContain("restored");
+    await h.db.query(
+      "UPDATE jobs SET available_at=now() WHERE message_id='recent'",
+    );
+    await workAccount("work", 10);
+    expect(modify.mock.calls.map((c: any[]) => c[0])).toEqual([
+      "new",
+      "recent",
+    ]);
+    expect(modify).toHaveBeenCalledWith("recent", ["Label_Cold"], ["INBOX"]);
+    expect(
+      (
+        await h.db.query(
+          "SELECT id,state FROM decisions WHERE id IN ('old','kept','restored') ORDER BY id",
+        )
+      ).rows,
+    ).toEqual([
+      { id: "kept", state: "kept" },
+      { id: "old", state: "suggested" },
+      { id: "restored", state: "restored" },
+    ]);
+    expect(h.classify).toHaveBeenCalledOnce();
+  } finally {
+    await h.db.close();
+    vi.unstubAllEnvs();
+  }
+});

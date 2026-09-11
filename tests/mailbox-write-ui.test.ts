@@ -29,11 +29,9 @@ it("enables account controls only for the permitted account, even when the dashb
   );
   const activateButtons = [
     ...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g),
-  ].filter(([, , content]) => content.includes("Enable filtering"));
+  ].filter(([, , content]) => content.includes("Start filtering"));
   expect(activateButtons).toHaveLength(2);
   expect(activateButtons[0][1]).toMatch(/\bdisabled=""/);
   expect(activateButtons[1][1]).not.toMatch(/\bdisabled=/);
-  expect(html).toContain(
-    "Moving emails is disabled for this account.",
-  );
+  expect(html).toContain("Moving emails is disabled for this account.");
 });

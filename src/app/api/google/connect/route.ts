@@ -17,16 +17,21 @@ export async function POST(request: Request) {
     if (!configured() || isDemo())
       throw new HttpError(503, "The Google connection is not configured yet.");
     requireOrigin(request);
+    const body = await request.text();
+    if (body.length > 1024)
+      throw new HttpError(413, "The request is too large.");
+    const startFiltering = new URLSearchParams(body).get("intent") === "filter";
     const state = opaque(),
       browser = opaque(),
       verifier = opaque();
     await query(
-      "INSERT INTO oauth_states(state_hash,verifier_cipher,browser_hash,expires_at,workspace_id) VALUES($1,$2,$3,now()+interval '10 minutes',$4)",
+      "INSERT INTO oauth_states(state_hash,verifier_cipher,browser_hash,expires_at,workspace_id,start_filtering) VALUES($1,$2,$3,now()+interval '10 minutes',$4,$5)",
       [
         hash(state),
         seal(verifier, `oauth:${hash(state)}`),
         hash(browser),
         await sessionWorkspace(),
+        startFiltering,
       ],
     );
     const url = new URL(

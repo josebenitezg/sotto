@@ -79,7 +79,7 @@ type ContextValue = {
 const WorkspaceContext = createContext<ContextValue | null>(null);
 const useWorkspace = () => useContext(WorkspaceContext)!;
 const nav = [
-  { href: "/review", label: "Review", icon: Inbox },
+  { href: "/review", label: "My inbox", icon: Inbox },
   { href: "/accounts", label: "Accounts", icon: Mail },
   { href: "/allowlist", label: "Allowlist", icon: ShieldCheck },
   { href: "/settings", label: "Settings", icon: Settings2 },
@@ -87,7 +87,7 @@ const nav = [
 ];
 const modeLabels = {
   review: "Review mode",
-  automatic: "Active",
+  automatic: "Filtering on",
   paused: "Paused",
 };
 const categoryLabels = {
@@ -104,6 +104,13 @@ function applyDemo(data: Dashboard, action: Action): Dashboard {
   const account = next.accounts.find((a) => a.id === action.accountId);
   const decision = next.decisions.find((d) => d.id === action.decisionId);
   if (action.action === "mode" && account) account.mode = action.mode as Mode;
+  if (action.action === "startFiltering" && account) {
+    account.mode = "automatic";
+    next.decisions.forEach((d) => {
+      if (d.accountId === account.id && d.state === "suggested")
+        d.state = "moved";
+    });
+  }
   if (action.action === "policy" && account) {
     account.policy.marketing = !!action.marketing;
     account.policy.newsletters = !!action.newsletters;
@@ -167,21 +174,31 @@ export function Workspace({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
+  const actionVersion = useRef(0);
   const pathname = usePathname();
   useEffect(() => {
     if (initial.demo) return;
     const controller = new AbortController();
+    let refreshing = false;
     const timer = setInterval(async () => {
-      if (document.hidden || inFlight.current) return;
+      if (document.hidden || inFlight.current || refreshing) return;
+      refreshing = true;
+      const version = actionVersion.current;
       try {
         const response = await fetch("/api/dashboard", {
           signal: controller.signal,
         });
-        if (response.ok && !inFlight.current) setData(await response.json());
+        if (response.ok) {
+          const next = await response.json();
+          if (!inFlight.current && version === actionVersion.current)
+            setData(next);
+        }
       } catch {
         /* Keep last known state; explicit actions surface errors inline. */
+      } finally {
+        refreshing = false;
       }
-    }, 15000);
+    }, 5000);
     return () => {
       clearInterval(timer);
       controller.abort();
@@ -190,6 +207,7 @@ export function Workspace({
   async function act(action: Action, success: string) {
     if (inFlight.current) return false;
     inFlight.current = true;
+    actionVersion.current += 1;
     setBusy(true);
     setError(null);
     try {
@@ -411,6 +429,7 @@ function ConnectButton({ outline = false }: { outline?: boolean }) {
       method="post"
       className="w-full max-w-md space-y-3"
     >
+      <input type="hidden" name="intent" value="filter" />
       <GoogleDataNotice id={noticeId} />
       <Button
         type="submit"
@@ -426,17 +445,29 @@ function ConnectButton({ outline = false }: { outline?: boolean }) {
   );
 }
 function Status({ account }: { account: Account }) {
+  const {
+    data: { demo },
+  } = useWorkspace();
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1.5 whitespace-nowrap text-xs",
-        !account.connected || account.mode !== "automatic"
+        !account.connected ||
+          account.lastError ||
+          account.mode !== "automatic" ||
+          (!account.writesEnabled && !demo)
           ? "text-warning"
           : "text-primary",
       )}
     >
       <span className="size-1.5 rounded-full bg-current" />
-      {account.connected ? modeLabels[account.mode] : "Disconnected"}
+      {!account.connected
+        ? "Disconnected"
+        : account.lastError
+          ? "Needs attention"
+          : account.mode === "automatic" && !account.writesEnabled && !demo
+            ? "Filtering unavailable"
+            : modeLabels[account.mode]}
     </span>
   );
 }
@@ -505,8 +536,8 @@ function Onboarding() {
             Start with your work email
           </h2>
           <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-            Connect your account and review what Sotto suggests moving. You can
-            add your personal email later.
+            Connect your account. Sotto starts filtering cold outreach right
+            away. Keep using Gmail as usual.
           </p>
           <div className="mt-6">
             <ConnectButton />
@@ -521,8 +552,8 @@ function Onboarding() {
           {[
             {
               icon: ListFilter,
-              title: "Review it first",
-              text: "Review suggestions before turning on automatic filtering.",
+              title: "It starts right away",
+              text: "Sotto checks the last 7 days of your inbox, then new emails.",
             },
             {
               icon: ShieldCheck,
@@ -570,9 +601,7 @@ function Onboarding() {
 export function ReviewPage() {
   const { data, act, busy } = useWorkspace();
   const [accountId, setAccountId] = useState("all");
-  const [filter, setFilter] = useState<"suggested" | "kept" | "moved">(
-    "suggested",
-  );
+  const [filter, setFilter] = useState<"suggested" | "kept" | "moved">("moved");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   if (!data.accounts.length) return <Onboarding />;
   const scoped = data.decisions.filter(
@@ -598,9 +627,6 @@ export function ReviewPage() {
   );
   const selectedWritesEnabled =
     data.demo || selectedAccount?.writesEnabled === true;
-  const anyReview = data.accounts.some(
-    (a) => a.connected && a.mode === "review",
-  );
   const syncing = data.accounts.filter(
     (a) =>
       (accountId === "all" || a.id === accountId) &&
@@ -612,52 +638,28 @@ export function ReviewPage() {
   return (
     <>
       <PageTitle
-        title="What matters, in view."
-        description="Review which emails need your attention and which can move aside."
+        title="Your quieter inbox"
+        description="Cold outreach goes to Sotto/Cold in Gmail. Everything else stays in your inbox."
         action={<AccountPicker value={accountId} onChange={setAccountId} all />}
       />
-      {anyReview ? (
-        <div className="mb-8 flex flex-col justify-between gap-4 rounded-xl border bg-card p-5 sm:flex-row sm:items-center">
-          <div className="flex gap-3">
-            <div className="mt-0.5 text-warning">
-              <ListFilter size={19} strokeWidth={1.75} />
+      <section
+        aria-label="Filtering status"
+        className="mb-8 divide-y rounded-xl border bg-card"
+      >
+        {data.accounts
+          .filter((a) => accountId === "all" || a.id === accountId)
+          .map((account) => (
+            <div key={account.id} className="p-5">
+              <AccountActivity account={account} />
             </div>
-            <div>
-              <p className="font-medium">Get to know Sotto's judgment</p>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">
-                In review mode, Sotto suggests and you decide what to move.
-              </p>
-            </div>
-          </div>
-          <Button variant="outline" asChild>
-            <Link href="/accounts">
-              View my accounts
-              <ArrowRight />
-            </Link>
-          </Button>
-        </div>
-      ) : null}
+          ))}
+      </section>
       <div className="mb-4 flex items-baseline justify-between gap-3">
-        <h2 className="text-base font-semibold">Your review</h2>
+        <h2 className="text-base font-semibold">Recent activity</h2>
         <span className="text-xs text-muted-foreground">
           {scoped.length} emails in this view
         </span>
       </div>
-      {syncing.length > 0 ? (
-        <div
-          className="mb-5 space-y-3 rounded-xl border bg-card p-4"
-          role="status"
-        >
-          <p className="text-sm font-medium">Reviewing your inbox</p>
-          {syncing.map((account) => (
-            <SyncProgress key={account.id} account={account} />
-          ))}
-          <p className="text-xs text-muted-foreground">
-            You can close this page. Review continues in the background, and
-            results appear here.
-          </p>
-        </div>
-      ) : null}
       <div
         className="mb-4 flex flex-wrap gap-1"
         role="group"
@@ -665,9 +667,9 @@ export function ReviewPage() {
       >
         {(
           [
-            { key: "suggested", label: "Suggested" },
-            { key: "kept", label: "Kept" },
-            { key: "moved", label: "Moved" },
+            { key: "moved", label: "Moved aside" },
+            { key: "kept", label: "Kept in inbox" },
+            { key: "suggested", label: "Suggestions" },
           ] as const
         ).map((tab) => (
           <Button
@@ -736,13 +738,15 @@ export function ReviewPage() {
                   ? "Review is still running"
                   : "Nothing to review right now"
                 : filter === "moved"
-                  ? "No emails moved yet"
+                  ? "No cold emails moved yet"
                   : "Emails you keep will appear here"
             }
             detail={
               filter === "suggested"
                 ? "New suggestions will appear here with an explanation."
-                : "Every decision is recorded so you can review it."
+                : filter === "moved"
+                  ? "Moved emails appear here and under Sotto/Cold in Gmail. You can return any email to your inbox."
+                  : "Every decision is recorded so you can review it."
             }
           />
         )}
@@ -754,22 +758,6 @@ export function ReviewPage() {
           stays.
         </p>
       </div>
-      {anyReview && scoped.length > 0 ? (
-        <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t pt-6">
-          <div>
-            <p className="font-medium">Happy with the suggestions?</p>
-            <p className="mt-0.5 text-[13px] text-muted-foreground">
-              Turn on automatic filtering when you finish reviewing.
-            </p>
-          </div>
-          <Button variant="outline" asChild>
-            <Link href="/accounts">
-              Set up filtering
-              <ArrowRight />
-            </Link>
-          </Button>
-        </div>
-      ) : null}
       <Sheet
         open={!!selected}
         onOpenChange={(open) => {
@@ -918,37 +906,36 @@ export function ReviewPage() {
 
 function SyncProgress({ account }: { account: Account }) {
   if (!account.sync) return null;
-  const { total, done, pending, failed, retrying, since } = account.sync;
+  const { total, done, pending, failed, retrying, scanning } = account.sync;
+  const working = scanning || pending > 0;
   return (
-    <div className="space-y-1.5 text-xs text-muted-foreground">
+    <div className="space-y-2 text-xs text-muted-foreground" role="status">
       <p>
-        <span className="font-medium text-foreground">{account.name}</span> ·{" "}
-        {done} of {total} emails processed
-        {pending > 0 ? ` · ${pending} pending` : ""}
+        {scanning
+          ? "Finding recent emails…"
+          : working
+            ? `Checking your inbox · ${done} of ${total} emails processed`
+            : `${done} emails checked`}
       </p>
-      {total > 0 ? (
-        <progress
-          className="h-1.5 w-full accent-primary"
-          value={done}
-          max={total}
-          aria-label={`Progress for ${account.name}`}
-        />
+      {working ? (
+        <>
+          <progress
+            className="h-1.5 w-full accent-primary"
+            value={scanning ? undefined : done}
+            max={Math.max(1, total)}
+            aria-label={`Progress for ${account.name}`}
+          />
+          <p>You can close this page. Sotto keeps working.</p>
+        </>
       ) : null}
       {retrying > 0 || failed > 0 ? (
         <p className="text-warning">
-          {retrying > 0 ? `${retrying} emails waiting for a retry. ` : ""}
-          {failed > 0 ? `${failed} need another Sync attempt.` : ""}
+          {retrying > 0 ? `${retrying} waiting to retry. ` : ""}
+          {failed > 0
+            ? `${failed} could not be checked. Try Check now in Account options.`
+            : ""}
         </p>
       ) : null}
-      <p>
-        Inbox emails since{" "}
-        {new Date(since).toLocaleDateString("en-US", {
-          day: "numeric",
-          month: "long",
-          timeZone: "UTC",
-        })}
-        .
-      </p>
     </div>
   );
 }
@@ -961,11 +948,123 @@ function InlineError() {
   ) : null;
 }
 
+function GmailFolderLink({ account }: { account: Account }) {
+  const { data } = useWorkspace();
+  return (
+    <Button variant="outline" size="sm" asChild>
+      <a
+        href={
+          data.demo
+            ? "https://mail.google.com/"
+            : `https://mail.google.com/mail/u/?authuser=${encodeURIComponent(account.email)}#label/Sotto%2FCold`
+        }
+        target="_blank"
+        rel="noreferrer"
+      >
+        Open Sotto/Cold <ExternalLink />
+      </a>
+    </Button>
+  );
+}
+
+function FilteringControls({ account }: { account: Account }) {
+  const { data, act, busy } = useWorkspace();
+  if (!account.connected) return <ConnectButton outline />;
+  const canFilter = data.demo || account.writesEnabled;
+  return (
+    <div className="space-y-3">
+      {account.mode !== "automatic" && canFilter ? (
+        <p className="text-xs leading-5 text-muted-foreground">
+          Start filtering cold outreach from the last 7 days, then new emails.
+          You can undo any move.
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        {account.mode === "automatic" ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            onClick={() =>
+              act(
+                { action: "mode", accountId: account.id, mode: "paused" },
+                "Filtering paused",
+              )
+            }
+          >
+            <Pause /> Pause
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            disabled={busy || !canFilter}
+            onClick={() =>
+              act(
+                { action: "startFiltering", accountId: account.id },
+                "Filtering started. Cold outreach will appear in Sotto/Cold.",
+              )
+            }
+          >
+            <Sparkles />{" "}
+            {account.mode === "paused" ? "Resume filtering" : "Start filtering"}
+          </Button>
+        )}
+        <GmailFolderLink account={account} />
+      </div>
+      {!canFilter ? (
+        <p className="text-xs text-warning">
+          Moving emails is disabled for this account.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function AccountActivity({ account }: { account: Account }) {
+  const { act, busy } = useWorkspace();
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium break-all">{account.email}</p>
+        <Status account={account} />
+      </div>
+      <div className="mt-3">
+        <FilteringControls account={account} />
+      </div>
+      {account.lastError ? (
+        <div role="alert" className="mt-3 text-xs text-destructive">
+          <p>{account.lastError}</p>
+          {account.connected && account.mode !== "paused" ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              onClick={() =>
+                act(
+                  { action: "sync", accountId: account.id },
+                  "Checking your inbox…",
+                )
+              }
+            >
+              Try again
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+      {account.connected && account.mode !== "paused" ? (
+        <div className="mt-3">
+          <SyncProgress account={account} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function AccountsPage() {
   const { data, act, busy } = useWorkspace();
   const [confirm, setConfirm] = useState<{
     account: Account;
-    action: "automatic" | "disconnect" | "deleteGmailData";
+    action: "disconnect" | "deleteGmailData";
   } | null>(null);
   const [confirmEmail, setConfirmEmail] = useState("");
   const confirmEmailId = useId();
@@ -973,125 +1072,21 @@ export function AccountsPage() {
   return (
     <>
       <PageTitle
-        title="Each account, at your pace."
-        description="Connect your accounts and choose when filtering starts."
-        action={<ConnectButton outline />}
+        title="Your Gmail accounts"
+        description="Connect once. Sotto takes care of the cold outreach."
       />
       <section className="overflow-hidden rounded-xl border bg-card">
         <ul className="divide-y">
           {data.accounts.map((account) => (
             <li key={account.id} className="p-5 sm:p-6">
-              <div className="flex items-start gap-4">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border bg-background">
-                  <Mail
-                    size={20}
-                    strokeWidth={1.5}
-                    className="text-muted-foreground"
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-medium">{account.name}</p>
-                    <Status account={account} />
-                  </div>
-                  <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
-                    {account.email}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-5 sm:pl-14">
-                <p className="text-[13px] text-muted-foreground">
-                  {!account.connected
-                    ? "Reconnect this account to continue."
-                    : account.mode === "review"
-                      ? "Sotto suggests what to move. Emails stay in your inbox."
-                      : account.mode === "paused"
-                        ? "Filtering is paused. New emails are not processed."
-                        : "Cold outreach goes to Sotto/Cold. Uncertain messages stay."}
-                </p>
-                {account.lastError ? (
-                  <p className="mt-3 text-[13px] text-destructive">
-                    {account.lastError}
-                  </p>
-                ) : null}
-                <div className="mt-4 flex flex-wrap items-center gap-2">
+              <AccountActivity account={account} />
+              <details className="mt-4 text-xs text-muted-foreground">
+                <summary className="w-fit cursor-pointer rounded py-1 focus-visible:outline-2 focus-visible:outline-ring">
+                  Account options
+                </summary>
+                <div className="mt-3 flex flex-wrap gap-2">
                   {account.connected ? (
                     <>
-                      {account.mode !== "paused" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy}
-                          onClick={() =>
-                            act(
-                              {
-                                action: "mode",
-                                accountId: account.id,
-                                mode: "paused",
-                              },
-                              "Filtering paused",
-                            )
-                          }
-                        >
-                          <Pause />
-                          Pause
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy}
-                          onClick={() =>
-                            act(
-                              {
-                                action: "mode",
-                                accountId: account.id,
-                                mode: "review",
-                              },
-                              "Review mode enabled",
-                            )
-                          }
-                        >
-                          Resume in review mode
-                        </Button>
-                      )}
-                      {account.mode === "review" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={
-                            busy ||
-                            !data.decisions.some(
-                              (d) => d.accountId === account.id,
-                            ) ||
-                            (!data.demo && !account.writesEnabled)
-                          }
-                          onClick={() =>
-                            setConfirm({ account, action: "automatic" })
-                          }
-                        >
-                          Enable filtering
-                          <ArrowRight />
-                        </Button>
-                      ) : account.mode === "automatic" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy}
-                          onClick={() =>
-                            act(
-                              {
-                                action: "mode",
-                                accountId: account.id,
-                                mode: "review",
-                              },
-                              "Review mode enabled",
-                            )
-                          }
-                        >
-                          Switch to review mode
-                        </Button>
-                      ) : null}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -1099,17 +1094,35 @@ export function AccountsPage() {
                         onClick={() =>
                           act(
                             { action: "sync", accountId: account.id },
-                            "Sync requested",
+                            "Checking your inbox…",
                           )
                         }
                       >
-                        <RefreshCw />
-                        Sync
+                        <RefreshCw /> Check now
                       </Button>
+                      {account.mode === "automatic" ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() =>
+                            act(
+                              {
+                                action: "mode",
+                                accountId: account.id,
+                                mode: "review",
+                              },
+                              "Only suggesting. Emails stay in your inbox.",
+                            )
+                          }
+                        >
+                          Only suggest moves
+                        </Button>
+                      ) : null}
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="text-muted-foreground"
+                        disabled={busy}
                         onClick={() =>
                           setConfirm({ account, action: "disconnect" })
                         }
@@ -1117,9 +1130,7 @@ export function AccountsPage() {
                         Disconnect
                       </Button>
                     </>
-                  ) : (
-                    <ConnectButton outline />
-                  )}
+                  ) : null}
                   <Button
                     size="sm"
                     variant="ghost"
@@ -1133,32 +1144,19 @@ export function AccountsPage() {
                     Delete Gmail data
                   </Button>
                 </div>
-                {!data.demo &&
-                !account.writesEnabled &&
-                account.mode === "review" ? (
-                  <p className="mt-3 text-xs text-warning">
-                    Moving emails is disabled for this account.
-                  </p>
-                ) : null}
-                <p className="mt-4 text-xs text-muted-foreground">
+                <p className="mt-3">
                   {account.lastSync
-                    ? `Last synced: ${new Date(account.lastSync).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short", timeZone: "UTC" })} UTC`
-                    : "Waiting for the first sync"}
+                    ? `Last checked: ${new Date(account.lastSync).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short", timeZone: "UTC" })} UTC`
+                    : "Waiting for the first check"}
                 </p>
-                <div className="mt-3">
-                  <SyncProgress account={account} />
-                </div>
-              </div>
+              </details>
             </li>
           ))}
         </ul>
       </section>
-      <div className="mt-8 flex gap-3 text-sm text-muted-foreground">
-        <UsersRound size={18} className="mt-0.5 shrink-0" />
-        <p className="max-w-[65ch]">
-          Your accounts share this workspace, with separate rules and decisions.
-          Start with work and add your personal account later.
-        </p>
+      <div className="mt-8 border-t pt-6">
+        <h2 className="mb-3 text-sm font-medium">Add another account</h2>
+        <ConnectButton outline />
       </div>
       <AlertDialog
         open={!!confirm}
@@ -1172,54 +1170,40 @@ export function AccountsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirm?.action === "automatic"
-                ? "Enable filtering"
-                : confirm?.action === "deleteGmailData"
-                  ? "Delete Gmail data"
-                  : "Disconnect this account"}
+              {confirm?.action === "deleteGmailData"
+                ? "Delete Gmail data"
+                : "Disconnect this account"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirm?.action === "automatic"
-                ? `You confirm that you have reviewed the suggestions for ${confirm.account.email}. Sotto can now move new emails in your selected categories. You can pause filtering and undo each move.`
-                : confirm?.action === "deleteGmailData"
-                  ? `Sotto will remove the connection, credential, preferences, allowed senders, and processing records for ${confirm.account.email} from its active database. Filtering stops for this account. Emails and labels stay as they are in Gmail; moves can no longer be undone from Sotto's history. This deletion cannot be undone.`
-                  : `Sotto will stop processing ${confirm?.account.email} and delete its local credential. Emails and labels stay in Gmail; decision history stays in Sotto. If Google does not respond, you can revoke access from your Google Account.`}
+              {confirm?.action === "deleteGmailData"
+                ? `Sotto will delete its connection, credentials, preferences and processing history for ${confirm.account.email}. Emails and labels stay in Gmail, but these moves can no longer be undone from Sotto. This deletion cannot be undone.`
+                : `Sotto will stop processing ${confirm?.account.email} and remove its saved credential. Emails and labels stay in Gmail; decision history stays in Sotto.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {confirm?.action === "deleteGmailData" ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Your sign-in, plan data, and other accounts are kept.
-                Reconnecting Google authorizes a new review. If Google does not
-                respond to the revocation request, you can revoke access in your
-                Google Account; local deletion still completes.
+                Your sign-in, plan data and other accounts are kept.
               </p>
-              <div className="space-y-2">
-                <Label htmlFor={confirmEmailId}>
-                  Type {confirm.account.email} to confirm
-                </Label>
-                <Input
-                  id={confirmEmailId}
-                  type="email"
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  disabled={busy}
-                  value={confirmEmail}
-                  onChange={(event) => setConfirmEmail(event.target.value)}
-                />
-              </div>
+              <Label htmlFor={confirmEmailId}>
+                Type {confirm.account.email} to confirm
+              </Label>
+              <Input
+                id={confirmEmailId}
+                type="email"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                disabled={busy}
+                value={confirmEmail}
+                onChange={(event) => setConfirmEmail(event.target.value)}
+              />
             </div>
           ) : null}
           <InlineError />
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className={
-                confirm?.action === "deleteGmailData"
-                  ? "bg-destructive text-white hover:bg-destructive/90"
-                  : undefined
-              }
               disabled={
                 busy ||
                 (confirm?.action === "deleteGmailData" &&
@@ -1229,43 +1213,18 @@ export function AccountsPage() {
               onClick={async (event) => {
                 event.preventDefault();
                 if (!confirm) return;
-                if (confirm.action === "automatic") {
-                  if (
-                    !(await act(
-                      { action: "reviewed", accountId: confirm.account.id },
-                      "Review confirmed",
-                    ))
-                  )
-                    return;
-                  if (
-                    await act(
-                      {
-                        action: "mode",
-                        accountId: confirm.account.id,
-                        mode: "automatic",
-                      },
-                      "Filtering enabled",
-                    )
-                  )
-                    setConfirm(null);
-                } else if (confirm.action === "deleteGmailData") {
-                  if (
-                    await act(
-                      {
-                        action: "deleteGmailData",
-                        accountId: confirm.account.id,
-                        confirmEmail: confirmEmail.trim(),
-                      },
-                      "Gmail data deleted from Sotto",
-                    )
-                  ) {
-                    setConfirm(null);
-                    setConfirmEmail("");
-                  }
-                } else if (
+                if (
                   await act(
-                    { action: "disconnect", accountId: confirm.account.id },
-                    "Account disconnected from Sotto",
+                    {
+                      action: confirm.action,
+                      accountId: confirm.account.id,
+                      ...(confirm.action === "deleteGmailData"
+                        ? { confirmEmail: confirmEmail.trim() }
+                        : {}),
+                    },
+                    confirm.action === "deleteGmailData"
+                      ? "Gmail data deleted from Sotto"
+                      : "Account disconnected",
                   )
                 )
                   setConfirm(null);
@@ -1273,11 +1232,9 @@ export function AccountsPage() {
             >
               {busy
                 ? "Saving…"
-                : confirm?.action === "automatic"
-                  ? "Enable filtering"
-                  : confirm?.action === "deleteGmailData"
-                    ? "Delete Gmail data"
-                    : "Disconnect"}
+                : confirm?.action === "deleteGmailData"
+                  ? "Delete Gmail data"
+                  : "Disconnect"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

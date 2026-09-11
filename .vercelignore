@@ -1,0 +1,11 @@
+private/
+.env*
+!.env.example
+.git/
+.next/
+node_modules/
+data/
+coverage/
+test-results/
+*.log
+.agents/

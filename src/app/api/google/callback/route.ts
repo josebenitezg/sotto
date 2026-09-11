@@ -6,12 +6,12 @@ import {
   appUrl,
   isDemo,
   publicSignup,
-  hosted,
 } from "@/lib/server/config";
 import { hash, unseal } from "@/lib/server/crypto";
 import { connectIdentity } from "@/lib/server/workspaces";
 import { query } from "@/lib/server/db";
 import { enqueueAccount } from "@/lib/server/queue";
+import { processingAllowed } from "@/lib/server/entitlements";
 import {
   createSession,
   cookieOptions,
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     if (!state || !code || !browser || params.has("error"))
       throw new Error("Invalid callback");
     const [pending] = await query(
-      "DELETE FROM oauth_states WHERE state_hash=$1 AND browser_hash=$2 AND expires_at>now() RETURNING verifier_cipher,workspace_id,created_at",
+      "DELETE FROM oauth_states WHERE state_hash=$1 AND browser_hash=$2 AND expires_at>now() RETURNING verifier_cipher,workspace_id,created_at,start_filtering",
       [hash(state), hash(browser)],
     );
     if (!pending) throw new Error("Expired state");
@@ -66,18 +66,19 @@ export async function GET(request: Request) {
       tokens.refresh_token ?? undefined,
       pending.workspace_id,
       pending.created_at,
+      pending.start_filtering === true,
     );
     try {
       await enqueueAccount(identity.sub);
     } catch {
       await query(
-        "UPDATE accounts SET last_error='The account is connected. Try Sync again to start reviewing.' WHERE id=$1",
+        "UPDATE accounts SET last_error='The account is connected. Use Check now to start processing.' WHERE id=$1",
         [identity.sub],
       );
     }
     const session = await createSession(workspaceId);
     const response = NextResponse.redirect(
-      `${appUrl()}/${hosted() ? "planes" : "cuentas"}?connected=1`,
+      `${appUrl()}/${(await processingAllowed(workspaceId)) ? "review" : "pricing"}?connected=1`,
     );
     response.cookies.set(sessionCookie, session, {
       ...cookieOptions(),

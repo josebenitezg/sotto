@@ -12,6 +12,7 @@ import { Gmail } from "@/lib/server/google";
 import { classifierConfigured } from "@/lib/server/ai";
 import { enqueueAccount } from "@/lib/server/queue";
 import { requireProcessingAccess } from "@/lib/server/entitlements";
+import { startFiltering } from "@/lib/server/filtering";
 import {
   withAccountLock,
   moveDecision,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/server/engine";
 
 const actionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("startFiltering"), accountId: z.string() }),
   z.object({
     action: z.literal("mode"),
     accountId: z.string(),
@@ -117,10 +119,15 @@ export async function POST(request: Request) {
       if (!account) throw new HttpError(404, "We could not find that account.");
       if (
         action.action === "move" ||
+        action.action === "startFiltering" ||
         (action.action === "mode" && action.mode !== "paused")
       )
         await requireProcessingAccess(workspaceId);
-      if (action.action === "mode") {
+      if (action.action === "startFiltering") {
+        if (!account.connected)
+          throw new HttpError(409, "Reconnect this account.");
+        await transaction((db) => startFiltering(db, accountId));
+      } else if (action.action === "mode") {
         if (!account.connected)
           throw new HttpError(409, "Reconnect this account.");
         if (
@@ -134,7 +141,7 @@ export async function POST(request: Request) {
             "Review the suggestions and enable processing before turning on filtering.",
           );
         await query(
-          "UPDATE accounts SET mode=$2,auto_after=CASE WHEN $2='automatic' THEN now() ELSE auto_after END WHERE id=$1",
+          "UPDATE accounts SET mode=$2,mode_changed_at=now(),auto_after=CASE WHEN $2='automatic' THEN now() ELSE auto_after END WHERE id=$1",
           [accountId, action.mode],
         );
       } else if (action.action === "policy") {
@@ -239,7 +246,7 @@ export async function POST(request: Request) {
         }
       } else if (action.action === "keep") {
         await query(
-          "UPDATE decisions SET state='kept',reason='Elegiste conservar este correo.',updated_at=now() WHERE id=$1 AND state='suggested'",
+          "UPDATE decisions SET state='kept',reason='You chose to keep this email.',updated_at=now() WHERE id=$1 AND state='suggested'",
           [action.decisionId],
         );
       } else if (action.action === "move" || action.action === "restore") {
@@ -271,7 +278,10 @@ export async function POST(request: Request) {
           );
       }
     });
-    if (action.action === "mode" && action.mode !== "paused")
+    if (
+      action.action === "startFiltering" ||
+      (action.action === "mode" && action.mode !== "paused")
+    )
       await enqueueAccount(accountId);
     return Response.json({ ok: true });
   } catch (error) {

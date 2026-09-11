@@ -27,7 +27,7 @@ Every worker and user action that changes account/mail state acquires the same P
 
 History pagination uses the original start cursor on every page. Only after all pages arrive does a transaction persist deduplicated jobs, update the cursor, and mark the event batch processed. A failed later page leaves the old cursor intact. On an expired history cursor, a bounded scan starts from the account's initial scan boundary and acquires a fresh cursor before listing messages.
 
-The baseline `start_at` is seven days before first connection. A long-lived account may need to scan a large interval after a history reset; this is correctness-oriented but not optimized for very large mailboxes yet. No such scan causes an automatic historical cleanup. A future release can add chunked backfill checkpoints.
+The baseline `start_at` is seven days before first connection. A long-lived account may need to scan a large interval after a history reset; this is correctness-oriented but not optimized for very large mailboxes yet. Explicit automatic-filtering consent includes eligible Inbox messages from the last seven days. Older messages are never automatically moved. A future release can add chunked backfill checkpoints.
 
 ## Decision and action boundaries
 
@@ -36,7 +36,7 @@ The baseline `start_at` is seven days before first connection. A long-lived acco
 3. Check actual SENT messages in the thread and previous outgoing correspondence, rather than trusting a `Re:` subject.
 4. Classify only unresolved text with a strict schema. No tool access is given to the model.
 5. Require an explicit AI `move` decision for eligible categories. Keep uncertain/protected messages. Optional categories are off by default. The model's confidence is informational, not a calibrated probability or a threshold for moving mail.
-6. Record the decision. Automatic mode affects eligible messages received after activation.
+6. Record the decision. Automatic mode affects eligible messages within the explicitly authorized scan boundary (last seven days at activation, then new mail). Kept and restored decisions remain terminal.
 7. Before moving, reread the message and current rules, verify sender authentication and policy, and persist a `moving` intent.
 8. Add the destination label and remove `INBOX` on that individual message. Persist `moved`. Never remove `UNREAD`.
 
@@ -58,10 +58,14 @@ In Vercel mode, Pub/Sub ingestion acknowledges only after durable database stora
 - No calibration claim, no guarantee of catching every cold email, and no guarantee against all model false positives.
 - Gmail has no conditional label-write transaction coordinated with the user's UI. Rereads narrow, but cannot eliminate, the race with a simultaneous manual change.
 - No Gmail connection/worker health certification until tested with live OAuth and delivery on the deployment.
-- No automatic unsubscribe, delete, sending, attachment processing, CRM enrichment or full historical cleanup.
+- No automatic unsubscribe, delete, sending, attachment processing, CRM enrichment or full historical cleanup. Initial automatic cleanup is limited to seven days.
 - Policy changes do not retroactively reclassify old decisions in this release.
-- The dashboard shows up to 200 recent decisions, not complete mailbox statistics. Decision metadata is retained until the user deletes the Gmail connection's data or requests deletion through support.
+- The dashboard shows up to 200 recent decisions per account, not complete mailbox statistics. Decision metadata is retained until the user deletes the Gmail connection's data or requests deletion through support.
 
 ## Tests
 
 Unit and SQL-backed tests cover protections, MIME handling, crypto binding, cursor pagination, rollback, uniqueness and action recovery using synthetic data. The SQL harness uses PGlite. Actual PostgreSQL advisory locks, concurrent worker processes and provider authentication need deployment integration tests.
+
+## Automatic connection
+
+The visible Connect with Google notice posts `intent=filter`. The server binds that intent to the one-use, expiring OAuth state, not to callback parameters. After identity and scope verification, activation is committed with a durable event under the account lock. Repeated connection to an automatic account preserves its cutoff. An older OAuth attempt cannot override a later pause or mode change. Legacy intents do not opt in. New and resumed activations queue only suggestions; kept/restored messages are never replayed. Both mailbox write gates and billing entitlements still apply. Queue publication failures leave durable work for recovery.

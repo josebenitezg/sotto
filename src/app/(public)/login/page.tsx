@@ -40,7 +40,7 @@ export default async function LoginPage({
           <em>for what matters.</em>
         </h1>
         <p className="my-6 max-w-[34ch] text-muted-foreground">
-          Connect Gmail and choose what belongs in your inbox.
+          Connect Gmail. Sotto takes care of the cold emails.
         </p>
         {error && (
           <p
@@ -52,6 +52,7 @@ export default async function LoginPage({
           </p>
         )}
         <form action="/api/google/connect" method="post" className="space-y-4">
+          <input type="hidden" name="intent" value="filter" />
           <GoogleDataNotice id="google-permission" />
           <button
             type="submit"
@@ -64,7 +65,7 @@ export default async function LoginPage({
             <span className="google-cta-icon">
               <GoogleMark />
             </span>{" "}
-            Continue with Google
+            Connect with Google
             <ArrowRight size={16} />
           </button>
         </form>

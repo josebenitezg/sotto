@@ -21,7 +21,7 @@ export async function dashboard(): Promise<Dashboard> {
   if (!loggedIn) return empty;
   const [rawAccounts, rawDecisions, rawRules] = await Promise.all([
     query(
-      `SELECT a.id,a.email,a.name,a.mode,a.policy,a.connected,a.last_sync,a.watch_expires,a.last_error,a.reviewed_at,a.start_at,
+      `SELECT a.id,a.email,a.name,a.mode,a.policy,a.connected,a.last_sync,a.watch_expires,a.last_error,a.reviewed_at,a.start_at,a.history_id,
         j.total,j.done,j.pending,j.failed,j.retrying
        FROM accounts a LEFT JOIN LATERAL (
          SELECT count(*)::int AS total,
@@ -59,6 +59,7 @@ export async function dashboard(): Promise<Dashboard> {
     lastError: a.last_error,
     reviewedAt: iso(a.reviewed_at),
     sync: {
+      scanning: !a.history_id,
       since: iso(a.start_at),
       total: a.total,
       done: a.done,

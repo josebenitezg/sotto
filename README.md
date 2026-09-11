@@ -2,11 +2,11 @@
 
 **A quieter inbox.** Open-source Gmail triage that puts unsolicited sales emails aside and leaves uncertain messages in your inbox.
 
-Connect your work and personal Google accounts, review the proposed decisions, then choose when to enable automatic filtering. Sotto labels messages instead of deleting them. Each move has a reason and an undo action.
+Connect your work and personal Google accounts. The connection notice authorizes automatic filtering of cold outreach from the last seven days of Inbox and new incoming emails. Sotto labels messages instead of deleting them. Each move has a reason and an undo action.
 
 ## Status
 
-Early implementation. Self-hosted installations support one owner with multiple accounts. An optional hosted mode isolates each person’s workspace and adds subscription billing. The interface is in Spanish. It includes OAuth connection, AI classification with per-account preferences, Pub/Sub event ingestion, durable processing, review mode, label changes and undo.
+Early implementation. Self-hosted installations support one owner with multiple accounts. An optional hosted mode isolates each person’s workspace and adds subscription billing. The interface is in English. It includes OAuth connection, AI classification with per-account preferences, Pub/Sub event ingestion, durable processing, review mode, label changes and undo.
 
 Local checks use synthetic messages, mocked Gmail calls and an embedded PostgreSQL engine. They do **not** certify live Google OAuth, Pub/Sub delivery, real-mail classification accuracy or deployment reliability. Run a review pilot on your installation before enabling writes. Public signup and payments are disabled by default. Hosted billing and signup require the additional setup in [billing](docs/billing.md).
 
@@ -41,9 +41,9 @@ See [setup](docs/setup.md) for Google configuration and [architecture](docs/arch
 
 ## Conservative by default
 
-- New accounts start in **review mode**. Read the proposed decisions first.
+- **Connect with Google** starts automatic filtering when AI and account write access are enabled. Accounts without write access remain in review mode.
 - `ENABLE_MAILBOX_WRITES=false` is an independent, installation-wide gate.
-- Automatic mode requires a reviewed sample and an explicitly enabled write gate.
+- Automatic filtering requires an explicit connection/start action and the installation/account write gate. Legacy connections and in-flight OAuth attempts preserve their mode. Pause and undo remain available.
 - Existing conversations, known recipients, starred messages, organization mail and clear operational notices are protected.
 - AI explicitly chooses keep, review or move based on meaning and your preferences. Confidence is informational; sender authentication and enabled categories still constrain moves.
 - Signup follow-ups and newsletters are separate, opt-in categories.

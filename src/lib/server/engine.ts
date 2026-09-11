@@ -157,12 +157,32 @@ async function contextFor(
   }
   return context;
 }
-async function classifyJob(accountId: string, messageId: string, gmail: Gmail) {
+export async function classifyJob(
+  accountId: string,
+  messageId: string,
+  gmail: Gmail,
+) {
   const existing = await query(
-    "SELECT id FROM decisions WHERE account_id=$1 AND message_id=$2",
+    "SELECT id,state FROM decisions WHERE account_id=$1 AND message_id=$2",
     [accountId, messageId],
   );
-  if (existing.length) return;
+  if (existing.length) {
+    // Retry an unfinished automatic move, including suggestions from the
+    // initial review. Kept/restored messages are terminal and stay untouched.
+    if (existing[0].state === "suggested") {
+      const [account] = await query(
+        "SELECT mode,auto_after FROM accounts WHERE id=$1",
+        [accountId],
+      );
+      if (
+        account?.mode === "automatic" &&
+        account.auto_after &&
+        writesEnabled(accountId)
+      )
+        await moveDecision(existing[0].id, gmail, true);
+    }
+    return;
+  }
   const mail = await gmail.message(messageId);
   if (
     !mail.labels.includes("INBOX") ||
@@ -229,6 +249,12 @@ export async function moveDecision(
   )
     return;
   const mail = await gmail.message(decision.message_id);
+  if (
+    automatic &&
+    (!account.auto_after ||
+      mail.receivedAt < new Date(account.auto_after).getTime())
+  )
+    return;
   const ctx = await contextFor(decision.account_id, gmail, mail);
   const blocked = protection(mail, ctx);
   if (

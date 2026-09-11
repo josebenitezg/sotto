@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { GoogleMark, SottoMark } from "@/components/brand";
 import { InboxPreview } from "@/components/inbox-preview";
+import { GoogleDataNotice } from "@/components/google-data-notice";
 import { configured, isDemo } from "@/lib/server/config";
 import { sessionWorkspace } from "@/lib/server/auth";
 
@@ -19,7 +20,7 @@ const questions = [
   ],
   [
     "How does it decide what to move?",
-    "AI considers each message, the conversation, and your preferences. Review its suggestions first, then turn on automatic filtering when you are ready. Uncertain messages stay for review.",
+    "AI considers each message, the conversation, and your preferences. Connecting starts filtering the last 7 days of your inbox, then new emails. Uncertain messages stay in your inbox.",
   ],
   [
     "What if it moves something important?",
@@ -65,16 +66,20 @@ export default async function LandingPage() {
               method="post"
               className="hero-connect"
             >
+              <input type="hidden" name="intent" value="filter" />
+              <div className="mb-4 max-w-md">
+                <GoogleDataNotice id="hero-permission" />
+              </div>
               <button
                 type="submit"
                 className="google-cta pressable"
                 disabled={!ready}
-                aria-describedby="hero-google-status"
+                aria-describedby="hero-permission hero-google-status"
               >
                 <span className="google-cta-icon">
                   <GoogleMark />
                 </span>
-                Continue with Google
+                Connect with Google
                 <ArrowRight size={16} />
               </button>
             </form>
@@ -130,18 +135,18 @@ export default async function LandingPage() {
           </article>
           <article>
             <span className="step-number">02</span>
-            <h3>Tell it what matters.</h3>
+            <h3>Let Sotto sort it.</h3>
             <p>
-              Share your preferences and review the first suggestions. AI
-              considers the context of each message.
+              AI checks the last 7 days of your inbox and keeps watching for new
+              mail. Uncertain messages stay in your inbox.
             </p>
           </article>
           <article>
             <span className="step-number">03</span>
             <h3>Get back to your day.</h3>
             <p>
-              Turn on automatic filtering when you are ready. Sales pitches move
-              aside, and every move can be undone.
+              Find cold outreach under Sotto/Cold in Gmail. Pause anytime, and
+              undo any move.
             </p>
           </article>
         </div>

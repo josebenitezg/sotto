@@ -32,6 +32,7 @@ export type Account = {
   lastError: string | null;
   reviewedAt: string | null;
   sync?: {
+    scanning?: boolean;
     since: string;
     total: number;
     done: number;

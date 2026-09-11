@@ -1207,3 +1207,40 @@ it("disconnects Composio locally while retaining retryable revocation if the pro
       .rows,
   ).toEqual([{ id: "d-a" }]);
 });
+
+it("allows the internal pilot to link a third account while retaining workspace isolation", async () => {
+  await h.db.query("UPDATE workspaces SET internal=true WHERE id='a'");
+  await connectIdentity(
+    { sub: "second-a", email: "second@example.com" },
+    undefined,
+    "a",
+    new Date(),
+    false,
+    { id: "ca-second", userId: "owner-second" },
+  );
+  await connectIdentity(
+    { sub: "third-a", email: "third@example.com" },
+    undefined,
+    "a",
+    new Date(),
+    false,
+    { id: "ca-third", userId: "owner-third" },
+  );
+  expect(
+    (
+      await h.db.query(
+        "SELECT count(*)::int AS n FROM accounts WHERE workspace_id='a' AND connected=true",
+      )
+    ).rows,
+  ).toEqual([{ n: 3 }]);
+  await expect(
+    connectIdentity(
+      { sub: "gmail-b", email: "b@example.com" },
+      undefined,
+      "a",
+      new Date(),
+      false,
+      { id: "ca-foreign", userId: "owner-foreign" },
+    ),
+  ).rejects.toMatchObject({ code: "workspace_conflict", status: 409 });
+});

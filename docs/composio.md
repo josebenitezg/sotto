@@ -26,3 +26,9 @@ The managed Gmail trigger polls for Inbox messages, with an interval of 15 minut
 Native Composio operations handle listing, history, profiles, and label changes. Raw message and thread reads use Composio's Google API proxy to preserve Gmail authentication headers, timestamps, and MIME structure. These have separate provider usage limits; monitor direct tool calls, proxy requests, trigger events, and OpenAI costs. The application does not automatically upgrade the Composio plan.
 
 Managed OAuth does not, by itself, establish that every public product is exempt from Google's verification or security requirements. Confirm that the provider's terms and verification cover your use case before a public commercial launch. Keep public signup closed during the pilot.
+
+## Private pilot and connection errors
+
+With public signup disabled, only addresses in `ALLOWED_GOOGLE_EMAILS` can connect. Add an invited address there before retrying. If `MAILBOX_WRITE_ACCOUNT_IDS` is configured, its verified Google account ID must also be included before automatic filtering can start. Internal workspaces are exempt from the commercial plan's two-account limit; ordinary hosted workspaces retain that limit.
+
+Connection failures return a fixed error code and a useful next step in English. Server logs include the provider, failing stage, code, duration, and HTTP status when available. They do not include email addresses, authorization URLs, tokens, or provider response bodies.

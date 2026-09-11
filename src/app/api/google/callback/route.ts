@@ -13,6 +13,11 @@ import { query } from "@/lib/server/db";
 import { enqueueAccount } from "@/lib/server/queue";
 import { processingAllowed } from "@/lib/server/entitlements";
 import {
+  ConnectionError,
+  logConnectionFailure,
+} from "@/lib/server/connection-error";
+import type { ConnectionErrorCode } from "@/lib/connection-errors";
+import {
   createSession,
   cookieOptions,
   oauthCookie,
@@ -20,24 +25,32 @@ import {
   sessionWorkspace,
 } from "@/lib/server/auth";
 export async function GET(request: Request) {
+  const started = Date.now();
+  let stage = "browser_state";
+  let fallback: ConnectionErrorCode = "failed";
+  console.info(
+    JSON.stringify({ event: "gmail_connection_started", provider: "google" }),
+  );
   try {
     if (isDemo()) throw new Error("Demo has no Google connections");
     const params = new URL(request.url).searchParams;
     const state = params.get("state"),
       code = params.get("code"),
       browser = (await cookies()).get(oauthCookie)?.value;
-    if (!state || !code || !browser || params.has("error"))
-      throw new Error("Invalid callback");
+    if (params.has("error")) throw new ConnectionError("canceled");
+    if (!state || !code || !browser) throw new ConnectionError("expired");
     const [pending] = await query(
       "DELETE FROM oauth_states WHERE state_hash=$1 AND browser_hash=$2 AND expires_at>now() RETURNING verifier_cipher,workspace_id,created_at,start_filtering",
       [hash(state), hash(browser)],
     );
-    if (!pending) throw new Error("Expired state");
+    if (!pending) throw new ConnectionError("expired");
     if (
       pending.workspace_id &&
       pending.workspace_id !== (await sessionWorkspace())
     )
-      throw new Error("Linking session changed");
+      throw new ConnectionError("session_changed");
+    stage = "token_exchange";
+    fallback = "provider";
     const client = googleClient();
     const { tokens } = await client.getToken({
       code,
@@ -45,22 +58,24 @@ export async function GET(request: Request) {
     });
     if (!tokens.id_token || !tokens.access_token)
       throw new Error("Incomplete authorization");
+    stage = "google_identity";
     const identity = (
       await client.verifyIdToken({
         idToken: tokens.id_token,
         audience: process.env.GOOGLE_CLIENT_ID,
       })
     ).getPayload();
-    if (
-      !identity?.sub ||
-      !identity.email ||
-      !identity.email_verified ||
-      (!publicSignup() && !allowedEmail(identity.email))
-    )
-      throw new Error("Account not allowed");
+    if (!identity?.sub || !identity.email || !identity.email_verified)
+      throw new ConnectionError("provider");
+    stage = "admission";
+    fallback = "failed";
+    if (!publicSignup() && !allowedEmail(identity.email))
+      throw new ConnectionError("not_allowed", 403);
+    stage = "gmail_permission";
     const info = await client.getTokenInfo(tokens.access_token);
     if (!info.scopes.includes(gmailScope))
-      throw new Error("Gmail permission missing");
+      throw new ConnectionError("permissions", 403);
+    stage = "workspace";
     const workspaceId = await connectIdentity(
       { sub: identity.sub, email: identity.email },
       tokens.refresh_token ?? undefined,
@@ -76,6 +91,7 @@ export async function GET(request: Request) {
         [identity.sub],
       );
     }
+    stage = "session";
     const session = await createSession(workspaceId);
     const response = NextResponse.redirect(
       `${appUrl()}/${(await processingAllowed(workspaceId)) ? "review" : "pricing"}?connected=1`,
@@ -85,10 +101,19 @@ export async function GET(request: Request) {
       maxAge: 7 * 86400,
     });
     response.cookies.delete(oauthCookie);
+    console.info(
+      JSON.stringify({
+        event: "gmail_connection_completed",
+        provider: "google",
+        durationMs: Date.now() - started,
+      }),
+    );
     return response;
-  } catch {
+  } catch (error) {
+    const code = error instanceof ConnectionError ? error.code : fallback;
+    logConnectionFailure("google", stage, code, error, started);
     const response = NextResponse.redirect(
-      `${appUrl()}/login?connection_error=1`,
+      `${appUrl()}/login?connection_error=${code}`,
     );
     response.cookies.delete(oauthCookie);
     return response;

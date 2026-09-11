@@ -3,7 +3,7 @@ import { hosted, writesEnabled } from "./config";
 import { classifierConfigured } from "./ai";
 import { startFiltering } from "./filtering";
 import { transaction } from "./db";
-import { HttpError } from "./auth";
+import { ConnectionError } from "./connection-error";
 import { seal } from "./crypto";
 import type { ComposioConnection } from "./composio";
 
@@ -44,10 +44,7 @@ export async function connectIdentity(
         (access?.workspace_id || existing?.workspace_id) !== linkedWorkspace) ||
       (access && existing && access.workspace_id !== existing.workspace_id)
     )
-      throw new HttpError(
-        409,
-        "That account already belongs to another Sotto workspace.",
-      );
+      throw new ConnectionError("workspace_conflict", 409);
     if (
       access?.gmail_deleted_at &&
       (!authorizationStartedAt ||
@@ -55,10 +52,7 @@ export async function connectIdentity(
         new Date(authorizationStartedAt).getTime() <=
           new Date(access.gmail_deleted_at).getTime())
     )
-      throw new HttpError(
-        409,
-        "Gmail data was deleted after this connection started. Connect Google again to authorize it.",
-      );
+      throw new ConnectionError("data_deleted", 409);
     // Isolation is independent of paid plans. Only an existing identity or
     // a browser-bound linking session can select an existing workspace.
     const workspaceId =
@@ -70,23 +64,25 @@ export async function connectIdentity(
       "INSERT INTO workspaces(id,email) VALUES($1,$2) ON CONFLICT(id) DO NOTHING",
       [workspaceId, identity.email],
     );
-    // Serializes simultaneous connections so the two-account limit is real.
-    await db.query("SELECT id FROM workspaces WHERE id=$1 FOR UPDATE", [
-      workspaceId,
-    ]);
+    // Serializes simultaneous connections and reads trusted, server-owned plan status.
+    const {
+      rows: [workspace],
+    } = await db.query(
+      "SELECT id,internal FROM workspaces WHERE id=$1 FOR UPDATE",
+      [workspaceId],
+    );
     await db.query(
       "INSERT INTO workspace_identities(id,workspace_id) VALUES($1,$2) ON CONFLICT(id) DO NOTHING",
       [identity.sub, workspaceId],
     );
-    if (hosted() && !existing?.connected) {
+    if (hosted() && !workspace.internal && !existing?.connected) {
       const {
         rows: [count],
       } = await db.query(
         "SELECT count(*)::int AS n FROM accounts WHERE workspace_id=$1 AND connected=true",
         [workspaceId],
       );
-      if (count.n >= 2)
-        throw new HttpError(409, "The plan includes up to two Gmail accounts.");
+      if (count.n >= 2) throw new ConnectionError("account_limit", 409);
     }
     if (!composio && !refreshToken && !existing?.token_cipher)
       throw new Error("Offline access missing");

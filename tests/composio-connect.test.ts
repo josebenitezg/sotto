@@ -35,12 +35,15 @@ vi.mock("../src/lib/server/entitlements", () => ({
   processingAllowed: async () => true,
 }));
 import { GET } from "../src/app/api/composio/callback/route";
+import { ConnectionError } from "../src/lib/server/connection-error";
 const request = () =>
   new Request(
     "https://sotto.example/api/composio/callback?session_uri=opaque-session",
   );
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.spyOn(console, "info").mockImplementation(() => {});
+  vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.stubEnv("DEMO_MODE", "false");
   vi.stubEnv("APP_URL", "https://sotto.example");
   vi.stubEnv("PUBLIC_SIGNUP", "false");
@@ -62,7 +65,10 @@ beforeEach(() => {
   h.connect.mockResolvedValue("workspace");
   h.session.mockResolvedValue("session-token");
 });
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 it("rejects a callback in another browser before activating the connection", async () => {
   h.cookie = undefined;
   expect((await GET(request())).headers.get("location")).toContain(
@@ -113,13 +119,59 @@ it("activates only its stored connection and filtering intent, preserving the ve
 });
 it("does not save disallowed identities and removes the rejected provider connection", async () => {
   h.identity.mockResolvedValue({ sub: "other", email: "stranger@example.com" });
-  await GET(request());
+  const response = await GET(request());
+  expect(response.headers.get("location")).toContain(
+    "connection_error=not_allowed",
+  );
   expect(h.connect).not.toHaveBeenCalled();
   expect(h.remove).toHaveBeenCalledWith("ca_test");
+  expect(JSON.parse(vi.mocked(console.warn).mock.calls[0][0])).toMatchObject({
+    event: "gmail_connection_failed",
+    stage: "admission",
+    code: "not_allowed",
+    status: 403,
+  });
 });
 it("keeps a successful connection when queue publication fails", async () => {
   h.enqueue.mockRejectedValue(new Error("Queue offline"));
   const response = await GET(request());
   expect(response.headers.get("location")).toContain("connected=1");
   expect(h.remove).not.toHaveBeenCalled();
+});
+
+it.each(["account_limit", "workspace_conflict", "data_deleted"] as const)(
+  "preserves a typed workspace rejection (%s)",
+  async (code) => {
+    h.connect.mockRejectedValue(new ConnectionError(code, 409));
+    const response = await GET(request());
+    expect(response.headers.get("location")).toContain(
+      `connection_error=${code}`,
+    );
+    expect(h.remove).toHaveBeenCalledWith("ca_test");
+    expect(h.session).not.toHaveBeenCalled();
+  },
+);
+it("logs the failing provider stage without exposing response bodies or credentials", async () => {
+  h.identity.mockRejectedValue(
+    Object.assign(
+      new Error(
+        "private@example.com bearer secret-value https://example.com/?token=private",
+      ),
+      { status: 502 },
+    ),
+  );
+  const response = await GET(request());
+  expect(response.headers.get("location")).toContain(
+    "connection_error=provider",
+  );
+  const output = JSON.stringify(vi.mocked(console.warn).mock.calls);
+  expect(output).not.toContain("private@example.com");
+  expect(output).not.toContain("secret-value");
+  expect(output).not.toContain("token=");
+  expect(JSON.parse(vi.mocked(console.warn).mock.calls[0][0])).toMatchObject({
+    provider: "composio",
+    stage: "google_identity",
+    code: "provider",
+    status: 502,
+  });
 });

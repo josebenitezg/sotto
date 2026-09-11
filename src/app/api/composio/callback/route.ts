@@ -24,34 +24,56 @@ import {
   sessionWorkspace,
 } from "@/lib/server/auth";
 import { queueComposioCleanup } from "@/lib/server/composio-cleanup";
+import {
+  ConnectionError,
+  logConnectionFailure,
+} from "@/lib/server/connection-error";
+import type { ConnectionErrorCode } from "@/lib/connection-errors";
 
 export async function GET(request: Request) {
   let ownedConnection: string | undefined;
   let saved = false;
+  let stage = "browser_state";
+  let fallback: ConnectionErrorCode = "failed";
+  const started = Date.now();
+  console.info(
+    JSON.stringify({ event: "gmail_connection_started", provider: "composio" }),
+  );
   try {
     if (isDemo()) throw new Error("Demo has no connections");
-    const uri = new URL(request.url).searchParams.get("session_uri");
+    const params = new URL(request.url).searchParams;
+    if (params.get("error") === "access_denied")
+      throw new ConnectionError("canceled");
+    if (params.get("status") === "failed")
+      throw new ConnectionError("provider");
+    const uri = params.get("session_uri");
     const browser = (await cookies()).get(composioCookie)?.value;
     // A normal Connect Link callback is deliberately insufficient. Require
     // Composio's deferred identity-verification callback and the same browser.
     if (!uri || uri.length > 4096 || !browser)
-      throw new Error("Invalid callback");
+      throw new ConnectionError("expired");
     const [pending] = await query(
       "DELETE FROM composio_states WHERE browser_hash=$1 AND expires_at>now() RETURNING *",
       [hash(browser)],
     );
-    if (!pending) throw new Error("Expired connection");
+    if (!pending) throw new ConnectionError("expired");
     ownedConnection = pending.connection_id;
     if (
       pending.workspace_id &&
       pending.workspace_id !== (await sessionWorkspace())
     )
-      throw new Error("Linking session changed");
+      throw new ConnectionError("session_changed");
+    stage = "complete_auth";
+    fallback = "provider";
     await completeComposioLink(uri, pending.user_id, pending.connection_id);
     const connection = { id: pending.connection_id, userId: pending.user_id };
+    stage = "google_identity";
     const identity = await composioIdentity(connection);
+    stage = "admission";
+    fallback = "failed";
     if (!publicSignup() && !allowedEmail(identity.email))
-      throw new Error("Account not allowed");
+      throw new ConnectionError("not_allowed", 403);
+    stage = "workspace";
     const workspaceId = await connectIdentity(
       identity,
       undefined,
@@ -69,6 +91,7 @@ export async function GET(request: Request) {
         [identity.sub],
       );
     }
+    stage = "session";
     const response = NextResponse.redirect(
       `${appUrl()}/${(await processingAllowed(workspaceId)) ? "review" : "pricing"}?connected=1`,
     );
@@ -77,17 +100,35 @@ export async function GET(request: Request) {
       maxAge: 7 * 86400,
     });
     response.cookies.delete(composioCookie);
+    console.info(
+      JSON.stringify({
+        event: "gmail_connection_completed",
+        provider: "composio",
+        durationMs: Date.now() - started,
+      }),
+    );
     return response;
-  } catch {
+  } catch (error) {
+    const code = error instanceof ConnectionError ? error.code : fallback;
+    logConnectionFailure("composio", stage, code, error, started);
     if (ownedConnection && !saved) {
       try {
         await deleteComposioConnection(ownedConnection);
       } catch {
-        await queueComposioCleanup(ownedConnection);
+        try {
+          await queueComposioCleanup(ownedConnection);
+        } catch {
+          console.warn(
+            JSON.stringify({
+              event: "gmail_connection_cleanup_failed",
+              provider: "composio",
+            }),
+          );
+        }
       }
     }
     const response = NextResponse.redirect(
-      `${appUrl()}/login?connection_error=1`,
+      `${appUrl()}/login?connection_error=${code}`,
     );
     response.cookies.delete(composioCookie);
     return response;

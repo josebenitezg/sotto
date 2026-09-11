@@ -5,6 +5,16 @@ import { HttpError } from "./auth";
 import { query, transaction } from "./db";
 import { hasAccess } from "./entitlements";
 import { enqueueAccount } from "./queue";
+import { isPlanId, plans, type PlanId } from "../plans";
+
+export function priceId(plan: PlanId) {
+  return required(
+    plan === "solo" ? "STRIPE_PRICE_SOLO_ID" : "STRIPE_PRICE_DUO_ID",
+  );
+}
+function planForPrice(id: string): PlanId | undefined {
+  return (Object.keys(plans) as PlanId[]).find((plan) => priceId(plan) === id);
+}
 
 export const TRIAL_DAYS = 3;
 export const trialRequiresCard = () =>
@@ -16,7 +26,8 @@ export const billingReady = () =>
   process.env.CHECKOUT_ENABLED === "true" &&
   [
     "STRIPE_SECRET_KEY",
-    "STRIPE_PRICE_ID",
+    "STRIPE_PRICE_SOLO_ID",
+    "STRIPE_PRICE_DUO_ID",
     "STRIPE_WEBHOOK_SECRET",
     "STRIPE_PORTAL_CONFIGURATION_ID",
   ].every((key) => !!process.env[key]?.trim());
@@ -36,17 +47,18 @@ export function checkoutParameters(
   workspaceId: string,
   customer: string,
   trialUsed: boolean,
+  plan: PlanId = "duo",
 ): Stripe.Checkout.SessionCreateParams {
   return {
     mode: "subscription",
     customer,
     client_reference_id: workspaceId,
-    line_items: [{ price: required("STRIPE_PRICE_ID"), quantity: 1 }],
+    line_items: [{ price: priceId(plan), quantity: 1 }],
     payment_method_collection:
       trialUsed || trialRequiresCard() ? "always" : "if_required",
     payment_method_types: ["card"],
     subscription_data: {
-      metadata: { sotto_workspace_id: workspaceId, application: "sotto" },
+      metadata: { sotto_workspace_id: workspaceId, application: "sotto", plan },
       ...(trialUsed
         ? {}
         : {
@@ -56,7 +68,7 @@ export function checkoutParameters(
             },
           }),
     },
-    metadata: { sotto_workspace_id: workspaceId, application: "sotto" },
+    metadata: { sotto_workspace_id: workspaceId, application: "sotto", plan },
     success_url: `${appUrl()}/pricing?checkout=success`,
     cancel_url: `${appUrl()}/pricing?checkout=canceled`,
     locale: "en",
@@ -71,13 +83,14 @@ function serviceAvailable() {
     );
 }
 
-export async function checkout(workspaceId: string) {
+export async function checkout(workspaceId: string, plan: PlanId = "duo") {
   serviceAvailable();
+  if (!isPlanId(plan)) throw new HttpError(400, "Choose Solo or Duo.");
   // Persist the idempotency key before provider calls. A timeout or database
   // failure can then be retried without creating a second Checkout Session.
   await query(
-    "UPDATE workspaces SET checkout_attempt=$2 WHERE id=$1 AND checkout_attempt IS NULL",
-    [workspaceId, randomUUID()],
+    "UPDATE workspaces SET checkout_attempt=$2,checkout_plan=$3 WHERE id=$1 AND checkout_attempt IS NULL",
+    [workspaceId, randomUUID(), plan],
   );
   return transaction(async (db) => {
     const {
@@ -90,17 +103,22 @@ export async function checkout(workspaceId: string) {
     const {
       rows: [account],
     } = await db.query(
-      "SELECT id FROM accounts WHERE workspace_id=$1 AND connected=true LIMIT 1",
+      "SELECT count(*)::int AS count FROM accounts WHERE workspace_id=$1 AND connected=true",
       [workspaceId],
     );
-    if (!account)
+    if (!account?.count)
       throw new HttpError(409, "Connect Gmail before starting your trial.");
+    if (account.count > plans[plan].mailboxes)
+      throw new HttpError(
+        409,
+        "Disconnect an extra Gmail account before choosing Solo.",
+      );
     const api = stripe();
-    const price = await api.prices.retrieve(required("STRIPE_PRICE_ID"));
+    const price = await api.prices.retrieve(priceId(plan));
     if (
       !price.active ||
       price.currency !== "usd" ||
-      price.unit_amount !== Number(process.env.PLAN_PRICE_CENTS || "900") ||
+      price.unit_amount !== plans[plan].priceCents ||
       price.recurring?.interval !== "month" ||
       price.recurring.interval_count !== 1
     )
@@ -150,29 +168,57 @@ export async function checkout(workspaceId: string) {
       const previous = await api.checkout.sessions.retrieve(
         workspace.checkout_id,
       );
-      if (previous.status === "open" && previous.url) return previous.url;
+      if (
+        previous.status === "open" &&
+        previous.url &&
+        workspace.checkout_plan === plan
+      )
+        return previous.url;
+      if (previous.status === "open")
+        await api.checkout.sessions.expire(previous.id);
       // Save the next key outside this transaction before a later retry.
       await db.query(
-        "UPDATE workspaces SET checkout_id=NULL,checkout_url=NULL,checkout_expires=NULL,checkout_attempt=NULL WHERE id=$1",
+        "UPDATE workspaces SET checkout_id=NULL,checkout_url=NULL,checkout_expires=NULL,checkout_attempt=NULL,checkout_plan=NULL WHERE id=$1",
         [workspaceId],
       );
       return null;
     }
+    // An earlier provider call may have succeeded before its database save
+    // failed. Recover the same plan first so retries keep identical parameters.
+    const attemptPlan = isPlanId(workspace.checkout_plan)
+      ? workspace.checkout_plan
+      : "duo";
     const session = await api.checkout.sessions.create(
-      checkoutParameters(workspaceId, customer, trialUsed),
+      checkoutParameters(workspaceId, customer, trialUsed, attemptPlan),
       {
         idempotencyKey: `sotto:checkout:${workspaceId}:${workspace.checkout_attempt}`,
       },
     );
     if (!session.url) throw new Error("Checkout URL missing");
+    if (attemptPlan !== plan) {
+      const recovered = await api.checkout.sessions.retrieve(session.id);
+      if (recovered.status === "open")
+        await api.checkout.sessions.expire(recovered.id);
+      if (recovered.status === "complete")
+        throw new HttpError(
+          409,
+          "Your previous checkout is complete. Refresh your subscription status.",
+        );
+      await db.query(
+        "UPDATE workspaces SET checkout_id=NULL,checkout_url=NULL,checkout_expires=NULL,checkout_attempt=NULL,checkout_plan=NULL WHERE id=$1",
+        [workspaceId],
+      );
+      return null;
+    }
     await db.query(
-      "UPDATE workspaces SET checkout_id=$2,checkout_url=$3,checkout_expires=$4,trial_used=$5 WHERE id=$1",
+      "UPDATE workspaces SET checkout_id=$2,checkout_url=$3,checkout_expires=$4,trial_used=$5,checkout_plan=$6 WHERE id=$1",
       [
         workspaceId,
         session.id,
         session.url,
         new Date(session.expires_at * 1000),
         trialUsed,
+        plan,
       ],
     );
     return session.url;
@@ -225,11 +271,9 @@ export async function reconcileCustomer(customerId: string) {
     const subscription = ours.sort((a, b) => b.created - a.created)[0];
     if (!subscription) return null;
     const items = subscription.items.data;
-    if (
-      items.length !== 1 ||
-      items[0].price.id !== required("STRIPE_PRICE_ID") ||
-      items[0].quantity !== 1
-    )
+    const plan =
+      items.length === 1 ? planForPrice(items[0].price.id) : undefined;
+    if (items.length !== 1 || !plan || items[0].quantity !== 1)
       throw new Error("Unexpected subscription product");
     const invoice =
       typeof subscription.latest_invoice === "object"
@@ -244,7 +288,7 @@ export async function reconcileCustomer(customerId: string) {
       : null;
     await db.query(
       `UPDATE workspaces SET stripe_subscription_id=$2,subscription_status=$3,
-      trial_used=trial_used OR $4,trial_end=$5,paid_until=$6,cancel_at_period_end=$7,billing_updated_at=now()
+      trial_used=trial_used OR $4,trial_end=$5,paid_until=$6,cancel_at_period_end=$7,billing_plan=$8,billing_updated_at=now()
       WHERE id=$1`,
       [
         workspace.id,
@@ -254,6 +298,7 @@ export async function reconcileCustomer(customerId: string) {
         trialEnd,
         paidUntil,
         subscription.cancel_at_period_end,
+        plan,
       ],
     );
     return hasAccess({

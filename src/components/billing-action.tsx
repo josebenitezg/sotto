@@ -2,17 +2,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
+import type { PlanId } from "@/lib/plans";
 
 export function BillingAction({
   action,
   children,
   disabled = false,
   secondary = false,
+  plan,
 }: {
   action: "checkout" | "portal" | "refresh";
   children: React.ReactNode;
   disabled?: boolean;
   secondary?: boolean;
+  plan?: PlanId;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -29,7 +32,11 @@ export function BillingAction({
         try {
           const response = await fetch(`/api/billing/${action}`, {
             method: "POST",
-            headers: { accept: "application/json" },
+            headers: {
+              accept: "application/json",
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({ plan }),
           });
           const result = await response.json();
           if (!response.ok)

@@ -47,6 +47,12 @@ export function PublicFooter() {
       </span>
       <nav aria-label="Footer" className="flex items-center gap-6">
         <Link
+          href="/terms"
+          className="transition-colors duration-[120ms] hover:text-foreground"
+        >
+          Terms
+        </Link>
+        <Link
           href="/privacy"
           className="transition-colors duration-[120ms] hover:text-foreground"
         >

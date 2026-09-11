@@ -22,9 +22,7 @@ it("keeps legacy or untrusted error parameters generic without reflecting their 
 });
 it("gives a useful next step for a pilot or plan restriction without blaming Gmail consent", () => {
   expect(connectionErrorMessage("not_allowed")).toContain("private pilot");
-  expect(connectionErrorMessage("account_limit")).toContain(
-    "two Gmail accounts",
-  );
+  expect(connectionErrorMessage("account_limit")).toContain("Change your plan");
   expect(connectionErrorMessage("not_allowed")).not.toContain(
     "allow access to Gmail",
   );

@@ -30,8 +30,11 @@ export default function PrivacyPage() {
       <p className="text-muted-foreground">
         Connection identifiers, encrypted credentials for direct Google
         connections, rules, message identifiers, sender, subject, and decision
-        history. Sotto does not store full message bodies. You can delete a
-        Gmail connection's data from Accounts, as explained below.
+        history. We also store the AI model and input, cached-input and output
+        token counts linked to the account to measure service usage and cost.
+        These usage records contain no message text. Sotto does not store full
+        message bodies. You can delete a Gmail connection's data from Accounts,
+        as explained below.
       </p>
       <h2 id="data-protection">How we protect Google user data</h2>
       <p className="text-muted-foreground">
@@ -194,16 +197,16 @@ export default function PrivacyPage() {
       <p className="text-[13px] leading-5 text-muted-foreground">
         <strong>Delete Gmail data.</strong> In Accounts, this action asks you to
         confirm the address and removes that account's connection, credential,
-        preferences, allowed senders, decisions, jobs, and events from the
-        active database. It stops processing even if Google revocation fails.
-        Emails and labels stay as they are in Gmail; deleting the history means
-        moves can no longer be undone from Sotto. We retain the minimum identity
-        linking your sign-in to your workspace, the deletion time to prevent
-        reconnections started before the request, your workspace email, and plan
-        data. Other accounts are not deleted. Reconnecting Google through the
-        connection notice authorizes filtering again. This action does not
-        request deletion of records that providers may retain under their own
-        policies.
+        preferences, allowed senders, decisions, jobs, events, and AI usage
+        records from the active database. It stops processing even if Google
+        revocation fails. Emails and labels stay as they are in Gmail; deleting
+        the history means moves can no longer be undone from Sotto. We retain
+        the minimum identity linking your sign-in to your workspace, the
+        deletion time to prevent reconnections started before the request, your
+        workspace email, and plan data. Other accounts are not deleted.
+        Reconnecting Google through the connection notice authorizes filtering
+        again. This action does not request deletion of records that providers
+        may retain under their own policies.
       </p>
       <p className="text-[13px] leading-5 text-muted-foreground">
         For support, privacy questions, or requests to delete sotto.email data,

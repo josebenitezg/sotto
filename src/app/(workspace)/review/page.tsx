@@ -8,13 +8,12 @@ export default async function Page({
   return (
     <>
       {params.connection_error ? (
-        <div
+        <p
           role="alert"
-          className="mb-6 rounded-xl border border-destructive/30 bg-card p-4 text-sm text-destructive"
+          className="mb-6 rounded-sm border border-destructive/40 px-3 py-2.5 text-[13px] leading-[18px] text-destructive"
         >
-          The connection did not complete. Choose an enabled account and allow
-          access to Gmail.
-        </div>
+          The connection did not complete. Try again and allow access to Gmail.
+        </p>
       ) : null}
       <ReviewPage />
     </>

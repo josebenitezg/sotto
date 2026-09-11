@@ -10,31 +10,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  ArrowDownToLine,
-  ArrowRight,
-  Check,
-  ChevronRight,
-  CircleHelp,
-  CreditCard,
-  ExternalLink,
-  Github,
-  Inbox,
-  ListFilter,
-  Mail,
-  Pause,
-  Plus,
-  RefreshCw,
-  Settings2,
-  ShieldCheck,
-  Sparkles,
-  Undo2,
-  UsersRound,
-  X,
-} from "lucide-react";
+import { ChevronRight, ExternalLink, Plus, X } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -63,7 +41,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { GoogleMark, SottoMark } from "./brand";
+import { GoogleMark } from "./brand";
+import { Wordmark } from "./public-shell";
 import { GoogleDataNotice } from "./google-data-notice";
 import type { Account, Dashboard, Decision, Mode } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -79,11 +58,11 @@ type ContextValue = {
 const WorkspaceContext = createContext<ContextValue | null>(null);
 const useWorkspace = () => useContext(WorkspaceContext)!;
 const nav = [
-  { href: "/review", label: "My inbox", icon: Inbox },
-  { href: "/accounts", label: "Accounts", icon: Mail },
-  { href: "/allowlist", label: "Allowlist", icon: ShieldCheck },
-  { href: "/settings", label: "Settings", icon: Settings2 },
-  { href: "/pricing", label: "Plan", icon: CreditCard },
+  { href: "/review", label: "Inbox" },
+  { href: "/accounts", label: "Accounts" },
+  { href: "/allowlist", label: "Allowlist" },
+  { href: "/settings", label: "Settings" },
+  { href: "/pricing", label: "Plan" },
 ];
 const modeLabels = {
   review: "Review mode",
@@ -98,6 +77,12 @@ const categoryLabels = {
   personal: "Relevant",
   uncertain: "Needs review",
 };
+const time = (value: string) =>
+  new Date(value).toLocaleString("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }) + " UTC";
 
 function applyDemo(data: Dashboard, action: Action): Dashboard {
   const next = structuredClone(data);
@@ -245,151 +230,74 @@ export function Workspace({
       setBusy(false);
     }
   }
-  const suggested = data.decisions.filter(
-    (d) => d.state === "suggested",
-  ).length;
   return (
     <WorkspaceContext.Provider
       value={{ data, act, busy, error, clearError: () => setError(null) }}
     >
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-card focus:p-3"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-sm focus:bg-background-2 focus:px-3 focus:py-2"
       >
         Skip to content
       </a>
-      <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r bg-card px-4 py-7 md:flex">
-        <Link
-          href="/"
-          className="mb-12 flex items-center gap-2.5 px-3 text-primary"
-          aria-label="Sotto, home"
-        >
-          <SottoMark />
-          <span className="text-[25px] leading-8 font-semibold tracking-[-0.06em] text-foreground">
-            sotto
-          </span>
-        </Link>
-        <nav aria-label="Main navigation" className="space-y-1">
-          {nav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={pathname === item.href ? "page" : undefined}
-              className={cn(
-                "flex h-11 items-center gap-3 rounded-md px-3 font-medium",
-                pathname === item.href
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:bg-muted/60",
-              )}
-            >
-              <item.icon size={18} strokeWidth={1.75} />
-              {item.label}
-              {item.href === "/" && suggested > 0 ? (
-                <span className="ml-auto rounded-md bg-card px-1.5 text-xs tabular-nums">
-                  {suggested}
-                </span>
-              ) : null}
-            </Link>
-          ))}
-        </nav>
-        <div className="mt-auto space-y-6 px-3">
-          <div className="flex items-start gap-2.5 text-xs leading-5 text-muted-foreground">
-            <ShieldCheck size={16} className="mt-0.5 shrink-0" />
-            <p>
-              Your email stays in Gmail.
-              <br />
-              You have the final say.
-            </p>
-          </div>
-          <a
-            href="https://github.com/josebenitezg/sotto"
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <Github size={15} />
-            Open source<span className="ml-auto">v0.1</span>
-          </a>
-        </div>
-      </aside>
-      <div className="md:ml-60">
-        <header className="flex h-16 items-center justify-between border-b bg-background px-5 md:px-8">
-          <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-            <span className="hidden md:inline">Your email</span>
-            <ChevronRight size={14} className="hidden md:inline" />
-            <span className="font-medium text-foreground md:font-normal">
-              {nav.find((n) => n.href === pathname)?.label ?? "Sotto"}
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            {data.demo ? (
-              <Badge
-                variant="outline"
-                className="border-border bg-card text-muted-foreground"
-              >
-                Sample view
-              </Badge>
-            ) : (
-              <span className="text-xs text-muted-foreground">
-                Your private workspace
-              </span>
-            )}
-            <SottoMark className="size-6 text-primary md:hidden" />
-          </div>
-        </header>
-        <main
-          id="main"
-          className="mx-auto max-w-[944px] px-5 pt-8 pb-28 md:px-8 md:pt-10 md:pb-12"
-        >
+      <header className="border-b">
+        <div className="mx-auto flex h-14 max-w-[880px] items-center justify-between px-4 md:px-6">
+          <Wordmark />
           {data.demo ? (
-            <div className="mb-8 flex items-start gap-2.5 text-[13px] text-muted-foreground">
-              <CircleHelp size={16} className="mt-0.5 shrink-0" />
-              <p>
-                These are sample emails. Try the controls; your Gmail stays
-                unchanged.
-              </p>
-            </div>
+            <span className="text-xs text-muted-foreground">
+              Demo · nothing touches Gmail
+            </span>
           ) : null}
-          {error ? (
-            <div
-              role="alert"
-              className="mb-6 rounded-lg border border-destructive/30 bg-card p-4 text-destructive"
-            >
-              {error}
-            </div>
-          ) : null}
-          {children}
-        </main>
-      </div>
-      <nav
-        aria-label="Mobile navigation"
-        className="fixed inset-x-0 bottom-0 z-30 flex justify-around border-t bg-card pt-2 pb-[max(12px,env(safe-area-inset-bottom))] md:hidden"
+        </div>
+        <nav
+          aria-label="Main navigation"
+          className="scrollbar-none mx-auto flex max-w-[880px] overflow-x-auto px-2 md:px-4"
+        >
+          {nav.map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "relative flex h-10 shrink-0 items-center px-2 text-[13px] transition-colors duration-[120ms] after:absolute after:inset-x-2 after:bottom-0 after:h-px after:bg-foreground after:opacity-0 after:content-['']",
+                  active
+                    ? "text-foreground after:opacity-100"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </header>
+      <main
+        id="main"
+        className="mx-auto w-full max-w-[880px] px-4 pt-8 pb-16 md:px-6 md:pt-10"
       >
-        {nav.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-current={pathname === item.href ? "page" : undefined}
-            className={cn(
-              "flex min-h-11 flex-col items-center justify-center gap-1 px-3 text-xs",
-              pathname === item.href
-                ? "font-medium text-primary"
-                : "text-muted-foreground",
-            )}
+        {error ? (
+          <p
+            role="alert"
+            className="mb-6 rounded-sm border border-destructive/40 px-3 py-2.5 text-[13px] leading-[18px] text-destructive"
           >
-            <item.icon size={18} />
-            {item.label}
-          </Link>
-        ))}
-      </nav>
+            {error}
+          </p>
+        ) : null}
+        {children}
+      </main>
       <Toaster
         position="bottom-right"
+        theme="dark"
         toastOptions={{
           style: {
-            background: "var(--card)",
+            background: "var(--background-2)",
             color: "var(--foreground)",
             border: "1px solid var(--border)",
+            borderRadius: "var(--radius-sm)",
             fontFamily: "inherit",
+            fontSize: "13px",
           },
         }}
       />
@@ -403,21 +311,46 @@ function PageTitle({
   action,
 }: {
   title: string;
-  description: string;
+  description?: string;
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+    <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h1 className="text-[28px] leading-8 font-semibold tracking-tight">
-          {title}
-        </h1>
-        <p className="mt-2 max-w-[65ch] text-sm leading-[22px] text-muted-foreground">
-          {description}
-        </p>
+        <h1 className="text-2xl leading-8 font-semibold">{title}</h1>
+        {description ? (
+          <p className="mt-1 max-w-[60ch] text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
       </div>
       {action}
     </div>
+  );
+}
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <h2 className="mb-3 text-[13px] leading-[18px] font-medium text-muted-foreground">
+      {children}
+    </h2>
+  );
+}
+function List({
+  children,
+  label,
+  className,
+}: {
+  children: ReactNode;
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <section
+      aria-label={label}
+      className={cn("hairline overflow-hidden rounded-md border", className)}
+    >
+      {children}
+    </section>
   );
 }
 function ConnectButton({ outline = false }: { outline?: boolean }) {
@@ -427,10 +360,9 @@ function ConnectButton({ outline = false }: { outline?: boolean }) {
     <form
       action="/api/google/connect"
       method="post"
-      className="w-full max-w-md space-y-3"
+      className="w-full max-w-[420px] space-y-4"
     >
       <input type="hidden" name="intent" value="filter" />
-      <GoogleDataNotice id={noticeId} />
       <Button
         type="submit"
         size="lg"
@@ -441,6 +373,7 @@ function ConnectButton({ outline = false }: { outline?: boolean }) {
         <GoogleMark />
         Connect with Google
       </Button>
+      <GoogleDataNotice id={noticeId} />
     </form>
   );
 }
@@ -448,45 +381,37 @@ function Status({ account }: { account: Account }) {
   const {
     data: { demo },
   } = useWorkspace();
+  const label = !account.connected
+    ? "Disconnected"
+    : account.lastError
+      ? "Needs attention"
+      : account.mode === "automatic" && !account.writesEnabled && !demo
+        ? "Filtering unavailable"
+        : modeLabels[account.mode];
+  const tone = !account.connected
+    ? "text-muted-foreground"
+    : label === "Filtering on"
+      ? "text-success"
+      : "text-warning";
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 whitespace-nowrap text-xs",
-        !account.connected ||
-          account.lastError ||
-          account.mode !== "automatic" ||
-          (!account.writesEnabled && !demo)
-          ? "text-warning"
-          : "text-primary",
+        "inline-flex items-center gap-1.5 text-[13px] whitespace-nowrap",
+        tone,
       )}
     >
-      <span className="size-1.5 rounded-full bg-current" />
-      {!account.connected
-        ? "Disconnected"
-        : account.lastError
-          ? "Needs attention"
-          : account.mode === "automatic" && !account.writesEnabled && !demo
-            ? "Filtering unavailable"
-            : modeLabels[account.mode]}
+      <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+      {label}
     </span>
   );
 }
-function Empty({
-  title,
-  detail,
-  icon: Icon = Inbox,
-}: {
-  title: string;
-  detail: string;
-  icon?: typeof Inbox;
-}) {
+function Empty({ title, detail }: { title: string; detail: string }) {
   return (
-    <div className="flex min-h-52 flex-col items-center justify-center px-6 py-10 text-center">
-      <div className="mb-4 flex size-10 items-center justify-center rounded-lg border bg-background text-muted-foreground">
-        <Icon size={20} strokeWidth={1.5} />
-      </div>
+    <div className="px-4 py-12 text-center">
       <p className="font-medium">{title}</p>
-      <p className="mt-1 max-w-md text-sm text-muted-foreground">{detail}</p>
+      <p className="mx-auto mt-1 max-w-[44ch] text-[13px] leading-[18px] text-muted-foreground">
+        {detail}
+      </p>
     </div>
   );
 }
@@ -502,10 +427,7 @@ function AccountPicker({
   const { data } = useWorkspace();
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger
-        aria-label="Select account"
-        className="h-9 min-w-44 bg-card"
-      >
+      <SelectTrigger aria-label="Select account" className="min-w-40">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -524,78 +446,25 @@ function Onboarding() {
   return (
     <>
       <PageTitle
-        title="A little less noise."
-        description="Sotto sets unsolicited sales emails aside, leaving room for what matters."
+        title="Connect Gmail"
+        description="Sotto filters cold outreach from the last 7 days, then new mail. Every move can be undone."
       />
-      <section className="overflow-hidden rounded-xl border bg-card">
-        <div className="p-6 md:p-8">
-          <div className="mb-6 flex size-12 items-center justify-center rounded-xl border bg-background text-muted-foreground">
-            <Inbox size={24} strokeWidth={1.5} />
-          </div>
-          <h2 className="text-base font-semibold">
-            Start with your work email
-          </h2>
-          <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-            Connect your account. Sotto starts filtering cold outreach right
-            away. Keep using Gmail as usual.
-          </p>
-          <div className="mt-6">
-            <ConnectButton />
-          </div>
-          {!data.configured ? (
-            <p className="mt-3 text-xs text-warning">
-              The Google connection is still being configured.
-            </p>
-          ) : null}
-        </div>
-        <div className="divide-y border-t">
-          {[
-            {
-              icon: ListFilter,
-              title: "It starts right away",
-              text: "Sotto checks the last 7 days of your inbox, then new emails.",
-            },
-            {
-              icon: ShieldCheck,
-              title: "When in doubt, keep it",
-              text: "Contacts, customers, and operational emails come first.",
-            },
-            {
-              icon: Undo2,
-              title: "You can always undo a move",
-              text: "Moving an email does not delete it. It stays in Gmail.",
-            },
-          ].map((row) => (
-            <div
-              key={row.title}
-              className="flex items-start gap-4 px-6 py-5 md:px-8"
-            >
-              <row.icon
-                size={18}
-                strokeWidth={1.75}
-                className="mt-0.5 text-muted-foreground"
-              />
-              <div>
-                <p className="font-medium">{row.title}</p>
-                <p className="mt-0.5 text-[13px] text-muted-foreground">
-                  {row.text}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-      <p className="mt-6 max-w-[68ch] text-xs leading-5 text-muted-foreground">
-        Connecting lets Sotto read emails and change their labels. Messages that
-        need classification are processed by the AI provider configured for your
-        installation.{" "}
-        <Link href="/privacy" className="underline underline-offset-2">
-          See how we handle your data
-        </Link>
-        .
-      </p>
+      <ConnectButton />
+      {!data.configured ? (
+        <p className="mt-3 text-[13px] text-warning">
+          The Google connection is still being configured.
+        </p>
+      ) : null}
     </>
   );
+}
+function InlineError() {
+  const { error } = useWorkspace();
+  return error ? (
+    <p role="alert" className="text-[13px] leading-[18px] text-destructive">
+      {error}
+    </p>
+  ) : null;
 }
 
 export function ReviewPage() {
@@ -627,7 +496,7 @@ export function ReviewPage() {
   );
   const selectedWritesEnabled =
     data.demo || selectedAccount?.writesEnabled === true;
-  const syncing = data.accounts.filter(
+  const syncing = data.accounts.some(
     (a) =>
       (accountId === "all" || a.id === accountId) &&
       a.connected &&
@@ -635,98 +504,84 @@ export function ReviewPage() {
       a.sync &&
       (a.sync.pending > 0 || a.sync.failed > 0),
   );
+  const accountName = (id: string) =>
+    data.accounts.find((a) => a.id === id)?.name;
   return (
     <>
       <PageTitle
-        title="Your quieter inbox"
-        description="Cold outreach goes to Sotto/Cold in Gmail. Everything else stays in your inbox."
+        title="Inbox"
         action={<AccountPicker value={accountId} onChange={setAccountId} all />}
       />
-      <section
-        aria-label="Filtering status"
-        className="mb-8 divide-y rounded-xl border bg-card"
-      >
+      <List label="Filtering status">
         {data.accounts
           .filter((a) => accountId === "all" || a.id === accountId)
           .map((account) => (
-            <div key={account.id} className="p-5">
-              <AccountActivity account={account} />
-            </div>
+            <AccountRow key={account.id} account={account} />
           ))}
-      </section>
-      <div className="mb-4 flex items-baseline justify-between gap-3">
-        <h2 className="text-base font-semibold">Recent activity</h2>
-        <span className="text-xs text-muted-foreground">
-          {scoped.length} emails in this view
-        </span>
-      </div>
+      </List>
       <div
-        className="mb-4 flex flex-wrap gap-1"
+        className="mt-10 mb-4 flex gap-5 border-b"
         role="group"
         aria-label="Filter decisions"
       >
         {(
           [
-            { key: "moved", label: "Moved aside" },
-            { key: "kept", label: "Kept in inbox" },
-            { key: "suggested", label: "Suggestions" },
+            { key: "moved", label: "Moved" },
+            { key: "kept", label: "Kept" },
+            { key: "suggested", label: "Suggested" },
           ] as const
         ).map((tab) => (
-          <Button
+          <button
             key={tab.key}
-            variant="ghost"
+            type="button"
             aria-pressed={filter === tab.key}
             onClick={() => setFilter(tab.key)}
             className={cn(
-              "gap-2",
+              "relative -mb-px flex h-9 items-center gap-2 border-b text-[13px] transition-colors duration-[120ms]",
               filter === tab.key
-                ? "bg-secondary text-foreground"
-                : "text-muted-foreground",
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
             {tab.label}
-            <span className="text-xs tabular-nums text-muted-foreground">
+            <span className="mono text-xs text-muted-foreground">
               {counts[tab.key]}
             </span>
-          </Button>
+          </button>
         ))}
       </div>
-      <section
-        aria-label="Email decisions"
-        className="overflow-hidden rounded-xl border bg-card"
-      >
+      <List label="Email decisions">
         {visible.length ? (
-          <ul className="divide-y">
+          <ul className="hairline">
             {visible.map((d) => (
               <li key={d.id}>
-                <Button
-                  variant="ghost"
+                <button
+                  type="button"
                   onClick={() => setSelectedId(d.id)}
-                  className="h-auto w-full justify-start gap-4 rounded-none px-4 py-5 text-left whitespace-normal sm:px-5"
+                  className="flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors duration-[120ms] hover:bg-gray-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                 >
-                  <div className="hidden size-10 shrink-0 items-center justify-center rounded-xl border bg-background font-medium text-muted-foreground sm:flex">
-                    {d.sender.slice(0, 1).toUpperCase()}
-                  </div>
                   <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal text-muted-foreground">
-                      <span className="max-w-[220px] truncate">{d.sender}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>
-                        {data.accounts.find((a) => a.id === d.accountId)?.name}
-                      </span>
-                    </div>
-                    <p className="truncate text-sm leading-5 font-medium">
+                    <p className="truncate leading-5 font-medium">
                       {d.subject}
                     </p>
-                    <p className="mt-1 line-clamp-1 text-[13px] leading-[18px] font-normal text-muted-foreground">
+                    <p className="mt-0.5 truncate text-[13px] leading-[18px] text-muted-foreground">
+                      <span className="mono">{d.sender}</span>
+                      {accountId === "all" ? (
+                        <>
+                          <span aria-hidden="true"> · </span>
+                          {accountName(d.accountId)}
+                        </>
+                      ) : null}
+                      <span aria-hidden="true"> · </span>
                       {d.reason}
                     </p>
                   </div>
                   <ChevronRight
                     size={16}
                     className="shrink-0 text-muted-foreground"
+                    aria-hidden="true"
                   />
-                </Button>
+                </button>
               </li>
             ))}
           </ul>
@@ -734,67 +589,48 @@ export function ReviewPage() {
           <Empty
             title={
               filter === "suggested"
-                ? syncing.length > 0
-                  ? "Review is still running"
-                  : "Nothing to review right now"
+                ? syncing
+                  ? "Still checking"
+                  : "Nothing to review"
                 : filter === "moved"
-                  ? "No cold emails moved yet"
-                  : "Emails you keep will appear here"
+                  ? "Nothing moved yet"
+                  : "Nothing kept yet"
             }
             detail={
               filter === "suggested"
-                ? "New suggestions will appear here with an explanation."
+                ? "New suggestions appear here with a reason."
                 : filter === "moved"
-                  ? "Moved emails appear here and under Sotto/Cold in Gmail. You can return any email to your inbox."
-                  : "Every decision is recorded so you can review it."
+                  ? "Moved emails appear here and under Sotto/Cold in Gmail."
+                  : "Emails you keep are recorded here."
             }
           />
         )}
-      </section>
-      <div className="mt-5 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
-        <ShieldCheck size={15} className="mt-0.5 shrink-0" />
-        <p>
-          A new sender can be a good opportunity. When in doubt, the email
-          stays.
-        </p>
-      </div>
+      </List>
       <Sheet
         open={!!selected}
         onOpenChange={(open) => {
           if (!open) setSelectedId(null);
         }}
       >
-        <SheetContent className="w-full overflow-y-auto sm:max-w-[480px]">
+        <SheetContent className="overflow-y-auto">
           {selected ? (
             <>
-              <SheetHeader className="border-b p-6 pt-10">
-                <SheetTitle className="pr-5 text-base leading-6">
-                  {selected.subject}
-                </SheetTitle>
-                <SheetDescription className="break-all">
+              <SheetHeader className="border-b">
+                <SheetTitle>{selected.subject}</SheetTitle>
+                <SheetDescription className="mono break-all">
                   {selected.sender}
                 </SheetDescription>
               </SheetHeader>
-              <div className="space-y-6 px-6 py-2">
-                <Badge variant="outline" className="font-normal">
-                  {categoryLabels[selected.category]}
-                </Badge>
+              <div className="space-y-6 px-6 pb-6">
                 <div>
-                  <p className="mb-2 font-medium">
-                    Why Sotto made this decision
+                  <p className="text-[13px] text-muted-foreground">
+                    {categoryLabels[selected.category]}
+                    <span aria-hidden="true"> · </span>
+                    <span className="mono">{selectedAccount?.email}</span>
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    {selected.reason}
-                  </p>
+                  <p className="mt-2 leading-5">{selected.reason}</p>
                 </div>
-                <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                  <Mail size={16} />
-                  {
-                    data.accounts.find((a) => a.id === selected.accountId)
-                      ?.email
-                  }
-                </div>
-                <div className="space-y-3 border-t pt-6">
+                <div className="space-y-2">
                   {selected.state === "suggested" ? (
                     <>
                       <Button
@@ -810,8 +646,7 @@ export function ReviewPage() {
                             setSelectedId(null);
                         }}
                       >
-                        <ArrowDownToLine />
-                        Move this email
+                        Move to Sotto/Cold
                       </Button>
                       <Button
                         variant="outline"
@@ -821,17 +656,16 @@ export function ReviewPage() {
                           if (
                             await act(
                               { action: "keep", decisionId: selected.id },
-                              "Kept in your inbox",
+                              "Kept in inbox",
                             )
                           )
                             setSelectedId(null);
                         }}
                       >
-                        <Check />
-                        Keep in my inbox
+                        Keep in inbox
                       </Button>
                       {!selectedWritesEnabled ? (
-                        <p className="text-xs text-warning">
+                        <p className="text-[13px] text-warning">
                           Moving emails is disabled for this account.
                         </p>
                       ) : null}
@@ -844,24 +678,23 @@ export function ReviewPage() {
                         if (
                           await act(
                             { action: "restore", decisionId: selected.id },
-                            "Email restored",
+                            "Returned to inbox",
                           )
                         )
                           setSelectedId(null);
                       }}
                     >
-                      <Undo2 />
-                      Return to my inbox
+                      Return to inbox
                     </Button>
                   ) : (
                     <p className="text-[13px] text-muted-foreground">
                       {["moving", "restoring"].includes(selected.state)
-                        ? "The change is being processed."
+                        ? "Processing…"
                         : "This email stays in Gmail."}
                     </p>
                   )}
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     className="w-full"
                     disabled={busy}
                     onClick={async () => {
@@ -878,11 +711,10 @@ export function ReviewPage() {
                         setSelectedId(null);
                     }}
                   >
-                    <ShieldCheck />
                     Always allow this sender
                   </Button>
                   {selected.gmailUrl ? (
-                    <Button variant="outline" className="w-full" asChild>
+                    <Button variant="ghost" className="w-full" asChild>
                       <a
                         href={selected.gmailUrl}
                         target="_blank"
@@ -909,49 +741,36 @@ function SyncProgress({ account }: { account: Account }) {
   const { total, done, pending, failed, retrying, scanning } = account.sync;
   const working = scanning || pending > 0;
   return (
-    <div className="space-y-2 text-xs text-muted-foreground" role="status">
-      <p>
+    <div className="mt-3 space-y-2 text-xs text-muted-foreground" role="status">
+      <p className="mono">
         {scanning
           ? "Finding recent emails…"
           : working
-            ? `Checking your inbox · ${done} of ${total} emails processed`
-            : `${done} emails checked`}
+            ? `${done} of ${total} checked`
+            : `${done} checked`}
       </p>
       {working ? (
-        <>
-          <progress
-            className="h-1.5 w-full accent-primary"
-            value={scanning ? undefined : done}
-            max={Math.max(1, total)}
-            aria-label={`Progress for ${account.name}`}
-          />
-          <p>You can close this page. Sotto keeps working.</p>
-        </>
+        <progress
+          className="w-full"
+          value={scanning ? undefined : done}
+          max={Math.max(1, total)}
+          aria-label={`Progress for ${account.name}`}
+        />
       ) : null}
       {retrying > 0 || failed > 0 ? (
         <p className="text-warning">
           {retrying > 0 ? `${retrying} waiting to retry. ` : ""}
-          {failed > 0
-            ? `${failed} could not be checked. Try Check now in Account options.`
-            : ""}
+          {failed > 0 ? `${failed} could not be checked. Use Check now.` : ""}
         </p>
       ) : null}
     </div>
   );
 }
-function InlineError() {
-  const { error } = useWorkspace();
-  return error ? (
-    <p role="alert" className="text-sm text-destructive">
-      {error}
-    </p>
-  ) : null;
-}
 
 function GmailFolderLink({ account }: { account: Account }) {
   const { data } = useWorkspace();
   return (
-    <Button variant="outline" size="sm" asChild>
+    <Button variant="ghost" size="sm" asChild>
       <a
         href={
           data.demo
@@ -961,7 +780,7 @@ function GmailFolderLink({ account }: { account: Account }) {
         target="_blank"
         rel="noreferrer"
       >
-        Open Sotto/Cold <ExternalLink />
+        Sotto/Cold <ExternalLink />
       </a>
     </Button>
   );
@@ -969,70 +788,76 @@ function GmailFolderLink({ account }: { account: Account }) {
 
 function FilteringControls({ account }: { account: Account }) {
   const { data, act, busy } = useWorkspace();
-  if (!account.connected) return <ConnectButton outline />;
   const canFilter = data.demo || account.writesEnabled;
   return (
-    <div className="space-y-3">
-      {account.mode !== "automatic" && canFilter ? (
-        <p className="text-xs leading-5 text-muted-foreground">
-          Start filtering cold outreach from the last 7 days, then new emails.
-          You can undo any move.
-        </p>
-      ) : null}
-      <div className="flex flex-wrap gap-2">
-        {account.mode === "automatic" ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={busy}
-            onClick={() =>
-              act(
-                { action: "mode", accountId: account.id, mode: "paused" },
-                "Filtering paused",
-              )
-            }
-          >
-            <Pause /> Pause
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            disabled={busy || !canFilter}
-            onClick={() =>
-              act(
-                { action: "startFiltering", accountId: account.id },
-                "Filtering started. Cold outreach will appear in Sotto/Cold.",
-              )
-            }
-          >
-            <Sparkles />{" "}
-            {account.mode === "paused" ? "Resume filtering" : "Start filtering"}
-          </Button>
-        )}
-        <GmailFolderLink account={account} />
-      </div>
-      {!canFilter ? (
-        <p className="text-xs text-warning">
-          Moving emails is disabled for this account.
-        </p>
-      ) : null}
+    <div className="flex flex-wrap items-center gap-2">
+      {account.mode === "automatic" ? (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={() =>
+            act(
+              { action: "mode", accountId: account.id, mode: "paused" },
+              "Filtering paused",
+            )
+          }
+        >
+          Pause
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          disabled={busy || !canFilter}
+          onClick={() =>
+            act(
+              { action: "startFiltering", accountId: account.id },
+              "Filtering started",
+            )
+          }
+        >
+          {account.mode === "paused" ? "Resume filtering" : "Start filtering"}
+        </Button>
+      )}
+      <GmailFolderLink account={account} />
     </div>
   );
 }
 
-function AccountActivity({ account }: { account: Account }) {
-  const { act, busy } = useWorkspace();
+function AccountRow({
+  account,
+  children,
+}: {
+  account: Account;
+  children?: ReactNode;
+}) {
+  const { data, act, busy } = useWorkspace();
+  const canFilter = data.demo || account.writesEnabled;
   return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium break-all">{account.email}</p>
-        <Status account={account} />
+    <div className="px-4 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0">
+          <p className="mono truncate text-[13px]">{account.email}</p>
+          <div className="mt-1">
+            <Status account={account} />
+          </div>
+        </div>
+        {account.connected ? (
+          <FilteringControls account={account} />
+        ) : (
+          <ConnectButton outline />
+        )}
       </div>
-      <div className="mt-3">
-        <FilteringControls account={account} />
-      </div>
+      {account.connected && !canFilter ? (
+        <p className="mt-3 text-[13px] text-warning">
+          Moving emails is disabled for this account.
+        </p>
+      ) : null}
       {account.lastError ? (
-        <div role="alert" className="mt-3 text-xs text-destructive">
+        <div
+          role="alert"
+          className="mt-3 flex flex-wrap items-center gap-3 text-[13px] text-destructive"
+        >
           <p>{account.lastError}</p>
           {account.connected && account.mode !== "paused" ? (
             <Button
@@ -1040,10 +865,7 @@ function AccountActivity({ account }: { account: Account }) {
               variant="ghost"
               disabled={busy}
               onClick={() =>
-                act(
-                  { action: "sync", accountId: account.id },
-                  "Checking your inbox…",
-                )
+                act({ action: "sync", accountId: account.id }, "Checking…")
               }
             >
               Try again
@@ -1052,10 +874,9 @@ function AccountActivity({ account }: { account: Account }) {
         </div>
       ) : null}
       {account.connected && account.mode !== "paused" ? (
-        <div className="mt-3">
-          <SyncProgress account={account} />
-        </div>
+        <SyncProgress account={account} />
       ) : null}
+      {children}
     </div>
   );
 }
@@ -1071,91 +892,84 @@ export function AccountsPage() {
   if (!data.accounts.length) return <Onboarding />;
   return (
     <>
-      <PageTitle
-        title="Your Gmail accounts"
-        description="Connect once. Sotto takes care of the cold outreach."
-      />
-      <section className="overflow-hidden rounded-xl border bg-card">
-        <ul className="divide-y">
-          {data.accounts.map((account) => (
-            <li key={account.id} className="p-5 sm:p-6">
-              <AccountActivity account={account} />
-              <details className="mt-4 text-xs text-muted-foreground">
-                <summary className="w-fit cursor-pointer rounded py-1 focus-visible:outline-2 focus-visible:outline-ring">
-                  Account options
-                </summary>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {account.connected ? (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={busy || account.mode === "paused"}
-                        onClick={() =>
-                          act(
-                            { action: "sync", accountId: account.id },
-                            "Checking your inbox…",
-                          )
-                        }
-                      >
-                        <RefreshCw /> Check now
-                      </Button>
-                      {account.mode === "automatic" ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={busy}
-                          onClick={() =>
-                            act(
-                              {
-                                action: "mode",
-                                accountId: account.id,
-                                mode: "review",
-                              },
-                              "Only suggesting. Emails stay in your inbox.",
-                            )
-                          }
-                        >
-                          Only suggest moves
-                        </Button>
-                      ) : null}
+      <PageTitle title="Accounts" />
+      <List label="Gmail accounts">
+        {data.accounts.map((account) => (
+          <AccountRow key={account.id} account={account}>
+            <details className="mt-3 text-[13px] text-muted-foreground">
+              <summary className="w-fit list-none rounded-sm py-1 hover:text-foreground [&::-webkit-details-marker]:hidden">
+                Options
+              </summary>
+              <div className="mt-2 flex flex-wrap items-center gap-1">
+                {account.connected ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy || account.mode === "paused"}
+                      onClick={() =>
+                        act(
+                          { action: "sync", accountId: account.id },
+                          "Checking…",
+                        )
+                      }
+                    >
+                      Check now
+                    </Button>
+                    {account.mode === "automatic" ? (
                       <Button
                         size="sm"
                         variant="ghost"
                         disabled={busy}
                         onClick={() =>
-                          setConfirm({ account, action: "disconnect" })
+                          act(
+                            {
+                              action: "mode",
+                              accountId: account.id,
+                              mode: "review",
+                            },
+                            "Only suggesting",
+                          )
                         }
                       >
-                        Disconnect
+                        Only suggest
                       </Button>
-                    </>
-                  ) : null}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive"
-                    disabled={busy}
-                    onClick={() => {
-                      setConfirmEmail("");
-                      setConfirm({ account, action: "deleteGmailData" });
-                    }}
-                  >
-                    Delete Gmail data
-                  </Button>
-                </div>
-                <p className="mt-3">
-                  {account.lastSync
-                    ? `Last checked: ${new Date(account.lastSync).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short", timeZone: "UTC" })} UTC`
-                    : "Waiting for the first check"}
-                </p>
-              </details>
-            </li>
-          ))}
-        </ul>
-      </section>
-      <div className="mt-8 border-t pt-6">
-        <h2 className="mb-3 text-sm font-medium">Add another account</h2>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() =>
+                        setConfirm({ account, action: "disconnect" })
+                      }
+                    >
+                      Disconnect
+                    </Button>
+                  </>
+                ) : null}
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={busy}
+                  onClick={() => {
+                    setConfirmEmail("");
+                    setConfirm({ account, action: "deleteGmailData" });
+                  }}
+                >
+                  Delete Gmail data
+                </Button>
+              </div>
+              <p className="mono mt-2 text-xs">
+                {account.lastSync
+                  ? `Last checked ${time(account.lastSync)}`
+                  : "Not checked yet"}
+              </p>
+            </details>
+          </AccountRow>
+        ))}
+      </List>
+      <div className="mt-10">
+        <SectionLabel>Add account</SectionLabel>
         <ConnectButton outline />
       </div>
       <AlertDialog
@@ -1181,10 +995,7 @@ export function AccountsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           {confirm?.action === "deleteGmailData" ? (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Your sign-in, plan data and other accounts are kept.
-              </p>
+            <div className="space-y-2">
               <Label htmlFor={confirmEmailId}>
                 Type {confirm.account.email} to confirm
               </Label>
@@ -1198,12 +1009,17 @@ export function AccountsPage() {
                 value={confirmEmail}
                 onChange={(event) => setConfirmEmail(event.target.value)}
               />
+              <p className="text-xs text-muted-foreground">
+                Your sign-in, plan and other accounts are kept.
+              </p>
             </div>
           ) : null}
           <InlineError />
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
+              data-filled="true"
               disabled={
                 busy ||
                 (confirm?.action === "deleteGmailData" &&
@@ -1223,7 +1039,7 @@ export function AccountsPage() {
                         : {}),
                     },
                     confirm.action === "deleteGmailData"
-                      ? "Gmail data deleted from Sotto"
+                      ? "Gmail data deleted"
                       : "Account disconnected",
                   )
                 )
@@ -1252,11 +1068,10 @@ export function RulesPage() {
   return (
     <>
       <PageTitle
-        title="These emails stay."
-        description="Keep the people you want to hear from close."
+        title="Allowlist"
         action={
           <Button
-            size="lg"
+            variant="outline"
             disabled={!data.accounts.length}
             onClick={() => setOpen(true)}
           >
@@ -1265,25 +1080,21 @@ export function RulesPage() {
           </Button>
         }
       />
-      <section className="overflow-hidden rounded-xl border bg-card">
+      <List label="Allowed senders">
         {data.rules.length ? (
-          <ul className="divide-y">
+          <ul className="hairline">
             {data.rules.map((rule) => (
-              <li key={rule.id} className="flex items-center gap-4 p-5">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background">
-                  <ShieldCheck size={17} className="text-muted-foreground" />
-                </div>
+              <li key={rule.id} className="flex items-center gap-4 px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{rule.sender}</p>
+                  <p className="mono truncate text-[13px]">{rule.sender}</p>
                   <p className="text-xs text-muted-foreground">
-                    {data.accounts.find((a) => a.id === rule.accountId)?.name}·
-                    Always in my inbox
+                    {data.accounts.find((a) => a.id === rule.accountId)?.name}
                   </p>
                 </div>
                 <Button
                   variant="ghost"
-                  size="icon"
-                  aria-label={`Remove allowance for ${rule.sender}`}
+                  size="icon-sm"
+                  aria-label={`Remove ${rule.sender}`}
                   onClick={() => setRemoveId(rule.id)}
                 >
                   <X />
@@ -1293,22 +1104,17 @@ export function RulesPage() {
           </ul>
         ) : (
           <Empty
-            title="A place for trusted contacts"
-            detail="Add a sender to keep their emails in your inbox, even when they look commercial."
-            icon={ShieldCheck}
+            title="No allowed senders"
+            detail="Allowed senders always stay in your inbox, even when their email looks commercial."
           />
         )}
-      </section>
-      <p className="mt-5 max-w-[65ch] text-xs leading-5 text-muted-foreground">
-        Sotto also keeps conversations you have participated in, emails from
-        your organization, and messages you have starred.
-      </p>
+      </List>
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent className="w-full sm:max-w-[440px]">
-          <SheetHeader className="p-6 pt-10">
+        <SheetContent>
+          <SheetHeader>
             <SheetTitle>Allow a sender</SheetTitle>
             <SheetDescription>
-              Their future emails stay in your inbox.
+              Their emails always stay in your inbox.
             </SheetDescription>
           </SheetHeader>
           <form
@@ -1331,19 +1137,21 @@ export function RulesPage() {
             }}
           >
             <div className="space-y-2">
-              <Label htmlFor="sender">Sender email</Label>
+              <Label htmlFor="sender">Email address</Label>
               <Input
                 id="sender"
                 type="email"
-                placeholder="nombre@empresa.com"
+                placeholder="name@company.com…"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="off"
+                spellCheck={false}
+                className="mono"
               />
             </div>
             <div className="space-y-2">
-              <Label>For this account</Label>
+              <Label>Account</Label>
               <AccountPicker value={accountId} onChange={setAccountId} />
             </div>
             <InlineError />
@@ -1365,9 +1173,9 @@ export function RulesPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove this exception</AlertDialogTitle>
+            <AlertDialogTitle>Remove this sender</AlertDialogTitle>
             <AlertDialogDescription>
-              Sotto will evaluate future emails from this sender again. Existing
+              Future emails from this sender are evaluated again. Existing
               messages stay unchanged.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1375,19 +1183,21 @@ export function RulesPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
+              data-filled="true"
               disabled={busy}
               onClick={async (e) => {
                 e.preventDefault();
                 if (
                   await act(
                     { action: "removeRule", ruleId: removeId },
-                    "Exception removed",
+                    "Sender removed",
                   )
                 )
                   setRemoveId(null);
               }}
             >
-              Remove exception
+              Remove
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1403,25 +1213,24 @@ export function SettingsPage() {
   return (
     <>
       <PageTitle
-        title="Make it yours."
-        description="Choose what to move out of each inbox."
+        title="Settings"
         action={
           account ? (
             <AccountPicker value={accountId} onChange={setAccountId} />
           ) : undefined
         }
       />
-      <h2 className="mb-4 text-base font-semibold">What Sotto can move</h2>
-      <section className="divide-y overflow-hidden rounded-xl border bg-card">
+      <SectionLabel>Move out of the inbox</SectionLabel>
+      <List label="Categories">
         <SettingRow
           title="Cold outreach"
-          description="Individual sales pitches from people you have not spoken with."
+          description="Sales pitches from people you have not spoken with. Goes to Sotto/Cold."
           checked
           disabled
         />
         <SettingRow
           title="Marketing"
-          description="Brand campaigns, promotions, and product offers."
+          description="Campaigns, promotions and offers. Goes to Sotto/Reading."
           checked={account?.policy.marketing ?? false}
           disabled={!account || busy}
           onChange={(value) =>
@@ -1439,7 +1248,7 @@ export function SettingsPage() {
         />
         <SettingRow
           title="Newsletters"
-          description="Editorial newsletters and recurring digests you prefer to read later."
+          description="Editorial newsletters and digests. Goes to Sotto/Reading."
           checked={account?.policy.newsletters ?? false}
           disabled={!account || busy}
           onChange={(value) =>
@@ -1455,52 +1264,14 @@ export function SettingsPage() {
             )
           }
         />
-      </section>
-      <p className="mt-3 text-xs text-muted-foreground">
-        Cold outreach goes to Sotto/Cold. Other enabled categories go to
-        Sotto/Reading.
-      </p>
+      </List>
       {account && <PreferencesEditor key={account.id} account={account} />}
-      <h2 className="mt-10 mb-4 text-base font-semibold">
-        Always under your control
-      </h2>
-      <section className="divide-y overflow-hidden rounded-xl border bg-card">
-        {[
-          {
-            icon: ShieldCheck,
-            title: "When in doubt, keep it",
-            description:
-              "Potential customers, investors, paperwork, and useful notices stay.",
-          },
-          {
-            icon: Undo2,
-            title: "Moved, still yours",
-            description: "Every move has an explanation and can be undone.",
-          },
-          {
-            icon: RefreshCw,
-            title: "A backup check",
-            description:
-              "If a Gmail notification is missed, Sotto catches up on pending changes.",
-          },
-        ].map((row) => (
-          <div key={row.title} className="flex items-start gap-4 p-5">
-            <row.icon
-              size={18}
-              className="mt-0.5 shrink-0 text-muted-foreground"
-            />
-            <div>
-              <p className="font-medium">{row.title}</p>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">
-                {row.description}
-              </p>
-            </div>
-          </div>
-        ))}
-      </section>
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <Link href="/privacy" className="underline underline-offset-4">
-          Privacy and data access
+      <div className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t pt-6 text-[13px] text-muted-foreground">
+        <Link
+          href="/privacy"
+          className="transition-colors duration-[120ms] hover:text-foreground"
+        >
+          Privacy
         </Link>
         {data.authenticated ? (
           <form action="/api/logout" method="post">
@@ -1513,8 +1284,9 @@ export function SettingsPage() {
             href="https://github.com/josebenitezg/sotto"
             target="_blank"
             rel="noreferrer"
+            className="transition-colors duration-[120ms] hover:text-foreground"
           >
-            Sotto is open source ↗
+            GitHub
           </a>
         )}
       </div>
@@ -1526,6 +1298,7 @@ function PreferencesEditor({ account }: { account: Account }) {
   const [instructions, setInstructions] = useState(
     account.policy.instructions || "",
   );
+  const dirty = instructions !== (account.policy.instructions || "");
   return (
     <form
       className="mt-10 space-y-3"
@@ -1543,28 +1316,32 @@ function PreferencesEditor({ account }: { account: Account }) {
         );
       }}
     >
-      <Label htmlFor="ai-preferences" className="text-base font-semibold">
-        What matters to you
-      </Label>
-      <p id="ai-preferences-help" className="text-[13px] text-muted-foreground">
-        Tell the AI what you do and which opportunities interest you. It will
-        consider this when reading future emails.
-      </p>
+      <div>
+        <Label htmlFor="ai-preferences">Preferences</Label>
+        <p
+          id="ai-preferences-help"
+          className="mt-1 text-[13px] leading-[18px] text-muted-foreground"
+        >
+          What you do and which emails matter. The AI reads this before
+          deciding.
+        </p>
+      </div>
       <Textarea
         id="ai-preferences"
         aria-describedby="ai-preferences-help"
         maxLength={1500}
         rows={4}
-        placeholder="For example: keep inquiries from potential customers and investors. Move pitches from agencies and lead generation services."
+        placeholder="Keep inquiries from customers and investors. Move pitches from agencies…"
         value={instructions}
         onChange={(event) => setInstructions(event.target.value)}
       />
       <InlineError />
       <Button
         type="submit"
-        disabled={busy || instructions === (account.policy.instructions || "")}
+        variant={dirty ? "default" : "outline"}
+        disabled={busy || !dirty}
       >
-        Save preferences
+        {busy ? "Saving…" : "Save"}
       </Button>
     </form>
   );
@@ -1590,16 +1367,19 @@ function SettingRow({
   }, [saved]);
   const id = title.toLowerCase().replaceAll(" ", "-");
   return (
-    <div className="flex items-center justify-between gap-6 p-5">
+    <div className="flex items-center justify-between gap-6 px-4 py-4">
       <div>
-        <Label htmlFor={id} className="text-sm font-medium">
+        <Label htmlFor={id} className="text-sm leading-5">
           {title}
         </Label>
-        <p id={`${id}-help`} className="mt-1 text-[13px] text-muted-foreground">
+        <p
+          id={`${id}-help`}
+          className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground"
+        >
           {description}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-3">
         <span role="status" className="text-xs text-muted-foreground">
           {saved ? "Saved" : ""}
         </span>

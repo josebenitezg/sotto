@@ -1,10 +1,13 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "Sotto — A quieter inbox",
-  description:
-    "Set unsolicited sales emails aside and make room for what matters.",
+  title: "Sotto",
+  description: "A quieter inbox. Cold sales emails, set aside in Gmail.",
   robots: { index: false, follow: false },
+};
+export const viewport: Viewport = {
+  themeColor: "#000000",
+  colorScheme: "dark",
 };
 export default function RootLayout({
   children,
@@ -12,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en-US">
+    <html lang="en" className="dark">
       <body>{children}</body>
     </html>
   );

@@ -1,16 +1,10 @@
-import Link from "next/link";
 export default function PrivacyPage() {
   return (
-    <main id="content" className="public-document space-y-6">
-      <Link
-        href="/"
-        className="text-sm text-muted-foreground underline underline-offset-4"
-      >
-        Back to home
-      </Link>
-      <h1 className="text-[28px] leading-8 font-semibold tracking-tight">
-        Your email belongs to you.
-      </h1>
+    <main
+      id="content"
+      className="mx-auto w-full max-w-[680px] space-y-5 px-6 py-16 text-[15px] leading-6 md:py-24 [&_h2]:pt-6 [&_h2]:text-base [&_h2]:leading-6 [&_h2]:font-medium [&_h2]:text-foreground [&_a]:text-foreground"
+    >
+      <h1 className="text-2xl leading-8 font-semibold">Privacy</h1>
       <p className="text-muted-foreground">
         Sotto is an open-source tool for organizing Gmail. The sotto.email
         service is operated by Perception Technologies Inc. and processes data
@@ -18,13 +12,13 @@ export default function PrivacyPage() {
         choose and control the providers. Each installation maintains its own
         database.
       </p>
-      <h2 className="text-base font-semibold">What we access</h2>
+      <h2>What we access</h2>
       <p className="text-muted-foreground">
         Sender, subject, message text, labels, and conversation context. Sotto
         also checks whether you have previously emailed the sender. Attachments,
         links, and remote images are not opened.
       </p>
-      <h2 className="text-base font-semibold">When filtering starts</h2>
+      <h2>When filtering starts</h2>
       <p className="text-muted-foreground">
         Connecting through the automatic-filtering notice authorizes Sotto to
         organize cold outreach in your Inbox from the last seven days and new
@@ -32,16 +26,14 @@ export default function PrivacyPage() {
         Sotto records this authorization. Reconnecting without this notice
         preserves your existing filtering choice.
       </p>
-      <h2 className="text-base font-semibold">What we store</h2>
+      <h2>What we store</h2>
       <p className="text-muted-foreground">
         The encrypted Google connection, rules, message identifiers, sender,
         subject, and decision history. Sotto does not store full message bodies.
         You can delete a Gmail connection's data from Accounts, as explained
         below.
       </p>
-      <h2 id="data-protection" className="text-base font-semibold">
-        How we protect Google user data
-      </h2>
+      <h2 id="data-protection">How we protect Google user data</h2>
       <p className="text-muted-foreground">
         At sotto.email, we protect Google user data in transit with encrypted
         connections: HTTPS between your browser and Sotto and between our server
@@ -51,12 +43,12 @@ export default function PrivacyPage() {
         Neon, using AES-256 encryption.
       </p>
       <p className="text-muted-foreground">
-        Google refresh tokens receive an additional layer of encryption in
-        Sotto using AES-256-GCM, bound to the corresponding account. The
-        encryption key and provider API credentials are kept in private server
-        environment configuration, separate from the database, and are not
-        included in browser code or the public source repository. Sotto does not
-        collect or store your Google password.
+        Google refresh tokens receive an additional layer of encryption in Sotto
+        using AES-256-GCM, bound to the corresponding account. The encryption
+        key and provider API credentials are kept in private server environment
+        configuration, separate from the database, and are not included in
+        browser code or the public source repository. Sotto does not collect or
+        store your Google password.
       </p>
       <p className="text-muted-foreground">
         Access to mailbox data and controls requires an authenticated session.
@@ -77,7 +69,7 @@ export default function PrivacyPage() {
         sotto.email service; operators of self-hosted copies control their own
         security configuration.
       </p>
-      <h2 className="text-base font-semibold">When we use AI</h2>
+      <h2>When we use AI</h2>
       <p className="text-muted-foreground">
         Messages that the protective checks do not resolve are classified with
         OpenAI. At sotto.email, the connection to OpenAI is direct. OpenAI
@@ -88,7 +80,7 @@ export default function PrivacyPage() {
         which provider you have configured. Also check your organization's
         policy before connecting a work account.
       </p>
-      <h2 className="text-base font-semibold">Limited use of your data</h2>
+      <h2>Limited use of your data</h2>
       <p className="text-muted-foreground">
         We use Google data only to connect your account, classify and organize
         the email you choose, show decisions, and let you correct them. Our use
@@ -109,7 +101,7 @@ export default function PrivacyPage() {
         access to content requires your specific authorization, except when
         necessary for security or compliance with the law.
       </p>
-      <h2 className="text-base font-semibold">Providers and retention</h2>
+      <h2>Providers and retention</h2>
       <p className="text-muted-foreground">
         Google manages Gmail access and change notifications. Vercel hosts Sotto
         and its processing queue; Neon stores encrypted connections and
@@ -155,23 +147,21 @@ export default function PrivacyPage() {
         deletion from the active database under their retention terms; a request
         for complete deletion is also reviewed with respect to those records.
       </p>
-      <h2 className="text-base font-semibold">Subscriptions and payments</h2>
+      <h2>Subscriptions and payments</h2>
       <p className="text-muted-foreground">
         When subscriptions are enabled, Stripe processes payments and receives
         your account email and workspace identifier. We do not send your
         messages to Stripe. Sotto stores subscription identifiers and status; it
         does not store your card details.
       </p>
-      <h2 className="text-base font-semibold">
-        The Google permission we request
-      </h2>
+      <h2>The Google permission we request</h2>
       <p className="text-muted-foreground">
         Google groups reading, modification, and sending within the permission
         needed to change message labels. Sotto uses that access to read and
         organize messages; it does not implement sending, deleting, or marking
         messages as read.
       </p>
-      <h2 className="text-base font-semibold">Pausing or disconnecting</h2>
+      <h2>Pausing or disconnecting</h2>
       <p className="text-muted-foreground">
         You can pause an account, disconnect it, or revoke access from your
         Google Account. Disconnecting stops processing and deletes its local
@@ -186,7 +176,7 @@ export default function PrivacyPage() {
         . Disconnecting does not delete emails, labels, or Sotto's decision
         history.
       </p>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-[13px] leading-5 text-muted-foreground">
         <strong>Delete Gmail data.</strong> In Accounts, this action asks you to
         confirm the address and removes that account's connection, credential,
         preferences, allowed senders, decisions, jobs, and events from the
@@ -200,7 +190,7 @@ export default function PrivacyPage() {
         request deletion of records that providers may retain under their own
         policies.
       </p>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-[13px] leading-5 text-muted-foreground">
         For support, privacy questions, or requests to delete sotto.email data,
         contact{" "}
         <a
@@ -211,7 +201,7 @@ export default function PrivacyPage() {
         </a>
         .
       </p>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-[13px] leading-5 text-muted-foreground">
         Last updated: September 11, 2026. Each installation's operator is
         responsible for its configuration and data processing.
       </p>

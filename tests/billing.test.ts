@@ -67,6 +67,7 @@ vi.mock("stripe", async (importOriginal) => {
 });
 import {
   checkout,
+  billingReady,
   portal,
   processStripeEvent,
   reconcileCustomer,
@@ -513,4 +514,30 @@ describe("signed events and provider-authoritative access", () => {
     h.subscriptions = [subscription()];
     expect((await webhook(request(payload, signature))).status).toBe(200);
   });
+});
+
+it("opens Composio checkout only for the selected, verified delivery mode", () => {
+  vi.stubEnv("GMAIL_PROVIDER", "composio");
+  for (const name of [
+    "COMPOSIO_API_KEY",
+    "COMPOSIO_AUTH_CONFIG_ID",
+    "COMPOSIO_WEBHOOK_SECRET",
+  ])
+    vi.stubEnv(name, "synthetic");
+  vi.stubEnv("COMPOSIO_NOTIFICATION_MODE", "trigger");
+  vi.stubEnv("COMPOSIO_POLLING_READY", "true");
+  vi.stubEnv("COMPOSIO_TRIGGERS_READY", undefined);
+  expect(billingReady()).toBe(false);
+  vi.stubEnv("COMPOSIO_TRIGGERS_READY", "true");
+  expect(billingReady()).toBe(true);
+  vi.stubEnv("CHECKOUT_ENABLED", "false");
+  expect(billingReady()).toBe(false);
+  vi.stubEnv("CHECKOUT_ENABLED", "true");
+  vi.stubEnv("COMPOSIO_NOTIFICATION_MODE", "poll");
+  vi.stubEnv("COMPOSIO_POLLING_READY", "false");
+  expect(billingReady()).toBe(false);
+  vi.stubEnv("COMPOSIO_POLLING_READY", "true");
+  expect(billingReady()).toBe(true);
+  vi.stubEnv("COMPOSIO_NOTIFICATION_MODE", "unknown");
+  expect(billingReady()).toBe(false);
 });

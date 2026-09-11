@@ -33,7 +33,9 @@ export const billingReady = () =>
   process.env.CHECKOUT_ENABLED === "true" &&
   (!composioEnabled() ||
     (process.env.COMPOSIO_NOTIFICATION_MODE === "poll" &&
-      process.env.COMPOSIO_POLLING_READY === "true")) &&
+      process.env.COMPOSIO_POLLING_READY === "true") ||
+    (process.env.COMPOSIO_NOTIFICATION_MODE === "trigger" &&
+      process.env.COMPOSIO_TRIGGERS_READY === "true")) &&
   [
     "STRIPE_SECRET_KEY",
     "STRIPE_PRICE_SOLO_ID",

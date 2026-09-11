@@ -4,6 +4,10 @@ import { GoogleMark, SottoMark } from "@/components/brand";
 import { GoogleDataNotice } from "@/components/google-data-notice";
 import { configured, isDemo } from "@/lib/server/config";
 import { sessionWorkspace } from "@/lib/server/auth";
+import {
+  connectionErrorCode,
+  connectionErrorMessage,
+} from "@/lib/connection-errors";
 
 export const metadata = { title: "Sign in · Sotto" };
 export default async function LoginPage({
@@ -13,7 +17,11 @@ export default async function LoginPage({
 }) {
   const { connection_error: error } = await searchParams;
   if (!isDemo() && (await sessionWorkspace()))
-    redirect(error ? "/review?connection_error=1" : "/review");
+    redirect(
+      error
+        ? `/review?connection_error=${connectionErrorCode(error)}`
+        : "/review",
+    );
   const ready = configured() && !isDemo();
   return (
     <main
@@ -30,7 +38,7 @@ export default async function LoginPage({
           role="alert"
           className="mt-6 rounded-sm border border-destructive/40 px-3 py-2.5 text-[13px] leading-[18px] text-destructive"
         >
-          The connection did not complete. Try again and allow access to Gmail.
+          {connectionErrorMessage(error)}
         </p>
       )}
       <form action="/api/google/connect" method="post" className="mt-6">

@@ -1,4 +1,5 @@
 import { ReviewPage } from "@/components/workspace";
+import { connectionErrorMessage } from "@/lib/connection-errors";
 export default async function Page({
   searchParams,
 }: {
@@ -12,7 +13,7 @@ export default async function Page({
           role="alert"
           className="mb-6 rounded-sm border border-destructive/40 px-3 py-2.5 text-[13px] leading-[18px] text-destructive"
         >
-          The connection did not complete. Try again and allow access to Gmail.
+          {connectionErrorMessage(params.connection_error)}
         </p>
       ) : null}
       <ReviewPage />

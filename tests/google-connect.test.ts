@@ -33,6 +33,8 @@ import { GET } from "../src/app/api/google/callback/route";
 import { hash, seal } from "../src/lib/server/crypto";
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.spyOn(console, "info").mockImplementation(() => {});
+  vi.spyOn(console, "warn").mockImplementation(() => {});
   h.cookie = undefined;
   h.pending = null;
   for (const [key, value] of Object.entries({
@@ -76,7 +78,10 @@ beforeEach(() => {
     scopes: ["https://www.googleapis.com/auth/gmail.modify"],
   });
 });
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 it("stores the explicit filtering intent alongside the browser-bound OAuth state", async () => {
   const request = (body: string) =>
     new Request("https://sotto.example/api/google/connect", {
@@ -134,7 +139,33 @@ it("never connects or activates an expired OAuth attempt", async () => {
       "https://sotto.example/api/google/callback?code=code&state=expired&intent=filter",
     ),
   );
-  expect(response.headers.get("location")).toContain("connection_error=1");
+  expect(response.headers.get("location")).toContain(
+    "connection_error=expired",
+  );
   expect(h.connect).not.toHaveBeenCalled();
   expect(h.enqueue).not.toHaveBeenCalled();
+});
+
+it("distinguishes a pilot rejection from missing Gmail permission", async () => {
+  h.cookie = "browser";
+  h.pending = {
+    verifier_cipher: seal("verifier", `oauth:${hash("state")}`),
+    workspace_id: null,
+    created_at: new Date(),
+    start_filtering: true,
+  };
+  const request = () =>
+    new Request(
+      "https://sotto.example/api/google/callback?code=code&state=state",
+    );
+  vi.stubEnv("ALLOWED_GOOGLE_EMAILS", "another@example.com");
+  expect((await GET(request())).headers.get("location")).toContain(
+    "connection_error=not_allowed",
+  );
+  vi.stubEnv("ALLOWED_GOOGLE_EMAILS", "owner@example.com");
+  h.tokenInfo.mockResolvedValue({ scopes: [] });
+  expect((await GET(request())).headers.get("location")).toContain(
+    "connection_error=permissions",
+  );
+  expect(h.connect).not.toHaveBeenCalled();
 });

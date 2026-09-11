@@ -1,11 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import {
-  allowedEmail,
-  appUrl,
-  isDemo,
-  publicSignup,
-} from "@/lib/server/config";
+import { appUrl, isDemo, publicSignup } from "@/lib/server/config";
 import { hash } from "@/lib/server/crypto";
 import { query } from "@/lib/server/db";
 import {
@@ -14,6 +9,7 @@ import {
   composioIdentity,
   deleteComposioConnection,
 } from "@/lib/server/composio";
+import { pilotAdmission } from "@/lib/server/global-config";
 import { connectIdentity } from "@/lib/server/workspaces";
 import { enqueueAccount } from "@/lib/server/queue";
 import { processingAllowed } from "@/lib/server/entitlements";
@@ -71,7 +67,10 @@ export async function GET(request: Request) {
     const identity = await composioIdentity(connection);
     stage = "admission";
     fallback = "failed";
-    if (!publicSignup() && !allowedEmail(identity.email))
+    if (
+      !publicSignup() &&
+      !(await pilotAdmission(identity.email, pending.workspace_id))
+    )
       throw new ConnectionError("not_allowed", 403);
     stage = "workspace";
     const workspaceId = await connectIdentity(

@@ -69,14 +69,19 @@ export async function connectIdentity(
     const {
       rows: [workspace],
     } = await db.query(
-      "SELECT id,internal,billing_plan FROM workspaces WHERE id=$1 FOR UPDATE",
+      "SELECT id,internal,sotto_full_access(email) AS full_access,billing_plan FROM workspaces WHERE id=$1 FOR UPDATE",
       [workspaceId],
     );
     await db.query(
       "INSERT INTO workspace_identities(id,workspace_id) VALUES($1,$2) ON CONFLICT(id) DO NOTHING",
       [identity.sub, workspaceId],
     );
-    if (hosted() && !workspace.internal && !existing?.connected) {
+    if (
+      hosted() &&
+      !workspace.internal &&
+      !workspace.full_access &&
+      !existing?.connected
+    ) {
       const {
         rows: [count],
       } = await db.query(

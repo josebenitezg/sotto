@@ -23,7 +23,7 @@ export default async function PlansPage({
   const workspaceId = isDemo() ? null : await sessionWorkspace();
   const [workspace] = workspaceId
     ? await query(
-        `SELECT w.*,
+        `SELECT w.*,sotto_full_access(w.email) AS full_access,
     (SELECT count(*)::int FROM accounts WHERE workspace_id=w.id AND connected=true) AS connected_accounts
     FROM workspaces w WHERE id=$1`,
         [workspaceId],
@@ -35,6 +35,7 @@ export default async function PlansPage({
     workspace &&
     hasAccess({
       internal: workspace.internal,
+      full_access: workspace.full_access,
       subscription_status: workspace.subscription_status,
       trial_end: workspace.trial_end,
       paid_until: workspace.paid_until,
@@ -44,6 +45,7 @@ export default async function PlansPage({
   const overLimit =
     workspace &&
     !workspace.internal &&
+    !workspace.full_access &&
     workspace.connected_accounts > mailboxLimit(workspace.billing_plan);
   const currentPlan = isPlanId(workspace?.billing_plan)
     ? plans[workspace.billing_plan]
@@ -72,10 +74,21 @@ export default async function PlansPage({
         A quieter inbox. A simple plan.
       </h1>
       <p className="mt-2 text-muted-foreground">
-        {workspace?.trial_used
-          ? "Choose the plan that fits your inbox. Cancel anytime."
-          : "Try Sotto free for 3 days. Cancel anytime."}
+        {workspace?.full_access
+          ? "Your full access is enabled. No trial is needed."
+          : workspace?.trial_used
+            ? "Choose the plan that fits your inbox. Cancel anytime."
+            : "Try Sotto free for 3 days. Cancel anytime."}
       </p>
+      {workspace?.full_access && (
+        <p className="mt-6 text-sm text-muted-foreground">
+          Full access. All mailboxes and email checks are included, with no
+          Sotto subscription required.
+          {workspace.stripe_subscription_id &&
+            !workspace.cancel_at_period_end &&
+            " An existing Stripe subscription still renews until canceled below."}
+        </p>
+      )}
       {workspace?.internal ? (
         <p className="mt-6 text-sm text-muted-foreground">
           Your installation already has access.
@@ -93,9 +106,11 @@ export default async function PlansPage({
                 : `Trial ends ${date(workspace.trial_end)}. Then $${(currentPlan?.priceCents ?? 0) / 100}/month.`
               : workspace.cancel_at_period_end && workspace.paid_until
                 ? `Canceled. Access until ${date(workspace.paid_until)}.`
-                : active
-                  ? "Subscription active."
-                  : "Processing is paused. Your history, undo and disconnect remain available."}
+                : workspace.full_access
+                  ? "Full access is enabled. Manage any existing Stripe subscription below."
+                  : active
+                    ? "Subscription active."
+                    : "Processing is paused. Your history, undo and disconnect remain available."}
           </p>
           {overLimit && (
             <p role="alert" className="text-sm text-destructive">
@@ -168,7 +183,7 @@ export default async function PlansPage({
                 `${plan.mailboxes} Gmail account${plan.mailboxes === 1 ? "" : "s"}`,
                 `${plan.emails} emails checked / month`,
                 `${plan.trialEmails} emails in your 3-day trial`,
-                "Automatic checks every 30 minutes",
+                `Automatic checks every ${process.env.COMPOSIO_NOTIFICATION_MODE === "poll" ? 30 : 15} minutes`,
                 "A reason for every move",
                 "Undo anytime in Sotto",
               ].map((line) => (
@@ -182,9 +197,11 @@ export default async function PlansPage({
                 </li>
               ))}
             </ul>
-            {workspace?.internal ? (
+            {workspace?.internal || workspace?.full_access ? (
               <span className="text-xs text-muted-foreground">
-                Included in your installation
+                {workspace?.full_access
+                  ? "Included in your full access"
+                  : "Included in your installation"}
               </span>
             ) : !available ? (
               <Button disabled>Coming soon</Button>
@@ -235,11 +252,13 @@ export default async function PlansPage({
         </div>
       )}
       <p className="mt-6 max-w-[72ch] text-xs leading-5 text-muted-foreground">
-        {workspace?.trial_used
-          ? "Your free trial has already been used. A new subscription is charged when you complete Checkout, at $5/month for Solo or $9/month for Duo. Stripe displays the charge and renewal details before you confirm."
-          : trialRequiresCard()
-            ? "Connect Gmail, choose a plan and add a card in Stripe. Your 3-day trial starts when Checkout is complete. Nothing is charged today. After the trial, your plan renews monthly at $5 for Solo or $9 for Duo unless you cancel before the trial ends."
-            : "Connect Gmail and choose a plan to start your 3-day trial. No card is required; the trial ends without a charge unless you subscribe."}{" "}
+        {workspace?.full_access
+          ? "Your full access is enabled. No trial is needed."
+          : workspace?.trial_used
+            ? "Your free trial has already been used. A new subscription is charged when you complete Checkout, at $5/month for Solo or $9/month for Duo. Stripe displays the charge and renewal details before you confirm."
+            : trialRequiresCard()
+              ? "Connect Gmail, choose a plan and add a card in Stripe. Your 3-day trial starts when Checkout is complete. Nothing is charged today. After the trial, your plan renews monthly at $5 for Solo or $9 for Duo unless you cancel before the trial ends."
+              : "Connect Gmail and choose a plan to start your 3-day trial. No card is required; the trial ends without a charge unless you subscribe."}{" "}
         One trial per workspace. Prices in USD.{" "}
         <Link href="/terms" className="underline underline-offset-2">
           Subscription terms

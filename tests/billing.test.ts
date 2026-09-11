@@ -67,6 +67,7 @@ vi.mock("stripe", async (importOriginal) => {
 });
 import {
   checkout,
+  billingReady,
   portal,
   processStripeEvent,
   reconcileCustomer,
@@ -85,6 +86,7 @@ beforeAll(async () => {
     "002_billing.sql",
     "007_plans.sql",
     "008_mail_allowances.sql",
+    "009_global_config.sql",
   ])
     await h.db.exec(
       await readFile(new URL(`../db/${name}`, import.meta.url), "utf8"),
@@ -214,6 +216,7 @@ describe("billing access and checkout recovery", () => {
     expect(h.price).toHaveBeenCalledWith("price_solo");
     const params = h.create.mock.calls[0][0];
     expect(params.line_items).toEqual([{ price: "price_solo", quantity: 1 }]);
+    expect(params.managed_payments).toEqual({ enabled: false });
     expect(params.payment_method_collection).toBe("always");
     expect(params.subscription_data.trial_period_days).toBe(3);
     expect(params.subscription_data.metadata.plan).toBe("solo");
@@ -513,4 +516,30 @@ describe("signed events and provider-authoritative access", () => {
     h.subscriptions = [subscription()];
     expect((await webhook(request(payload, signature))).status).toBe(200);
   });
+});
+
+it("opens Composio checkout only for the selected, verified delivery mode", () => {
+  vi.stubEnv("GMAIL_PROVIDER", "composio");
+  for (const name of [
+    "COMPOSIO_API_KEY",
+    "COMPOSIO_AUTH_CONFIG_ID",
+    "COMPOSIO_WEBHOOK_SECRET",
+  ])
+    vi.stubEnv(name, "synthetic");
+  vi.stubEnv("COMPOSIO_NOTIFICATION_MODE", "trigger");
+  vi.stubEnv("COMPOSIO_POLLING_READY", "true");
+  vi.stubEnv("COMPOSIO_TRIGGERS_READY", undefined);
+  expect(billingReady()).toBe(false);
+  vi.stubEnv("COMPOSIO_TRIGGERS_READY", "true");
+  expect(billingReady()).toBe(true);
+  vi.stubEnv("CHECKOUT_ENABLED", "false");
+  expect(billingReady()).toBe(false);
+  vi.stubEnv("CHECKOUT_ENABLED", "true");
+  vi.stubEnv("COMPOSIO_NOTIFICATION_MODE", "poll");
+  vi.stubEnv("COMPOSIO_POLLING_READY", "false");
+  expect(billingReady()).toBe(false);
+  vi.stubEnv("COMPOSIO_POLLING_READY", "true");
+  expect(billingReady()).toBe(true);
+  vi.stubEnv("COMPOSIO_NOTIFICATION_MODE", "unknown");
+  expect(billingReady()).toBe(false);
 });

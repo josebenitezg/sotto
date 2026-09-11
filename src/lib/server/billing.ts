@@ -33,7 +33,9 @@ export const billingReady = () =>
   process.env.CHECKOUT_ENABLED === "true" &&
   (!composioEnabled() ||
     (process.env.COMPOSIO_NOTIFICATION_MODE === "poll" &&
-      process.env.COMPOSIO_POLLING_READY === "true")) &&
+      process.env.COMPOSIO_POLLING_READY === "true") ||
+    (process.env.COMPOSIO_NOTIFICATION_MODE === "trigger" &&
+      process.env.COMPOSIO_TRIGGERS_READY === "true")) &&
   [
     "STRIPE_SECRET_KEY",
     "STRIPE_PRICE_SOLO_ID",
@@ -61,6 +63,9 @@ export function checkoutParameters(
 ): Stripe.Checkout.SessionCreateParams {
   return {
     mode: "subscription",
+    // Keep Sotto as the seller even if this Stripe account defaults to Managed Payments.
+    // Managed Payments rejects our allowance disclosure and changes the billing model.
+    managed_payments: { enabled: false },
     customer,
     client_reference_id: workspaceId,
     line_items: [{ price: priceId(plan), quantity: 1 }],
@@ -110,10 +115,11 @@ export async function checkout(workspaceId: string, plan: PlanId = "duo") {
   return transaction(async (db) => {
     const {
       rows: [workspace],
-    } = await db.query("SELECT * FROM workspaces WHERE id=$1 FOR UPDATE", [
-      workspaceId,
-    ]);
-    if (!workspace || workspace.internal)
+    } = await db.query(
+      "SELECT *,sotto_full_access(email) AS full_access FROM workspaces WHERE id=$1 FOR UPDATE",
+      [workspaceId],
+    );
+    if (!workspace || workspace.internal || workspace.full_access)
       throw new HttpError(409, "This workspace does not need a subscription.");
     const {
       rows: [account],

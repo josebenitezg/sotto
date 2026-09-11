@@ -18,7 +18,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build",
+    "access": "tsx --env-file=.env.local scripts/full-access.ts"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",

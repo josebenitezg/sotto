@@ -16,7 +16,7 @@ export function Wordmark({ className = "" }: { className?: string }) {
   );
 }
 
-export function PublicHeader() {
+export function PublicHeader({ inApp = false }: { inApp?: boolean }) {
   return (
     <header className="mx-auto flex h-14 w-full max-w-[1120px] items-center justify-between px-6">
       <Wordmark />
@@ -28,10 +28,10 @@ export function PublicHeader() {
           Pricing
         </Link>
         <Link
-          href="/login"
+          href={inApp ? "/review" : "/login"}
           className="flex h-8 items-center rounded-sm border border-border px-3 text-[13px] text-foreground transition-colors duration-[120ms] hover:border-border-hover hover:bg-gray-100"
         >
-          Sign in
+          {inApp ? "Open Sotto" : "Sign in"}
         </Link>
       </nav>
     </header>

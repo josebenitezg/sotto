@@ -1,9 +1,12 @@
 import { PublicFooter, PublicHeader } from "@/components/public-shell";
-export default function PublicLayout({
+import { sessionWorkspace } from "@/lib/server/auth";
+import { isDemo } from "@/lib/server/config";
+export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const inApp = isDemo() || !!(await sessionWorkspace());
   return (
     <div className="flex min-h-svh flex-col">
       <a
@@ -12,7 +15,7 @@ export default function PublicLayout({
       >
         Skip to content
       </a>
-      <PublicHeader />
+      <PublicHeader inApp={inApp} />
       <div className="flex-1">{children}</div>
       <PublicFooter />
     </div>

@@ -1,4 +1,5 @@
-import { Check } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Check } from "lucide-react";
 import {
   BillingAction,
   RefreshAfterCheckout,
@@ -42,6 +43,15 @@ export default async function PlansPage({
       id="content"
       className="mx-auto w-full max-w-[680px] px-6 py-16 md:py-24"
     >
+      {workspace || isDemo() ? (
+        <Link
+          href="/review"
+          className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors duration-[120ms] hover:text-foreground"
+        >
+          <ArrowLeft size={14} aria-hidden="true" />
+          Back to Sotto
+        </Link>
+      ) : null}
       <h1 className="text-2xl leading-8 font-semibold">Pricing</h1>
       <p className="mt-2 text-muted-foreground">
         One plan. Three days to try it.

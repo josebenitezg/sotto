@@ -115,10 +115,11 @@ export async function checkout(workspaceId: string, plan: PlanId = "duo") {
   return transaction(async (db) => {
     const {
       rows: [workspace],
-    } = await db.query("SELECT * FROM workspaces WHERE id=$1 FOR UPDATE", [
-      workspaceId,
-    ]);
-    if (!workspace || workspace.internal)
+    } = await db.query(
+      "SELECT *,sotto_full_access(email) AS full_access FROM workspaces WHERE id=$1 FOR UPDATE",
+      [workspaceId],
+    );
+    if (!workspace || workspace.internal || workspace.full_access)
       throw new HttpError(409, "This workspace does not need a subscription.");
     const {
       rows: [account],

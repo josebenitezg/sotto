@@ -1,13 +1,9 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { googleClient, gmailScope } from "@/lib/server/google";
-import {
-  allowedEmail,
-  appUrl,
-  isDemo,
-  publicSignup,
-} from "@/lib/server/config";
+import { appUrl, isDemo, publicSignup } from "@/lib/server/config";
 import { hash, unseal } from "@/lib/server/crypto";
+import { pilotAdmission } from "@/lib/server/global-config";
 import { connectIdentity } from "@/lib/server/workspaces";
 import { query } from "@/lib/server/db";
 import { enqueueAccount } from "@/lib/server/queue";
@@ -69,7 +65,10 @@ export async function GET(request: Request) {
       throw new ConnectionError("provider");
     stage = "admission";
     fallback = "failed";
-    if (!publicSignup() && !allowedEmail(identity.email))
+    if (
+      !publicSignup() &&
+      !(await pilotAdmission(identity.email, pending.workspace_id))
+    )
       throw new ConnectionError("not_allowed", 403);
     stage = "gmail_permission";
     const info = await client.getTokenInfo(tokens.access_token);

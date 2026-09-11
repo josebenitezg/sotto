@@ -27,6 +27,8 @@ Using the trigger-based assumptions below, Solo at 250 checked new messages cont
 
 Next cost work: measure actual token usage, batch Gmail reads where supported, cache repeated metadata within a worker batch, and revisit volume/provider pricing. A future direct Google integration would remove Composio's intermediary fees but still requires applicable Google verification and security review. Do not promise that another auth provider automatically removes those requirements.
 
+The private global configuration supports `full_access_emails` for operator-selected complimentary users. These workspace owners bypass Stripe and Sotto mail/account caps while listed. Revocation restores their existing billing state and usage without a new trial. These users still incur provider costs, which must be included alongside pilot and paid usage in the economics.
+
 ## Three-day trial
 
 1. Connect Gmail with the data-use notice and filtering consent.

@@ -25,6 +25,18 @@ Checkout explicitly sets `managed_payments.enabled=false`. The Sotto account def
 
 Stripe events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `.updated`, `.deleted`, `.paused`, `.resumed`, `.trial_will_end`, `invoice.paid`, `invoice.payment_failed`, `invoice.payment_action_required`.
 
+## Full access configuration
+
+Migration 009 adds the private `global_config` store in the existing database. The `full_access_emails` key holds an array of lowercase verified workspace-owner emails. No extra storage service or redeployment is needed to change it.
+
+Operators can run `npm run access -- list`, `npm run access -- add person@example.com`, or `npm run access -- remove person@example.com` against the intended database. The key can also be edited directly in the database console. There is no public configuration-write endpoint, and this list is never sent to the browser.
+
+Listed owners get full processing and mailbox access without a Stripe checkout, trial or Sotto mail allowance. Adding a secondary mailbox does not grant its owner's workspace free access: entitlement follows `workspaces.email`, established from the first verified identity. Exact emails only; domains and wildcards are not grants. Existing internal installation access remains separate.
+
+Grants and removals are read on subsequent requests and worker checks, with no process cache. Removal restores the workspace's existing subscription and usage counters; it does not reset its trial. An existing Stripe subscription is not automatically canceled or refunded when an operator grants full access. Cancel it separately through Stripe to stop renewal; the pricing page retains its management controls and makes this clear.
+
+Full access bypasses billing limits, not Google consent, mailbox isolation, the global write switch or a configured mailbox-write allowlist. Public rollout still requires authorization to expand the pilot write restriction. The same provider capacity and service limits apply.
+
 ## Trial, limits and billing access
 
 The trial starts after authenticated Checkout completion, not at signup. One trial per workspace; Stripe subscription history also prevents reuse after a missed webhook. Completed trials cannot be restarted by reconnecting Gmail or changing plans. Returning subscribers pay immediately, as displayed by Stripe.

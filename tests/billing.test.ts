@@ -86,6 +86,7 @@ beforeAll(async () => {
     "002_billing.sql",
     "007_plans.sql",
     "008_mail_allowances.sql",
+    "009_global_config.sql",
   ])
     await h.db.exec(
       await readFile(new URL(`../db/${name}`, import.meta.url), "utf8"),

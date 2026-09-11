@@ -39,6 +39,44 @@ export default function PrivacyPage() {
         You can delete a Gmail connection's data from Accounts, as explained
         below.
       </p>
+      <h2 id="data-protection" className="text-base font-semibold">
+        How we protect Google user data
+      </h2>
+      <p className="text-muted-foreground">
+        At sotto.email, we protect Google user data in transit with encrypted
+        connections: HTTPS between your browser and Sotto and between our server
+        and Google or OpenAI, and TLS with certificate verification for our
+        database connection. Stored application data, including Gmail metadata
+        and decision history, is encrypted at rest by our database provider,
+        Neon, using AES-256 encryption.
+      </p>
+      <p className="text-muted-foreground">
+        Google refresh tokens receive an additional layer of encryption in
+        Sotto using AES-256-GCM, bound to the corresponding account. The
+        encryption key and provider API credentials are kept in private server
+        environment configuration, separate from the database, and are not
+        included in browser code or the public source repository. Sotto does not
+        collect or store your Google password.
+      </p>
+      <p className="text-muted-foreground">
+        Access to mailbox data and controls requires an authenticated session.
+        The server checks workspace ownership before returning mailbox data or
+        accepting changes. Session cookies are Secure and HttpOnly, sessions
+        expire, and session identifiers are stored as hashes in the database.
+        Google connections use PKCE and single-use, browser-bound authorization
+        state. Changes from the browser require an origin check, and Gmail
+        notification requests require a verified Google identity token.
+      </p>
+      <p className="text-muted-foreground">
+        We also limit the data we retain: full message bodies are processed for
+        classification but are not stored in Sotto's database, and processing
+        queues contain account identifiers rather than email content.
+        Application code excludes email bodies and Google credentials from
+        diagnostic logs. You can revoke access or delete the stored Gmail data
+        using the controls described below. These measures apply to the hosted
+        sotto.email service; operators of self-hosted copies control their own
+        security configuration.
+      </p>
       <h2 className="text-base font-semibold">When we use AI</h2>
       <p className="text-muted-foreground">
         Messages that the protective checks do not resolve are classified with
@@ -157,9 +195,10 @@ export default function PrivacyPage() {
         moves can no longer be undone from Sotto. We retain the minimum identity
         linking your sign-in to your workspace, the deletion time to prevent
         reconnections started before the request, your workspace email, and plan
-        data. Other accounts are not deleted. Reconnecting Google authorizes a
-        new review. This action does not request deletion of records that
-        providers may retain under their own policies.
+        data. Other accounts are not deleted. Reconnecting Google through the
+        connection notice authorizes filtering again. This action does not
+        request deletion of records that providers may retain under their own
+        policies.
       </p>
       <p className="text-xs text-muted-foreground">
         For support, privacy questions, or requests to delete sotto.email data,
@@ -173,7 +212,7 @@ export default function PrivacyPage() {
         .
       </p>
       <p className="text-xs text-muted-foreground">
-        Last updated: September 2026. Each installation's operator is
+        Last updated: September 11, 2026. Each installation's operator is
         responsible for its configuration and data processing.
       </p>
     </main>

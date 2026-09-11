@@ -13,7 +13,7 @@ Sotto identifies unsolicited sales email with AI, moves it out of the inbox into
 | Enterprise  |       Contact support |                              Agreed separately |
 | Self-hosted | No Sotto subscription | Operator supplies infrastructure and providers |
 
-Live Solo and Duo products and prices have been created in Stripe for Perception Technologies Inc. The public checkout remains closed pending runtime setup, integration validation, commercial hosting and verified scheduled delivery. No unlimited-processing commitment is made. The MIT software remains open source; subscriptions pay for the hosted service.
+The launch will use the dedicated Sotto Stripe account, operated by Jose Maria Benitez Genes under the Sotto name. The founder selected this arrangement on September 11, replacing the earlier Perception Technologies Inc. setup. Products previously created in Perception are not the new launch destination. Public checkout remains closed pending Sotto account activation, its live runtime setup, commercial hosting and verified scheduled delivery. No unlimited-processing commitment is made. The MIT software remains open source; subscriptions pay for the hosted service.
 
 ## Included usage and lower-cost delivery
 
@@ -86,7 +86,9 @@ Vercel Hobby is for personal, non-commercial use. Paid Sotto needs commercial ho
 
 Check the team's actual upgrade quote before purchase: existing add-ons can make it higher than the $20 base price. Commercial hosting has not yet been activated for this launch. Usage beyond included allowances is additional; the base price is not an all-in hosting cap. Database, queues, domain renewal, monitoring, support and tax are separate or depend on their own free allowances and actual consumption.
 
-Fixed-cost break-even is `monthly fixed cost / contribution per subscriber`, only when contribution is positive. If a 250-message Solo customer cost $2.375 plus $0.480 Stripe fees, contribution would be $2.145 before support and trial acquisition cost; $30 of fixed hosting would require 14 such paying customers. This is a narrow sensitivity example, not a forecast or a recommended low-volume plan.
+Include the provider minimum when modeling paid infrastructure. For the selected polling approach, a conservative Solo-only model is `profit = 5N - 0.480N - 0.375N - 30 - max(29, C(N))`, where `N` is paying Solo subscribers and `C(N)` is total billable Composio usage after free allowances. The $30 hosting figure reflects the team's quoted upgrade with an existing add-on; verify the quote before purchase. The $29 Composio minimum includes usage credit, so usage covered by that credit is not added again.
+
+While billable Composio usage remains within that credit, the example reaches break-even at `ceil(59 / 4.145) = 15` paying Solo subscribers. This is a narrow sensitivity estimate, not a forecast: it excludes trial acquisition cost, the existing pilot's usage, support, taxes, infrastructure overages and any additional services. Beyond the credit, use measured provider usage rather than applying this fixed-cost shortcut.
 
 A trial costing $0.20 with 10% paid conversion adds $2 in acquisition cost per new paying customer. At 5% it adds $4. These are assumptions. Initial history and trial abuse must be measured and bounded before scaling.
 
@@ -97,6 +99,6 @@ A trial costing $0.20 with 10% paid conversion adds $2 in acquisition cost per n
 - Enable commercial hosting, deploy the half-hour polling schedule and verify provider capacity. Keep current pilot mailboxes working independently of hosted billing.
 - Open public signup and mailbox writes together with verified entitlements; the old pilot write allowlist would otherwise prevent new paying users from receiving the promised service.
 - Validate Gmail connection through Composio for a new user, first historical processing, future mail, disconnect and Undo. Confirm applicable provider production requirements rather than describing the underlying Google app as verified without evidence.
-- Publish accurate terms, privacy and processor disclosures, with Perception Technologies Inc. and support@sotto.email.
+- Publish accurate terms, privacy and processor disclosures, identifying Jose Maria Benitez Genes as the operator of Sotto and support@sotto.email as its support contact.
 
 Start with 10–20 users and measure connection success, time to first useful decision, trial-to-paid conversion, monthly retention, restores, support burden, token counts and provider calls/events. Do not buy acquisition traffic or make claims of unlimited usage before those economics are understood.

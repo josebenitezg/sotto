@@ -8,7 +8,8 @@ export default function TermsPage() {
     >
       <h1 className="text-2xl font-semibold">Subscription terms</h1>
       <p>
-        Sotto is operated by Perception Technologies Inc. Contact{" "}
+        Sotto is operated by Jose Maria Benitez Genes under the Sotto name.
+        Contact{" "}
         <a className="underline" href="mailto:support@sotto.email">
           support@sotto.email
         </a>{" "}

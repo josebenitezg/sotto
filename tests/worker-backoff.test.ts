@@ -190,7 +190,7 @@ it("automatically moves only the permitted account and keeps blocked recovery fr
   }
 });
 
-it("filters recent existing suggestions and new mail, retries failed label creation, and never moves old, kept or restored mail", async () => {
+it("reassesses legacy suggestions, filters recent cold and new mail, and preserves campaigns, old, kept and restored mail across retries", async () => {
   vi.stubEnv("BILLING_ENABLED", "false");
   vi.stubEnv("DEMO_MODE", "false");
   vi.stubEnv("GOOGLE_PUBSUB_TOPIC", "");
@@ -198,15 +198,13 @@ it("filters recent existing suggestions and new mail, retries failed label creat
   vi.stubEnv("MAILBOX_WRITE_ACCOUNT_IDS", "work");
   h.db = new PGlite();
   h.gmail.mockReset();
-  h.classify
-    .mockReset()
-    .mockResolvedValue({
-      decision: "move",
-      category: "cold",
-      confidence: 0.9,
-      protected: false,
-      reason: "Synthetic sales outreach",
-    });
+  h.classify.mockReset().mockImplementation(async (mail) => ({
+    decision: mail.id === "campaign" ? "keep" : "move",
+    category: mail.id === "campaign" ? "marketing" : "cold",
+    confidence: 0.9,
+    protected: false,
+    reason: "Synthetic sales outreach",
+  }));
   try {
     await h.db.exec(
       await readFile(new URL("../db/001_initial.sql", import.meta.url), "utf8"),
@@ -214,12 +212,13 @@ it("filters recent existing suggestions and new mail, retries failed label creat
     await h.db
       .exec(`INSERT INTO accounts(id,email,name,token_cipher,history_id,mode,auto_after)
       VALUES('work','owner@studio.example','Work','synthetic','100','automatic',now()-interval '7 days');
-      INSERT INTO jobs(account_id,message_id) VALUES('work','recent'),('work','old'),('work','kept'),('work','restored'),('work','new');`);
+      INSERT INTO jobs(account_id,message_id) VALUES('work','recent'),('work','old'),('work','kept'),('work','restored'),('work','campaign'),('work','new');`);
     for (const [id, state] of [
       ["recent", "suggested"],
       ["old", "suggested"],
       ["kept", "kept"],
       ["restored", "restored"],
+      ["campaign", "suggested"],
     ])
       await h.db.query(
         `INSERT INTO decisions(id,account_id,message_id,thread_id,sender,subject,category,confidence,reason,state,ai_decision)
@@ -268,15 +267,20 @@ it("filters recent existing suggestions and new mail, retries failed label creat
     expect(
       (
         await h.db.query(
-          "SELECT id,state FROM decisions WHERE id IN ('old','kept','restored') ORDER BY id",
+          "SELECT id,state FROM decisions WHERE id IN ('old','kept','restored','campaign') ORDER BY id",
         )
       ).rows,
     ).toEqual([
+      { id: "campaign", state: "kept" },
       { id: "kept", state: "kept" },
       { id: "old", state: "suggested" },
       { id: "restored", state: "restored" },
     ]);
-    expect(h.classify).toHaveBeenCalledOnce();
+    expect(h.classify.mock.calls.map(([mail]) => mail.id)).toEqual([
+      "recent",
+      "campaign",
+      "new",
+    ]);
   } finally {
     await h.db.close();
     vi.unstubAllEnvs();

@@ -283,18 +283,40 @@ export async function moveDecision(
     ]);
     return;
   }
-  const result: Classification = {
+  let result: Classification = {
     decision: decision.ai_decision,
     category: decision.category,
     confidence: decision.confidence,
     protected: false,
     reason: decision.reason,
   };
+  // Review suggestions can outlive classifier improvements. Before an
+  // automatic move, reassess legacy decisions with the current AI policy.
+  if (
+    automatic &&
+    decision.state === "suggested" &&
+    decision.policy_version !== CLASSIFIER_POLICY_VERSION
+  ) {
+    result = await classify(mail, ctx);
+    await query(
+      `UPDATE decisions SET category=$2,confidence=$3,reason=$4,ai_decision=$5,
+       policy_version=$6,state=$7,updated_at=now() WHERE id=$1`,
+      [
+        decisionId,
+        result.category,
+        result.confidence,
+        result.reason,
+        result.decision,
+        CLASSIFIER_POLICY_VERSION,
+        shouldMove(result, account.policy as Policy) ? "suggested" : "kept",
+      ],
+    );
+  }
   if (!shouldMove(result, account.policy as Policy)) return;
   const label =
     decision.label_added ??
     (await gmail.ensureLabel(
-      decision.category === "cold" ? "Sotto/Cold" : "Sotto/Reading",
+      result.category === "cold" ? "Sotto/Cold" : "Sotto/Reading",
     ));
   const addedByUs =
     decision.state === "moving"

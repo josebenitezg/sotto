@@ -111,7 +111,11 @@ export default async function PlansPage({
               {allowance.resetsAt && (
                 <>
                   {" "}
-                  {allowance.trial ? "Trial allowance ends" : "Renews"}{" "}
+                  {workspace.cancel_at_period_end
+                    ? "Included usage ends"
+                    : allowance.trial
+                      ? "Trial allowance ends"
+                      : "Renews"}{" "}
                   {date(new Date(allowance.resetsAt))}.
                 </>
               )}

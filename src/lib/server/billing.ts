@@ -294,12 +294,26 @@ export async function reconcileCustomer(customerId: string) {
       typeof subscription.latest_invoice === "object"
         ? subscription.latest_invoice
         : null;
+    // Customer Portal can set cancel_at without cancel_at_period_end (including
+    // flexible subscriptions). Enforce that deadline even if its webhook is late.
+    const periodEnd = Math.min(
+      items[0].current_period_end,
+      subscription.cancel_at ?? Infinity,
+    );
+    const canceling =
+      subscription.cancel_at_period_end ||
+      (subscription.cancel_at !== null &&
+        subscription.cancel_at !== undefined &&
+        subscription.cancel_at <= items[0].current_period_end);
     const paidUntil =
       subscription.status === "active" && invoice?.status === "paid"
-        ? new Date(items[0].current_period_end * 1000)
+        ? new Date(periodEnd * 1000)
         : null;
     const trialEnd = subscription.trial_end
-      ? new Date(subscription.trial_end * 1000)
+      ? new Date(
+          Math.min(subscription.trial_end, subscription.cancel_at ?? Infinity) *
+            1000,
+        )
       : null;
     const allowanceTrial = subscription.status === "trialing";
     const allowanceStart = allowanceTrial
@@ -310,7 +324,7 @@ export async function reconcileCustomer(customerId: string) {
       : null;
     const allowanceResetsAt = allowanceTrial
       ? trialEnd
-      : new Date(items[0].current_period_end * 1000);
+      : new Date(periodEnd * 1000);
     await db.query(
       `UPDATE workspaces SET stripe_subscription_id=$2,subscription_status=$3,
       trial_used=trial_used OR $4,trial_end=$5,paid_until=$6,cancel_at_period_end=$7,billing_plan=$8,
@@ -323,7 +337,7 @@ export async function reconcileCustomer(customerId: string) {
         !!subscription.trial_start,
         trialEnd,
         paidUntil,
-        subscription.cancel_at_period_end,
+        canceling,
         plan,
         allowancePeriod,
         allowanceResetsAt,

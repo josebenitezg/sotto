@@ -103,6 +103,13 @@ describe.skipIf(process.env.STRIPE_INTEGRATION !== "true")(
           ])
         ).rows as any[];
         const limit = (await workspaceAllowance(h.state.workspaceId))!.limit;
+        expect(w.cancel_at_period_end).toBe(
+          sub.cancel_at_period_end ||
+            !!(
+              sub.cancel_at &&
+              sub.cancel_at <= sub.items.data[0].current_period_end
+            ),
+        );
         await h.db.query("INSERT INTO usage_periods VALUES($1,$2,$3)", [
           w.id,
           w.allowance_period,

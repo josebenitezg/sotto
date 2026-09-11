@@ -5,6 +5,7 @@ import { startFiltering } from "./filtering";
 import { transaction } from "./db";
 import { HttpError } from "./auth";
 import { seal } from "./crypto";
+import type { ComposioConnection } from "./composio";
 
 // A verified Google identity can sign in to its existing workspace. Linking a
 // second inbox requires a browser-bound OAuth intent from that workspace.
@@ -14,6 +15,7 @@ export async function connectIdentity(
   linkedWorkspace: string | null,
   authorizationStartedAt?: Date | string,
   filteringRequested = false,
+  composio?: ComposioConnection,
 ) {
   return transaction(async (db) => {
     // Same key/order as mailbox actions and workers. A reconnect must not
@@ -33,7 +35,7 @@ export async function connectIdentity(
     const {
       rows: [existing],
     } = await db.query(
-      "SELECT workspace_id,token_cipher,connected,mode_changed_at FROM accounts WHERE id=$1",
+      "SELECT workspace_id,token_cipher,connected,mode_changed_at,mail_provider,composio_account_id FROM accounts WHERE id=$1",
       [identity.sub],
     );
     if (
@@ -86,11 +88,13 @@ export async function connectIdentity(
       if (count.n >= 2)
         throw new HttpError(409, "The plan includes up to two Gmail accounts.");
     }
-    if (!refreshToken && !existing?.token_cipher)
+    if (!composio && !refreshToken && !existing?.token_cipher)
       throw new Error("Offline access missing");
-    const cipher = refreshToken
-      ? seal(refreshToken, `gmail:${identity.sub}`)
-      : existing.token_cipher;
+    const cipher = composio
+      ? ""
+      : refreshToken
+        ? seal(refreshToken, `gmail:${identity.sub}`)
+        : existing.token_cipher;
     await db.query(
       `INSERT INTO accounts(id,email,name,token_cipher,workspace_id,start_at)
       VALUES($1,$2,$3,$4,$5,now()-interval '7 days')
@@ -103,6 +107,26 @@ export async function connectIdentity(
         workspaceId,
       ],
     );
+    await db.query(
+      `UPDATE accounts SET mail_provider=$2,composio_account_id=$3,composio_user_id=$4,
+        composio_trigger_id=CASE WHEN composio_account_id IS NOT DISTINCT FROM $3 THEN composio_trigger_id ELSE NULL END,
+        last_watch=CASE WHEN mail_provider=$2 AND composio_account_id IS NOT DISTINCT FROM $3 THEN last_watch ELSE NULL END,
+        watch_expires=CASE WHEN mail_provider=$2 THEN watch_expires ELSE NULL END WHERE id=$1`,
+      [
+        identity.sub,
+        composio ? "composio" : "google",
+        composio?.id ?? null,
+        composio?.userId ?? null,
+      ],
+    );
+    if (
+      existing?.composio_account_id &&
+      existing.composio_account_id !== composio?.id
+    )
+      await db.query(
+        "INSERT INTO composio_cleanup(connection_id) VALUES($1) ON CONFLICT DO NOTHING",
+        [existing.composio_account_id],
+      );
     const intentIsCurrent =
       !existing?.mode_changed_at ||
       (authorizationStartedAt &&

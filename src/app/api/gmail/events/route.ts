@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     // this event by cascade or commits first and leaves no account to insert.
     const [account] = await query(
       `WITH active AS (
-        SELECT id FROM accounts WHERE email=$2 AND connected=true FOR KEY SHARE
+        SELECT id FROM accounts WHERE email=$2 AND connected=true AND mail_provider='google' FOR KEY SHARE
       ), saved AS (
         INSERT INTO mailbox_events(id,account_id,history_id)
           SELECT $1,id,$3 FROM active ON CONFLICT DO NOTHING

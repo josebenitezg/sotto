@@ -3,6 +3,14 @@ import { appUrl, required, writesEnabled } from "./config";
 import { query } from "./db";
 import { unseal } from "./crypto";
 import type { Mail } from "../types";
+import {
+  ComposioError,
+  ensureComposioTrigger,
+  stopComposioTrigger,
+  deleteComposioConnection,
+  type ComposioConnection,
+} from "./composio";
+import { composioGmailRequest } from "./composio-gmail";
 
 export const gmailScope = "https://www.googleapis.com/auth/gmail.modify";
 export function googleClient() {
@@ -72,24 +80,52 @@ export function normalizeMessage(raw: RawMessage): Mail {
 }
 
 export class Gmail {
-  private client: OAuth2Client;
+  private client?: OAuth2Client;
   constructor(
     token: string,
     private readonly accountId?: string,
+    private readonly composio?: ComposioConnection,
   ) {
-    this.client = googleClient();
-    this.client.setCredentials({ refresh_token: token });
+    if (!composio) {
+      this.client = googleClient();
+      this.client.setCredentials({ refresh_token: token });
+    }
   }
   static async forAccount(id: string) {
     const [account] = await query(
-      "SELECT token_cipher FROM accounts WHERE id=$1 AND connected=true",
+      "SELECT token_cipher,mail_provider,composio_account_id,composio_user_id,composio_trigger_id FROM accounts WHERE id=$1 AND connected=true",
       [id],
     );
+    if (
+      account?.mail_provider === "composio" &&
+      account.composio_account_id &&
+      account.composio_user_id
+    )
+      return new Gmail("", id, {
+        id: account.composio_account_id,
+        userId: account.composio_user_id,
+        triggerId: account.composio_trigger_id,
+      });
     if (!account?.token_cipher) throw new Error("Account disconnected");
     return new Gmail(unseal(account.token_cipher, `gmail:${id}`), id);
   }
   async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const { token } = await this.client.getAccessToken();
+    if (this.composio) {
+      // The classifier receives no tools; these are fixed server operations.
+      // Validate the path before proxying to keep credentials on Google's host.
+      if (
+        !/^(profile|labels|messages|threads|history)(\/|\?|$)/.test(path) ||
+        /(?:\.\.|[\\#])/.test(path)
+      )
+        throw new Error("Unsupported Gmail operation");
+      try {
+        return await composioGmailRequest<T>(this.composio, path, options);
+      } catch (error) {
+        if (error instanceof ComposioError) throw new GmailError(error.status);
+        throw error;
+      }
+    }
+    const { token } = await this.client!.getAccessToken();
     if (!token) throw new Error("Missing access token");
     const response = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/${path}`,
@@ -176,10 +212,28 @@ export class Gmail {
       }),
     });
   }
+  async ensureNotifications() {
+    if (this.composio && this.accountId) {
+      const triggerId = await ensureComposioTrigger(this.composio);
+      await query(
+        "UPDATE accounts SET composio_trigger_id=$2,last_watch=now(),watch_expires=NULL WHERE id=$1 AND composio_account_id=$3",
+        [this.accountId, triggerId, this.composio.id],
+      );
+      this.composio.triggerId = triggerId;
+    } else if (process.env.GOOGLE_PUBSUB_TOPIC && this.accountId) {
+      const watch = await this.watch();
+      await query(
+        "UPDATE accounts SET watch_expires=$2,last_watch=now() WHERE id=$1",
+        [this.accountId, new Date(Number(watch.expiration))],
+      );
+    }
+  }
   async stop() {
+    if (this.composio) return stopComposioTrigger(this.composio);
     return this.request("stop", { method: "POST" });
   }
   async revoke() {
-    await this.client.revokeCredentials();
+    if (this.composio) return deleteComposioConnection(this.composio.id);
+    await this.client!.revokeCredentials();
   }
 }

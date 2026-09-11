@@ -8,6 +8,7 @@ import {
   processingErrorCode,
 } from "@/lib/server/processing-error";
 import { defaultPolicy } from "@/lib/types";
+import { cleanupComposioConnections } from "@/lib/server/composio-cleanup";
 
 export const maxDuration = 60;
 export async function GET(request: Request) {
@@ -85,6 +86,7 @@ export async function GET(request: Request) {
   for (const account of accounts) await enqueueAccount(account.id);
   await query("DELETE FROM sessions WHERE expires_at<now()");
   await query("DELETE FROM oauth_states WHERE expires_at<now()");
+  await cleanupComposioConnections();
   await query(
     "DELETE FROM mailbox_events WHERE processed_at<now()-interval '7 days'",
   );

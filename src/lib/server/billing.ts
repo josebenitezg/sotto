@@ -139,6 +139,7 @@ export async function checkout(workspaceId: string) {
         await api.billingPortal.sessions.create({
           customer,
           configuration: required("STRIPE_PORTAL_CONFIGURATION_ID"),
+          locale: "en",
           return_url: `${appUrl()}/pricing`,
         })
       ).url;
@@ -191,6 +192,7 @@ export async function portal(workspaceId: string) {
     await stripe().billingPortal.sessions.create({
       customer: workspace.stripe_customer_id,
       configuration: required("STRIPE_PORTAL_CONFIGURATION_ID"),
+      locale: "en",
       return_url: `${appUrl()}/pricing`,
     })
   ).url;

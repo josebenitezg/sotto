@@ -80,7 +80,12 @@ import { stripe } from "../src/lib/server/billing";
 
 beforeAll(async () => {
   h.db = new PGlite();
-  for (const name of ["001_initial.sql", "002_billing.sql", "007_plans.sql"])
+  for (const name of [
+    "001_initial.sql",
+    "002_billing.sql",
+    "007_plans.sql",
+    "008_mail_allowances.sql",
+  ])
     await h.db.exec(
       await readFile(new URL(`../db/${name}`, import.meta.url), "utf8"),
     );
@@ -174,6 +179,7 @@ function subscription(
         {
           price: { id: "price_sotto" },
           quantity: 1,
+          current_period_start: Math.floor(Date.now() / 1000),
           current_period_end: Date.now() / 1000 + 86400,
         },
       ],
@@ -418,6 +424,35 @@ describe("signed events and provider-authoritative access", () => {
     await reconcileCustomer("cus_a");
     await h.db.query("UPDATE accounts SET connected=true WHERE id='extra'");
     expect(await accountProcessingAllowed("extra")).toBe(true);
+  });
+  it("keeps usage through plan changes and replay, but identifies a new paid period", async () => {
+    const sub = subscription("active");
+    h.subscriptions = [sub];
+    await reconcileCustomer("cus_a");
+    const get = async () =>
+      (
+        await h.db.query(
+          "SELECT allowance_period,billing_plan FROM workspaces WHERE id='a'",
+        )
+      ).rows[0] as any;
+    const first = await get();
+    await h.db.query("INSERT INTO usage_periods VALUES('a',$1,200)", [
+      first.allowance_period,
+    ]);
+    sub.items.data[0].price.id = "price_solo";
+    await reconcileCustomer("cus_a");
+    expect((await get()).allowance_period).toBe(first.allowance_period);
+    expect(
+      (
+        await h.db.query(
+          "SELECT used FROM usage_periods WHERE workspace_id='a'",
+        )
+      ).rows[0],
+    ).toEqual({ used: 200 });
+    sub.items.data[0].current_period_start += 30 * 86400;
+    sub.items.data[0].current_period_end += 30 * 86400;
+    await reconcileCustomer("cus_a");
+    expect((await get()).allowance_period).not.toBe(first.allowance_period);
   });
   it("verifies the raw request signature before touching billing state", async () => {
     const payload = JSON.stringify(event("evt_signed"));

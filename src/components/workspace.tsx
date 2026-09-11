@@ -297,6 +297,24 @@ export function Workspace({
             . Your history and Undo are still available.
           </p>
         )}
+        {data.allowance && data.accessActive !== false && (
+          <p
+            role="status"
+            className="mb-6 text-[13px] leading-5 text-muted-foreground"
+          >
+            {data.allowance.used} / {data.allowance.limit} emails checked
+            {data.allowance.trial
+              ? " during your trial"
+              : " this billing month"}
+            .
+            {data.allowance.exhausted
+              ? " New filtering is paused. No extra charges."
+              : ""}{" "}
+            <Link href="/pricing" className="underline underline-offset-2">
+              View allowance
+            </Link>
+          </p>
+        )}
         {children}
       </main>
       <Toaster
@@ -391,17 +409,19 @@ function ConnectButton({ outline = false }: { outline?: boolean }) {
 }
 function Status({ account }: { account: Account }) {
   const {
-    data: { demo, accessActive },
+    data: { demo, accessActive, allowance },
   } = useWorkspace();
   const label = !account.connected
     ? "Disconnected"
     : accessActive === false
       ? "Plan paused"
-      : account.lastError
-        ? "Needs attention"
-        : account.mode === "automatic" && !account.writesEnabled && !demo
-          ? "Filtering unavailable"
-          : modeLabels[account.mode];
+      : allowance?.exhausted
+        ? "Limit reached"
+        : account.lastError
+          ? "Needs attention"
+          : account.mode === "automatic" && !account.writesEnabled && !demo
+            ? "Filtering unavailable"
+            : modeLabels[account.mode];
   const tone = !account.connected
     ? "text-muted-foreground"
     : label === "Filtering on"
@@ -803,7 +823,10 @@ function GmailFolderLink({ account }: { account: Account }) {
 function FilteringControls({ account }: { account: Account }) {
   const { data, act, busy } = useWorkspace();
   const canFilter =
-    data.demo || (account.writesEnabled && data.accessActive !== false);
+    data.demo ||
+    (account.writesEnabled &&
+      data.accessActive !== false &&
+      !data.allowance?.exhausted);
   return (
     <div className="flex flex-wrap items-center gap-2">
       {account.mode === "automatic" ? (
@@ -847,8 +870,6 @@ function AccountRow({
   children?: ReactNode;
 }) {
   const { data, act, busy } = useWorkspace();
-  const canFilter =
-    data.demo || (account.writesEnabled && data.accessActive !== false);
   return (
     <div className="px-4 py-4">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
@@ -864,7 +885,7 @@ function AccountRow({
           <ConnectButton outline />
         )}
       </div>
-      {account.connected && !canFilter ? (
+      {account.connected && !account.writesEnabled && !data.demo ? (
         <p className="mt-3 text-[13px] text-warning">
           Moving emails is disabled for this account.
         </p>

@@ -11,6 +11,12 @@ import {
 } from "./classifier";
 import { writesEnabled } from "./config";
 import { accountProcessingAllowed } from "./entitlements";
+import {
+  accountAllowance,
+  reserveMessage,
+  MailAllowanceReached,
+} from "./allowances";
+import { usesComposioPolling } from "./polling";
 import { processingErrorCode, retryPlan } from "./processing-error";
 import type { Classification, Policy } from "../types";
 
@@ -43,14 +49,18 @@ export async function withAccountLock<T>(
 }
 export function historyCandidates(
   history: {
-    messagesAdded?: { message: { id: string } }[];
+    messagesAdded?: { message: { id: string; labelIds?: string[] } }[];
     labelsAdded?: { message: { id: string }; labelIds: string[] }[];
   }[],
 ) {
   return [
     ...new Set(
       history.flatMap((h) => [
-        ...(h.messagesAdded ?? []).map((m) => m.message.id),
+        ...(h.messagesAdded ?? [])
+          .filter(
+            (m) => !m.message.labelIds || m.message.labelIds.includes("INBOX"),
+          )
+          .map((m) => m.message.id),
         ...(h.labelsAdded ?? [])
           .filter((m) => m.labelIds.includes("INBOX"))
           .map((m) => m.message.id),
@@ -60,6 +70,11 @@ export function historyCandidates(
 }
 export async function syncMailbox(accountId: string, gmail: Gmail) {
   if (!(await accountProcessingAllowed(accountId))) return;
+  const allowance = await accountAllowance(accountId);
+  if (allowance) {
+    if (allowance.exhausted) return;
+    return syncBudgetedMailbox(accountId, gmail, allowance.remaining);
+  }
   const [account] = await query(
     "SELECT * FROM accounts WHERE id=$1 AND connected=true",
     [accountId],
@@ -127,6 +142,89 @@ export async function syncMailbox(accountId: string, gmail: Gmail) {
     );
   });
 }
+// Read one page at a time and persist its continuation. Draining queued mail
+// first avoids paying for the same history read in every three-message batch.
+async function syncBudgetedMailbox(
+  accountId: string,
+  gmail: Gmail,
+  remaining: number,
+) {
+  const [account] = await query(
+    "SELECT * FROM accounts WHERE id=$1 AND connected=true AND mode<>'paused'",
+    [accountId],
+  );
+  if (!account) return;
+  if (
+    (
+      await query(
+        "SELECT 1 FROM jobs WHERE account_id=$1 AND state IN ('pending','running') LIMIT 1",
+        [accountId],
+      )
+    ).length
+  )
+    return;
+  const kind = account.sync_kind ?? (account.history_id ? "history" : "inbox");
+  let cursor = account.sync_cursor ?? account.history_id;
+  if (!cursor)
+    cursor = (await gmail.request<{ historyId: string }>("profile")).historyId;
+  const params = new URLSearchParams(
+    kind === "history"
+      ? { startHistoryId: cursor }
+      : {
+          q: `in:inbox after:${Math.floor(new Date(account.start_at).getTime() / 1000)}`,
+          maxResults: String(Math.min(100, remaining)),
+        },
+  );
+  if (account.sync_page_token) params.set("pageToken", account.sync_page_token);
+  let result: {
+    historyId?: string;
+    nextPageToken?: string;
+    history?: Parameters<typeof historyCandidates>[0];
+    messages?: { id: string }[];
+  };
+  try {
+    result = await gmail.request(
+      `${kind === "history" ? "history" : "messages"}?${params}`,
+    );
+  } catch (error) {
+    if (
+      !(error instanceof GmailError) ||
+      error.status !== 404 ||
+      kind !== "history"
+    )
+      throw error;
+    await query(
+      "UPDATE accounts SET history_id=NULL,sync_kind=NULL,sync_cursor=NULL,sync_page_token=NULL WHERE id=$1",
+      [accountId],
+    );
+    return syncBudgetedMailbox(accountId, gmail, remaining);
+  }
+  const candidates =
+    kind === "history"
+      ? historyCandidates(result.history ?? [])
+      : (result.messages ?? []).map((m) => m.id);
+  await transaction(async (db) => {
+    for (const id of candidates)
+      await db.query(
+        "INSERT INTO jobs(account_id,message_id) VALUES($1,$2) ON CONFLICT(account_id,message_id) DO NOTHING",
+        [accountId, id],
+      );
+    if (result.nextPageToken)
+      await db.query(
+        "UPDATE accounts SET sync_kind=$2,sync_cursor=$3,sync_page_token=$4,last_sync=now(),last_error=NULL WHERE id=$1",
+        [accountId, kind, cursor, result.nextPageToken],
+      );
+    else
+      await db.query(
+        "UPDATE accounts SET history_id=$2,sync_kind=NULL,sync_cursor=NULL,sync_page_token=NULL,last_sync=now(),last_error=NULL WHERE id=$1",
+        [accountId, kind === "history" ? result.historyId : cursor],
+      );
+    await db.query(
+      "UPDATE mailbox_events SET processed_at=now() WHERE account_id=$1 AND processed_at IS NULL",
+      [accountId],
+    );
+  });
+}
 async function contextFor(
   accountId: string,
   gmail: Gmail,
@@ -184,6 +282,7 @@ export async function classifyJob(
     }
     return;
   }
+  await reserveMessage(accountId, messageId);
   const mail = await gmail.message(messageId);
   if (
     !mail.labels.includes("INBOX") ||
@@ -372,7 +471,9 @@ export async function workAccount(accountId: string, maxJobs = 30) {
     if (
       (account.mail_provider === "composio" ||
         process.env.GOOGLE_PUBSUB_TOPIC) &&
-      (!account.last_watch ||
+      ((account.composio_trigger_id &&
+        (await usesComposioPolling(accountId))) ||
+        !account.last_watch ||
         Date.now() - new Date(account.last_watch).getTime() > 20 * 3600000)
     ) {
       await gmail.ensureNotifications();
@@ -396,9 +497,16 @@ export async function workAccount(accountId: string, maxJobs = 30) {
       "UPDATE jobs SET state='pending' WHERE account_id=$1 AND state='running'",
       [accountId],
     );
+    const allowance = await accountAllowance(accountId);
     const jobs = await query(
-      "SELECT * FROM jobs WHERE account_id=$1 AND state='pending' AND available_at<=now() ORDER BY id LIMIT $2",
-      [accountId, maxJobs],
+      allowance
+        ? `SELECT j.* FROM jobs j WHERE j.account_id=$1 AND j.state='pending' AND j.available_at<=now()
+       AND ($3 OR EXISTS (SELECT 1 FROM message_allowances m WHERE m.account_id=j.account_id AND m.message_id=j.message_id))
+       ORDER BY j.id LIMIT $2`
+        : "SELECT * FROM jobs WHERE account_id=$1 AND state='pending' AND available_at<=now() ORDER BY id LIMIT $2",
+      allowance
+        ? [accountId, maxJobs, !allowance.exhausted]
+        : [accountId, maxJobs],
     );
     let failed = false;
     for (const job of jobs) {
@@ -414,6 +522,13 @@ export async function workAccount(accountId: string, maxJobs = 30) {
           [job.id],
         );
       } catch (error) {
+        if (error instanceof MailAllowanceReached) {
+          await query(
+            "UPDATE jobs SET state='pending',attempts=GREATEST(0,attempts-1),last_error=NULL WHERE id=$1",
+            [job.id],
+          );
+          break;
+        }
         if (error instanceof GmailError && error.status === 404) {
           await query("UPDATE jobs SET state='done' WHERE id=$1", [job.id]);
           continue;

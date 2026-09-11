@@ -4,7 +4,7 @@ The MIT self-hosted app needs no Sotto subscription: leave `BILLING_ENABLED=fals
 
 ## Runtime configuration
 
-Run database migrations before deploying. Migration 007 adds `billing_plan`, durable checkout-plan recovery and technical AI usage records. Existing subscriptions map to Duo; new hosted workspaces start with the Solo mailbox limit until Stripe verifies another plan. Internal installations keep their existing access. Disconnected accounts retain history without occupying a connected slot.
+Run database migrations before deploying. Migration 007 adds `billing_plan`, durable checkout-plan recovery and technical AI usage records. Migration 008 adds per-period mail allowances and durable scan continuation. Existing subscriptions map to Duo; new hosted workspaces start with the Solo mailbox limit until Stripe verifies another plan. Internal installations keep their existing access. Disconnected accounts retain history without occupying a connected slot.
 
 Configure server-only values from one Stripe environment:
 
@@ -16,6 +16,8 @@ Configure server-only values from one Stripe environment:
 - `STRIPE_PORTAL_CONFIGURATION_ID`: a dedicated Sotto portal with payment-method updates, invoice history, cancellation at period end and plan changes restricted to Solo/Duo with fixed quantity 1. Configure and verify proration behavior before allowing changes. Do not change a shared account-wide portal configuration.
 - `TRIAL_REQUIRE_CARD=true`: require a card for the three-day trial, followed by monthly billing unless canceled. The optional `false` setting supports no-card trials on self-managed installations; missing payment method ends the trial by cancellation.
 - `BILLING_ENABLED=true`: enforce hosted entitlements.
+- `COMPOSIO_NOTIFICATION_MODE=poll`: use scheduled history reconciliation for non-internal hosted accounts and remove their managed per-message triggers. Internal pilot accounts keep their existing notifications.
+- `COMPOSIO_POLLING_READY=true`: set only after deploying and verifying `/api/cron/poll` on a `*/30 * * * *` commercial scheduler. The route requires `CRON_SECRET` and `QUEUE_DRIVER=vercel`. This flag gates checkout; it does not install a schedule. The repository currently retains only the daily recovery schedule so it can deploy before the commercial hosting upgrade.
 - `CHECKOUT_ENABLED=true`: expose checkout only when Gmail, runtime permissions, webhook and the portal have passed integration validation.
 - `PUBLIC_SIGNUP=true`: accept verified Google identities beyond the pilot email allowlist. Public launch also needs installation-wide mailbox-write opt-in; leaving `MAILBOX_WRITE_ACCOUNT_IDS` restricted to pilot accounts would prevent new subscribers from receiving filtering. Remove that restriction only for the authorized launch after entitlement checks are verified. An empty value fails closed; it is not equivalent to an unset restriction.
 
@@ -39,17 +41,23 @@ Static Payment Links are not used for hosted provisioning: authenticated Checkou
 
 The direct OpenAI classifier records model, account ID, input/cached-input/output tokens in `ai_usage`. It records reported usage even for incomplete responses, without persisting email content in the usage table. Missing or invalid provider usage is skipped; telemetry failures do not interrupt mailbox processing. This measures future calls, not historical usage. See the business plan for the pricing formula and Composio costs that token measurement alone does not capture.
 
-No monthly message allowance is currently enforced. Do not advertise unlimited processing or open public paid signup until the included-volume/provider-cost decision is resolved.
+Solo includes 250 checked emails per monthly billing period (50 during the trial); Duo includes 500 shared across both accounts (100 during the trial). Checking reserves a slot before provider reads. Kept and moved emails, including recent cleanup, count. Retries and Undo do not count again. New work pauses at the cap without an overage charge. Existing reservations can finish. The UI shows usage and reset time.
+
+Quota updates share a workspace row lock across accounts. A trial and each Stripe monthly billing period have distinct usage buckets; replay, reconnect and plan changes preserve usage. Account deletion removes checked-message IDs but retains the aggregate count until workspace deletion. There is no rollover. A new unpaid period grants no processing until Stripe confirms payment. Hosted scans persist one page at a time and drain pending work before another history read. At quota, the worker stops new reads and avoids a queue continuation loop.
+
+Free Composio allowances are shared across the installation. The mail cap bounds per-customer processing, not the global number of customers. Monitor capacity and upgrade the provider plan before that shared limit is reached.
 
 ## Verification and deployment status
 
 Updated September 11, 2026:
 
 - Live Solo ($5) and Duo ($9) products/prices have been created and read back in Perception Technologies Inc. No customer has been charged by this setup.
-- The new test Solo price and the existing $9 test price are available for integration validation.
+- A dedicated sandbox portal permits Solo/Duo changes, fixed quantity 1, prorated invoices, payment updates and period-end cancellation.
 - A dedicated live restricted-key form and a commercial Vercel upgrade quote are prepared, pending the founder's confirmations. Live portal, runtime environment and signed webhook setup are incomplete.
-- Checkout and public signup remain disabled. Existing pilot accounts keep internal access.
+- Test runtime settings are prepared on production with checkout/public signup closed. The half-hour scheduler remains gated off until commercial hosting is active. Existing pilot accounts keep internal access.
 
 Automated tests use synthetic records, embedded PostgreSQL and a mocked Stripe API with the real Stripe signature verifier. Coverage includes workspace isolation, Solo/Duo limits, price validation, exact trial expiry, unpaid states, duplicate/reordered events, failed queue publication, signature tampering and checkout retry recovery. These tests do not establish that the live key, portal, Google flow or Stripe deliveries work.
 
-A prior provider test on September 10 created a synthetic no-card subscription with exactly 259,200 seconds of trial and verified cancellation without a new invoice. It did not validate the new card-required end-to-end flow. Complete sandbox Checkout, trial conversion/payment failure, plan change, cancellation and replay tests before turning on live checkout. Then verify production webhook delivery and a new hosted workspace while keeping pilot access intact.
+The September 11 sandbox browser run used a synthetic customer, Stripe test cards and a Test Clock. It verified card-required Checkout with the exact 259,200-second trial, $0 initial invoice, $5 first charge, Solo-to-Duo change with $3.47 proration and no duplicate subscription, and the next $9 monthly renewal. A failing test card produced an unpaid $9 invoice and `past_due`; the application denied new processing against that real provider state. Updating the card through the portal recovered that invoice and application access. Period-end cancellation has been requested; terminal cancellation and signed deployed delivery are verified separately before release.
+
+`tests/stripe-sandbox.integration.test.ts` is opt-in and never runs real API calls in ordinary CI. It uses real Stripe test data with an isolated synthetic PostgreSQL database and a paused mailbox without Gmail credentials. Supply a test-only key, both test price IDs and an ignored `private/stripe-sandbox-run.json` containing `workspaceId`, `customer`, `subscription` and a dedicated `portal` configuration. These resources must have matching Sotto metadata. Run with `STRIPE_INTEGRATION=true`; set `STRIPE_EXPECT_STATUS=past_due` or `canceled` for those lifecycle stages. Never use a live key or a real customer for these tests.

@@ -4,6 +4,7 @@ import { sessionWorkspace } from "./auth";
 import { configured, isDemo, writesEnabled } from "./config";
 import { query } from "./db";
 import { processingAllowed } from "./entitlements";
+import { workspaceAllowance } from "./allowances";
 const iso = (date: Date | null) => date?.toISOString() ?? null;
 export async function dashboard(): Promise<Dashboard> {
   if (isDemo()) return structuredClone(demoDashboard);
@@ -20,8 +21,8 @@ export async function dashboard(): Promise<Dashboard> {
     writesEnabled: false,
   };
   if (!loggedIn) return empty;
-  const [rawAccounts, rawDecisions, rawRules, accessActive] = await Promise.all(
-    [
+  const [rawAccounts, rawDecisions, rawRules, accessActive, allowance] =
+    await Promise.all([
       query(
         `SELECT a.id,a.email,a.name,a.mode,a.policy,a.connected,a.last_sync,a.watch_expires,a.last_error,a.reviewed_at,a.start_at,a.history_id,
         j.total,j.done,j.pending,j.failed,j.retrying
@@ -48,8 +49,8 @@ export async function dashboard(): Promise<Dashboard> {
         [workspaceId],
       ),
       processingAllowed(workspaceId),
-    ],
-  );
+      workspaceAllowance(workspaceId),
+    ]);
   const accounts = rawAccounts.map((a) => ({
     id: a.id,
     email: a.email,
@@ -96,6 +97,7 @@ export async function dashboard(): Promise<Dashboard> {
   return {
     ...empty,
     accessActive,
+    allowance,
     accounts,
     decisions,
     rules,

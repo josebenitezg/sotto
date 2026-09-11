@@ -3,12 +3,16 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   query: vi.fn(),
   work: vi.fn(),
+  allowance: vi.fn(),
 }));
 vi.mock("@vercel/queue", () => ({
   send: mocks.send,
   handleCallback: (handler: unknown) => handler,
 }));
 vi.mock("../src/lib/server/db", () => ({ query: mocks.query }));
+vi.mock("../src/lib/server/allowances", () => ({
+  accountAllowance: mocks.allowance,
+}));
 vi.mock("../src/lib/server/engine", () => ({
   workAccount: mocks.work,
   AccountBusy: class extends Error {},
@@ -23,6 +27,25 @@ beforeEach(() => {
   mocks.send.mockReset().mockResolvedValue({ messageId: "next" });
   mocks.query.mockReset();
   mocks.work.mockReset();
+  mocks.allowance.mockReset().mockResolvedValue(null);
+});
+it("does not keep scheduling unreserved work or scan pages after quota is exhausted", async () => {
+  mocks.allowance.mockResolvedValue({ exhausted: true });
+  mocks.query
+    .mockResolvedValueOnce([{ id: "work" }])
+    .mockResolvedValueOnce([{ next_at: null, scan_pending: true }]);
+  await consume({ accountId: "work" }, { messageId: "quota" });
+  expect(mocks.query.mock.calls[1][1]).toEqual(["work", false]);
+  expect(mocks.send).not.toHaveBeenCalled();
+});
+it("continues a stored scan page when allowance remains", async () => {
+  mocks.allowance.mockResolvedValue({ exhausted: false });
+  mocks.query
+    .mockResolvedValueOnce([{ id: "work" }])
+    .mockResolvedValueOnce([{ next_at: null, scan_pending: true }]);
+  await consume({ accountId: "work" }, { messageId: "page" });
+  expect(mocks.send).toHaveBeenCalledTimes(1);
+  expect(mocks.send.mock.calls[0][2]).toMatchObject({ delaySeconds: 1 });
 });
 afterEach(() => vi.unstubAllEnvs());
 it("processes bounded batches and durably schedules delayed pending work", async () => {

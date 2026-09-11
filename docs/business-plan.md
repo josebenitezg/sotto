@@ -13,7 +13,19 @@ Sotto identifies unsolicited sales email with AI, moves it out of the inbox into
 | Enterprise  |       Contact support |                              Agreed separately |
 | Self-hosted | No Sotto subscription | Operator supplies infrastructure and providers |
 
-Live Solo and Duo products and prices have been created in Stripe for Perception Technologies Inc. The public checkout remains closed pending runtime setup, integration validation, commercial hosting and a decision about included email volume. No unlimited-processing commitment is made. The MIT software remains open source; subscriptions pay for the hosted service.
+Live Solo and Duo products and prices have been created in Stripe for Perception Technologies Inc. The public checkout remains closed pending runtime setup, integration validation, commercial hosting and verified scheduled delivery. No unlimited-processing commitment is made. The MIT software remains open source; subscriptions pay for the hosted service.
+
+## Included usage and lower-cost delivery
+
+Solo includes 250 checked emails per monthly billing period and a 50-email trial. Duo includes 500 shared across its two accounts and a 100-email trial. The founder authorized a temporary usage limit on September 11. There are no overage charges or rollover. A slot is reserved when checking begins; retries and Undo do not consume another. Recent cleanup and future messages share the allowance. Reconnecting, deleting a Gmail connection or switching plans does not reset the aggregate counter.
+
+Hosted Composio accounts are being moved to scheduled reconciliation every 30 minutes instead of per-message triggers. This removes the managed trigger event charge for those accounts. It still uses Composio-managed OAuth and its API-call pricing; it does not evade provider authorization or remove Google requirements for a future direct integration. Existing internal pilot accounts keep their current notification behavior.
+
+Implementation reads one history/backfill page at a time, stores continuation, drains queued work before reading again, and stops new reads and classification at quota. Monthly quota is keyed to the subscription's Stripe billing period, with a separate trial window. The scheduler requires commercial hosting and verified cron deployment before paid signup opens.
+
+For a 30-day month, one idle history check every 30 minutes means about 1,440 calls per mailbox, or $0.864 at an assumed $0.0006 per direct managed call outside free allowances. At 250 checked emails, adding the earlier $0.50–$0.75 tool and $0.375 AI examples gives about $1.739–$1.989 per mailbox before hosting, initial scan, retries and support. Solo contribution would then be about $2.531–$2.781 after standard Stripe fees; Duo at two such mailboxes about $4.398–$4.898. These are modeled steady-state costs, not observed margins. A 31-day month has 1,488 scheduled slots. Provider outages and heavy retry usage can increase cost.
+
+Next cost work: measure actual token usage, batch Gmail reads where supported, cache repeated metadata within a worker batch, and revisit volume/provider pricing. A future direct Google integration would remove Composio's intermediary fees but still requires applicable Google verification and security review. Do not promise that another auth provider automatically removes those requirements.
 
 ## Three-day trial
 
@@ -52,7 +64,7 @@ The live workspace is on Hobby. Its managed OAuth subset includes 20,000 tool ca
 
 Published managed OAuth overage on paid plans is $0.0005/tool call and $0.005/delivered trigger event, with connection charges after included connections. Direct execution outside sessions has an additional $0.0001/call after its first 10,000 free calls; proxy execution adds $0.0002/call after its first 1,000 free calls. Pro is $29/month with $29 of usage credit; do not count that credit and the same covered usage twice. Zero-data-retention options are separate paid features and are not assumed here. [Composio pricing](https://composio.dev/pricing).
 
-The implementation uses managed triggers for new inbox messages, native tools, raw-message/thread proxy reads, sent-history checks, labeling and reconciliation. **1,000 new messages can cost $5 in trigger events alone after the free quota**, before tool calls, AI or hosting. Changing trigger polling frequency does not change this per-delivered-event charge.
+The original implementation uses managed triggers for new inbox messages, native tools, raw-message/thread proxy reads, sent-history checks, labeling and reconciliation. **1,000 new messages can cost $5 in trigger events alone after the free quota**, before tool calls, AI or hosting. Changing trigger polling frequency does not change this per-delivered-event charge.
 
 Illustrative steady-state sensitivity beyond free allowances, assuming each analyzed new message produces one event, $2–$3 of aggregate tool costs per 1,000 messages and the AI example above:
 
@@ -66,7 +78,7 @@ Tool costs in this table are assumptions to validate, not provider measurements.
 
 At 1,000 messages, Solo loses money before hosting. With two similarly busy mailboxes Duo also loses money. At 500 per mailbox there is little or no contribution left. Free quotas improve initial cash cost but do not fix the scaled margin.
 
-**Launch decision remains open:** keep $5/$9 with a clearly disclosed and enforced allowance that also controls event delivery, or lower provider cost/change prices before promising full-inbox coverage. No allowance has been selected or implemented without the founder's decision. Investigate Gmail batch reads and scheduled reconciliation through Composio; they are not implemented or included as realized savings.
+The table above describes the original trigger-based implementation. The selected launch offer now uses 250/500 checked emails and scheduled reconciliation as described above; it remains conditional on deploying and verifying that scheduler. Savings are modeled until observed in provider usage.
 
 ### Hosting and other costs
 
@@ -82,7 +94,7 @@ A trial costing $0.20 with 10% paid conversion adds $2 in acquisition cost per n
 
 - Complete dedicated live runtime credentials, a Sotto-only billing portal and signed webhook. Retain closed checkout until validation.
 - Verify a sandbox browser checkout and subscription lifecycle, then production readiness and event delivery. Automated mocked tests do not replace this.
-- Enable commercial hosting and resolve the consumption/pricing decision. Keep current pilot mailboxes working independently of hosted billing.
+- Enable commercial hosting, deploy the half-hour polling schedule and verify provider capacity. Keep current pilot mailboxes working independently of hosted billing.
 - Open public signup and mailbox writes together with verified entitlements; the old pilot write allowlist would otherwise prevent new paying users from receiving the promised service.
 - Validate Gmail connection through Composio for a new user, first historical processing, future mail, disconnect and Undo. Confirm applicable provider production requirements rather than describing the underlying Google app as verified without evidence.
 - Publish accurate terms, privacy and processor disclosures, with Perception Technologies Inc. and support@sotto.email.

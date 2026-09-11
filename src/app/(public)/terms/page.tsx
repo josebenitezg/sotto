@@ -28,6 +28,23 @@ export default function TermsPage() {
         before the trial ends to avoid that charge. Reconnecting Gmail or
         changing plans does not restart your trial.
       </p>
+      <h2 className="text-lg font-medium">Included emails</h2>
+      <p>
+        Solo includes 250 checked emails per monthly billing period; Duo
+        includes 500 shared across two connected accounts. The 3-day trial
+        includes 50 emails on Solo or 100 on Duo. Recent inbox cleanup and new
+        messages both count, whether kept or moved. An email uses one slot when
+        Sotto first begins checking it; retries and Undo do not consume another
+        slot. Unused allowance does not roll over. Reconnecting or changing
+        plans does not reset usage.
+      </p>
+      <p>
+        At the limit, new filtering pauses with no overage charge. Messages
+        remain in Gmail, and existing history and Undo stay available. A paid
+        renewal starts the next allowance. Trial allowance renews only when the
+        paid subscription starts successfully. Hosted plans check for new mail
+        every 30 minutes while access and allowance are available.
+      </p>
       <h2 className="text-lg font-medium">Renewal and cancellation</h2>
       <p>
         Subscriptions renew monthly until canceled. Open Pricing and choose

@@ -31,10 +31,11 @@ export default function PrivacyPage() {
         Connection identifiers, encrypted credentials for direct Google
         connections, rules, message identifiers, sender, subject, and decision
         history. We also store the AI model and input, cached-input and output
-        token counts linked to the account to measure service usage and cost.
-        These usage records contain no message text. Sotto does not store full
-        message bodies. You can delete a Gmail connection's data from Accounts,
-        as explained below.
+        token counts linked to the account to measure service usage and cost. We
+        record checked-message identifiers and a per-period usage total to
+        enforce plan allowances. These usage records contain no message text.
+        Sotto does not store full message bodies. You can delete a Gmail
+        connection's data from Accounts, as explained below.
       </p>
       <h2 id="data-protection">How we protect Google user data</h2>
       <p className="text-muted-foreground">

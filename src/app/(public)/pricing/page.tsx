@@ -10,6 +10,7 @@ import { billingReady, trialRequiresCard } from "@/lib/server/billing";
 import { query } from "@/lib/server/db";
 import { configured, hosted, isDemo } from "@/lib/server/config";
 import { hasAccess } from "@/lib/server/entitlements";
+import { workspaceAllowance } from "@/lib/server/allowances";
 import { GoogleDataNotice } from "@/components/google-data-notice";
 import { isPlanId, mailboxLimit, plans } from "@/lib/plans";
 
@@ -29,6 +30,7 @@ export default async function PlansPage({
       )
     : [];
   const available = billingReady();
+  const allowance = workspaceId ? await workspaceAllowance(workspaceId) : null;
   const active =
     workspace &&
     hasAccess({
@@ -102,6 +104,21 @@ export default async function PlansPage({
               filtering.
             </p>
           )}
+          {allowance && (
+            <p className="text-sm text-muted-foreground">
+              {allowance.used} / {allowance.limit} emails checked
+              {allowance.trial ? " during your trial" : " this billing month"}.
+              {allowance.resetsAt && (
+                <>
+                  {" "}
+                  {allowance.trial ? "Trial allowance ends" : "Renews"}{" "}
+                  {date(new Date(allowance.resetsAt))}.
+                </>
+              )}
+              {allowance.exhausted &&
+                " New filtering is paused; there are no extra charges."}
+            </p>
+          )}
           <div className="flex flex-wrap gap-3">
             <BillingAction action="portal" secondary>
               Manage subscription
@@ -145,7 +162,9 @@ export default async function PlansPage({
             <ul className="my-6 space-y-3 text-[13px] leading-[18px]">
               {[
                 `${plan.mailboxes} Gmail account${plan.mailboxes === 1 ? "" : "s"}`,
-                "AI filtering, automatically",
+                `${plan.emails} emails checked / month`,
+                `${plan.trialEmails} emails in your 3-day trial`,
+                "Automatic checks every 30 minutes",
                 "A reason for every move",
                 "Undo anytime in Sotto",
               ].map((line) => (
@@ -222,6 +241,13 @@ export default async function PlansPage({
           Subscription terms
         </Link>
         .
+      </p>
+      <p className="mt-3 max-w-[72ch] text-xs leading-5 text-muted-foreground">
+        The allowance includes recent emails and new messages checked, whether
+        kept or moved. Duo shares its allowance across both accounts. Retries
+        and Undo do not use extra emails. Unused emails do not roll over. At the
+        limit, new processing pauses until the next paid period; messages stay
+        in Gmail and there are no overage charges.
       </p>
       {!available && (
         <p className="mt-3 text-xs text-muted-foreground">

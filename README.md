@@ -55,7 +55,7 @@ See [setup](docs/setup.md) for Google configuration and [architecture](docs/arch
 
 Direct Google connections request `gmail.modify`, which also grants sending capability. Composio managed connections may request full Gmail access, including permanent deletion. Sotto exposes only fixed reading and label operations; this is an application restriction, not a narrower Google permission guarantee. Review the actual consent screen.
 
-Direct Google refresh tokens are encrypted in Sotto. With Composio, Google credentials are held by Composio and Sotto stores connection identifiers; Gmail data passes through that provider. The database contains account details, sender/subject metadata and decision history, but no full message bodies. Selected email text and account preferences are sent to OpenAI, directly or through Vercel AI Gateway, with `store:false`; this does not guarantee zero provider retention. See [security](SECURITY.md) and the installation's privacy page before connecting work email.
+Direct Google refresh tokens are encrypted in Sotto. With Composio, Google credentials are held by Composio and Sotto stores connection identifiers; Gmail data passes through that provider. The database contains account details, sender/subject metadata and decision history, but no full message bodies. Selected email text and account preferences are sent directly to OpenAI with `store:false`; this does not guarantee zero provider retention. See [security](SECURITY.md) and the installation's privacy page before connecting work email.
 
 ## Development
 

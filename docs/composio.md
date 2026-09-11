@@ -5,12 +5,12 @@ Sotto supports Composio's managed Gmail OAuth alongside direct Google OAuth. The
 ## Configure an installation
 
 1. Apply the database migrations, including `006_composio.sql`.
-2. Create a Composio project and Gmail managed auth config. Request only Google profile, email, and `gmail.modify` where supported. If managed OAuth requires full Gmail access, obtain the user's informed consent before connecting. Do not request contacts or other unrelated scopes.
+2. Create a Composio project and Gmail managed auth config with `https://www.googleapis.com/auth/userinfo.profile`, `https://www.googleapis.com/auth/userinfo.email`, and `https://mail.google.com/`. The managed Gmail flow was verified with full Gmail access; Google blocked the pilot using `gmail.modify`. Obtain the user's informed consent for full access before connecting. Do not request contacts or other unrelated scopes. Direct Google installations can still use their own client with `gmail.modify`.
 3. Set the project's request/response log storage to **Don't store data**. This is not a guarantee of zero provider retention.
 4. Publish the application with `GMAIL_PROVIDER=google` initially. Verify that `/api/composio/callback` exists and rejects requests without a browser-bound connection attempt.
 5. Set Composio's **OAuth user verification** URL to `https://YOUR_HOST/api/composio/callback`. This is required: Sotto deliberately rejects ordinary callback URLs containing only a connection ID. Never disable user verification as a workaround.
 6. Create a V3 webhook subscription for `composio.trigger.message` pointing at `https://YOUR_HOST/api/composio/events`. Keep its signing secret private.
-7. Set private server environment variables `COMPOSIO_API_KEY`, `COMPOSIO_AUTH_CONFIG_ID`, and `COMPOSIO_WEBHOOK_SECRET`, then set `GMAIL_PROVIDER=composio` and redeploy. The worker needs the same configuration. Keep `AI_PROVIDER=openai` and `OPENAI_API_KEY` for direct classification.
+7. Set private server environment variables `COMPOSIO_API_KEY`, `COMPOSIO_AUTH_CONFIG_ID`, and `COMPOSIO_WEBHOOK_SECRET`, then set `GMAIL_PROVIDER=composio` and redeploy. The worker needs the same configuration. Set `OPENAI_API_KEY` for direct classification.
 8. Connect an authorized pilot account through Sotto. Check initial processing, new-mail delivery, label changes, unread preservation, undo, pause, and disconnect before opening signup.
 
 Do not put project keys, webhook secrets, or Google tokens in browser configuration. Never log provider response bodies, which may contain credentials or mail.

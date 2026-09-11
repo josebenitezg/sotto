@@ -24,7 +24,7 @@ while (!stopping) {
       } catch (error) {
         if (error instanceof AccountBusy) continue;
         await query(
-          "UPDATE accounts SET last_error='No pudimos sincronizar. Revisá tu conexión con Google.' WHERE id=$1",
+          "UPDATE accounts SET last_error='Sync failed. Check your Google connection.' WHERE id=$1",
           [account.id],
         );
       }

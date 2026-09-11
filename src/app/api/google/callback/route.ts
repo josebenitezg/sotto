@@ -71,7 +71,7 @@ export async function GET(request: Request) {
       await enqueueAccount(identity.sub);
     } catch {
       await query(
-        "UPDATE accounts SET last_error='La cuenta está conectada. Reintentá Sincronizar para iniciar la revisión.' WHERE id=$1",
+        "UPDATE accounts SET last_error='The account is connected. Try Sync again to start reviewing.' WHERE id=$1",
         [identity.sub],
       );
     }

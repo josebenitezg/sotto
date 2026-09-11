@@ -240,7 +240,7 @@ export async function moveDecision(
       "UPDATE decisions SET state='kept',reason=$2,updated_at=now() WHERE id=$1",
       [
         decisionId,
-        blocked?.reason ?? "El estado del correo cambió. Se conserva en Gmail.",
+        blocked?.reason ?? "The email's state changed. It stays in Gmail.",
       ],
     );
     return;
@@ -268,7 +268,7 @@ export async function moveDecision(
   const label =
     decision.label_added ??
     (await gmail.ensureLabel(
-      decision.category === "cold" ? "Sotto/Cold" : "Sotto/Lectura",
+      decision.category === "cold" ? "Sotto/Cold" : "Sotto/Reading",
     ));
   const addedByUs =
     decision.state === "moving"
@@ -393,7 +393,7 @@ export async function workAccount(accountId: string, maxJobs = 30) {
             );
             await query("UPDATE accounts SET last_error=$2 WHERE id=$1", [
               accountId,
-              "El servicio de IA alcanzó su límite temporal. Los correos siguen pendientes; Sotto reintentará automáticamente.",
+              "The AI service reached its temporary limit. Emails remain pending; Sotto will retry automatically.",
             ]);
             return;
           }
@@ -406,7 +406,7 @@ export async function workAccount(accountId: string, maxJobs = 30) {
       if (failed || pendingFailure)
         await query("UPDATE accounts SET last_error=$2 WHERE id=$1", [
           accountId,
-          "Hay correos pendientes de procesar. Revisá la conexión o reintentá la sincronización.",
+          "Some emails are still pending. Check the connection or try syncing again.",
         ]);
     },
     true,

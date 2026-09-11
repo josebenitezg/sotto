@@ -33,12 +33,14 @@ export function BillingAction({
           });
           const result = await response.json();
           if (!response.ok)
-            throw new Error(result.error || "No pudimos abrir tu suscripción.");
+            throw new Error(
+              result.error || "We could not open your subscription.",
+            );
           if (result.url) window.location.assign(result.url);
           else router.refresh();
         } catch (error) {
           setError(
-            error instanceof Error ? error.message : "Intentá de nuevo.",
+            error instanceof Error ? error.message : "Please try again.",
           );
         } finally {
           inFlight.current = false;
@@ -52,7 +54,7 @@ export function BillingAction({
         disabled={disabled || busy}
         type="submit"
       >
-        {busy ? "Un momento…" : children}
+        {busy ? "One moment…" : children}
       </Button>
       {error && (
         <p role="alert" className="mt-3 max-w-[55ch] text-sm text-destructive">
@@ -83,8 +85,8 @@ export function RefreshAfterCheckout() {
   return (
     <p role="status" className="text-sm text-muted-foreground">
       {error
-        ? "La confirmación está pendiente. Usá Actualizar estado para volver a comprobarla."
-        : "Comprobamos tu suscripción directamente con Stripe."}
+        ? "Confirmation is pending. Use Refresh status to check again."
+        : "We check your subscription directly with Stripe."}
     </p>
   );
 }

@@ -14,20 +14,20 @@ import { sessionWorkspace } from "@/lib/server/auth";
 
 const questions = [
   [
-    "¿Sotto reemplaza a Gmail?",
-    "No. Seguís usando Gmail como siempre. Sotto aparta los correos comerciales no solicitados en una etiqueta que podés revisar cuando quieras.",
+    "Does Sotto replace Gmail?",
+    "No. Keep using Gmail as usual. Sotto moves unsolicited sales emails into a label you can check whenever you like.",
   ],
   [
-    "¿Cómo decide qué apartar?",
-    "La IA interpreta el mensaje, el contexto de la conversación y tus preferencias. Primero revisás sus propuestas; después podés activar el modo automático. Si hay dudas, deja el mensaje para revisar.",
+    "How does it decide what to move?",
+    "AI considers each message, the conversation, and your preferences. Review its suggestions first, then turn on automatic filtering when you are ready. Uncertain messages stay for review.",
   ],
   [
-    "¿Y si aparta algo que me importa?",
-    "Podés ver el motivo de cada decisión, devolver el correo a la bandeja y agregar el remitente a tus permitidos. Sotto no elimina mensajes ni los marca como leídos.",
+    "What if it moves something important?",
+    "See the reason for each decision, return the email to your inbox, and add the sender to your allowlist. Sotto does not delete messages or mark them as read.",
   ],
   [
-    "¿Qué pasa con mis datos?",
-    "Sotto consulta el correo necesario para clasificarlo y envía un fragmento acotado al proveedor de IA. No guarda el cuerpo completo ni abre adjuntos. Los permisos, proveedores y datos guardados están explicados en la página de privacidad.",
+    "What happens to my data?",
+    "Sotto reads the email data needed for classification and sends a limited portion to the AI provider. It does not store full message bodies or open attachments. Our privacy policy explains the permissions, providers, and data we store.",
   ],
 ];
 
@@ -35,26 +35,29 @@ export default async function LandingPage() {
   const ready = configured() && !isDemo();
   const signedIn = ready && !!(await sessionWorkspace());
   return (
-    <main id="contenido">
+    <main id="content">
       <section className="landing-hero">
         <div className="hero-copy">
           <div className="hero-eyebrow">
-            <span className="quiet-dot" /> Menos cold emails. Más calma.
+            <span className="quiet-dot" />
+            Fewer cold emails. More calm.
           </div>
           <h1 className="display-title">
-            Tu inbox,
+            Your inbox,
             <br />
-            <em>en voz baja.</em>
+            <em>a little quieter.</em>
           </h1>
           <p className="hero-description">
-            Las conversaciones que importan, a la vista.
-            <br className="hidden lg:block" /> Las ventas que no pediste,
-            aparte.
-            <br /> Dejá que Sotto se ocupe del ruido.
+            Keep the conversations that matter in view.
+            <br className="hidden lg:block" />
+            Give unsolicited pitches a place of their own.
+            <br />
+            Let Sotto take care of the noise.
           </p>
           {signedIn ? (
-            <Link href="/revision" className="google-cta pressable">
-              Abrir mi bandeja <ArrowRight size={16} />
+            <Link href="/review" className="google-cta pressable">
+              Open my inbox
+              <ArrowRight size={16} />
             </Link>
           ) : (
             <form
@@ -71,70 +74,74 @@ export default async function LandingPage() {
                 <span className="google-cta-icon">
                   <GoogleMark />
                 </span>
-                Continuar con Google <ArrowRight size={16} />
+                Continue with Google
+                <ArrowRight size={16} />
               </button>
             </form>
           )}
           <p id="hero-google-status" className="hero-footnote">
             {ready
-              ? "Para Gmail y Google Workspace."
-              : "Acceso con Google disponible próximamente."}
+              ? "For Gmail and Google Workspace."
+              : "Google sign-in is coming soon."}
           </p>
-          <a href="#como-funciona" className="hero-discover">
-            Un pequeño cambio en tu día <ArrowDown size={14} />
+          <a href="#how-it-works" className="hero-discover">
+            A small change to your day
+            <ArrowDown size={14} />
           </a>
         </div>
         <div className="hero-product">
           <div className="product-margin-note">
-            No todo merece tu atención.<span aria-hidden="true">↴</span>
+            Not everything needs your attention.
+            <span aria-hidden="true">↴</span>
           </div>
           <InboxPreview />
         </div>
       </section>
       <div className="landing-trust">
         <span>
-          <SottoMark className="size-4" /> IA que lee el contexto
+          <SottoMark className="size-4" />
+          AI that considers the context
         </span>
         <span>
-          <Undo2 size={14} /> Cada decisión se puede deshacer
+          <Undo2 size={14} />
+          Every move can be undone
         </span>
         <a href="https://github.com/josebenitezg/sotto">
-          <Github size={14} /> Abierto, también por dentro{" "}
-          <ArrowUpRight size={12} />
+          <Github size={14} />
+          Open source, inside and out <ArrowUpRight size={12} />
         </a>
       </div>
-      <section id="como-funciona" className="how-section">
+      <section id="how-it-works" className="how-section">
         <div className="section-intro">
-          <p className="section-kicker">Así de simple</p>
+          <p className="section-kicker">Keep it simple</p>
           <h2 className="display-heading">
-            Un lugar para cada correo.
+            A place for every email.
             <br />
-            <em>Un poco de aire para vos.</em>
+            <em>A little room for you.</em>
           </h2>
         </div>
         <div className="how-grid">
           <article>
             <span className="step-number">01</span>
-            <h3>Conectá tu Gmail.</h3>
+            <h3>Connect your Gmail.</h3>
             <p>
-              Tu cuenta de trabajo, la personal o las dos. El correo sigue donde
-              siempre.
+              Work, personal, or both. Your email stays right where it belongs.
             </p>
           </article>
           <article>
             <span className="step-number">02</span>
-            <h3>Enseñale qué te importa.</h3>
+            <h3>Tell it what matters.</h3>
             <p>
-              Contale tus preferencias y revisá las primeras propuestas. La IA
-              considera el contexto de cada mensaje.
+              Share your preferences and review the first suggestions. AI
+              considers the context of each message.
             </p>
           </article>
           <article>
             <span className="step-number">03</span>
-            <h3>Volvé a lo tuyo.</h3>
+            <h3>Get back to your day.</h3>
             <p>
-              Activá el modo automático cuando estés listo. Lo comercial queda
-              aparte y todo se puede deshacer.
+              Turn on automatic filtering when you are ready. Sales pitches move
+              aside, and every move can be undone.
             </p>
           </article>
         </div>
@@ -142,19 +149,20 @@ export default async function LandingPage() {
       <section className="quiet-manifesto">
         <SottoMark className="size-10" />
         <p>
-          No necesitás una bandeja nueva.
+          You already have an inbox.
           <br />
-          Necesitás que la tuya <em>respire.</em>
+          Give yours room to
+          <em>breathe.</em>
         </p>
-        <span>Menos interrupciones. El mismo Gmail.</span>
+        <span>Fewer interruptions. The same Gmail.</span>
       </section>
       <section className="landing-bottom">
         <div className="faq-section">
-          <p className="section-kicker">Antes de entrar</p>
+          <p className="section-kicker">Before you begin</p>
           <h2 className="display-heading">
-            Con calma.
+            A little clarity.
             <br />
-            <em>Y con respuestas.</em>
+            <em>A few answers.</em>
           </h2>
           <div className="faq-list">
             {questions.map(([question, answer]) => (
@@ -170,17 +178,17 @@ export default async function LandingPage() {
         </div>
         <aside className="landing-plan">
           <SottoMark className="size-8" />
-          <p className="mt-5 text-sm">Un plan para hacer lugar.</p>
+          <p className="mt-5 text-sm">One plan. More room.</p>
           <h2 className="display-heading mt-4">
-            3 días
+            3 days
             <br />
-            <em>para probar.</em>
+            <em>to try it out.</em>
           </h2>
           <ul className="my-6 space-y-3 text-sm">
             {[
-              "Hasta dos cuentas de Gmail",
-              "Revisión y modo automático",
-              "Tu correo bajo tu control",
+              "Up to two Gmail accounts",
+              "Review and automatic filtering",
+              "Your email, under your control",
             ].map((text) => (
               <li key={text} className="flex items-center gap-2">
                 <Check size={15} />
@@ -188,13 +196,14 @@ export default async function LandingPage() {
               </li>
             ))}
           </ul>
-          <Link href="/planes" className="plan-link pressable">
-            Conocer el plan <ArrowUpRight size={16} />
+          <Link href="/pricing" className="plan-link pressable">
+            Explore the plan
+            <ArrowUpRight size={16} />
           </Link>
           <p className="mt-4 text-xs leading-5 opacity-75">
-            Estamos preparando el acceso.
+            We are getting access ready.
             <br />
-            Tu prueba empieza cuando la activás.
+            Your trial starts when you activate it.
           </p>
         </aside>
       </section>

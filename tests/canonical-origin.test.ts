@@ -26,7 +26,10 @@ it.each([
   "https://wwwXsottoXexample/login",
 ])("does not redirect the canonical host or unrelated host %s", async (url) => {
   vi.stubEnv("APP_URL", "https://sotto.example");
-  const response = await unstable_getResponseFromNextConfig({ url, nextConfig });
+  const response = await unstable_getResponseFromNextConfig({
+    url,
+    nextConfig,
+  });
   expect(getRedirectUrl(response)).toBeNull();
 });
 
@@ -34,6 +37,30 @@ it.each(["", "http://localhost:3210", "https://www.sotto.example"])(
   "keeps demo, local, and already-www installations unchanged: %s",
   async (appUrl) => {
     vi.stubEnv("APP_URL", appUrl);
-    expect(await nextConfig.redirects?.()).toEqual([]);
+    expect(
+      (await nextConfig.redirects?.())?.filter((rule) => rule.has),
+    ).toEqual([]);
+  },
+);
+
+it.each([
+  ["revision", "review"],
+  ["cuentas", "accounts"],
+  ["permitidos", "allowlist"],
+  ["ajustes", "settings"],
+  ["planes", "pricing"],
+  ["privacidad", "privacy"],
+])(
+  "preserves existing /%s links and their query parameters",
+  async (oldPath, newPath) => {
+    vi.stubEnv("APP_URL", "https://sotto.example");
+    const response = await unstable_getResponseFromNextConfig({
+      url: `https://sotto.example/${oldPath}?connected=1`,
+      nextConfig,
+    });
+    expect(response.status).toBe(308);
+    expect(getRedirectUrl(response)).toBe(
+      `https://sotto.example/${newPath}?connected=1`,
+    );
   },
 );

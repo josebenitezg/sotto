@@ -11,8 +11,7 @@ export async function POST(request: Request) {
     requireOrigin(request);
     const workspaceId = await requireSession();
     const url = (await checkout(workspaceId)) || (await checkout(workspaceId));
-    if (!url)
-      throw new HttpError(409, "Volvé a intentar para abrir tu suscripción.");
+    if (!url) throw new HttpError(409, "Try again to open your subscription.");
     return request.headers.get("accept")?.includes("application/json")
       ? Response.json({ url })
       : NextResponse.redirect(url, 303);

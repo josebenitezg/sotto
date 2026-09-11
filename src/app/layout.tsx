@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "Sotto — Tu correo, con menos ruido",
+  title: "Sotto — A quieter inbox",
   description:
-    "Separá las ventas no solicitadas y recuperá espacio para lo que importa.",
+    "Set unsolicited sales emails aside and make room for what matters.",
   robots: { index: false, follow: false },
 };
 export default function RootLayout({
@@ -12,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
+    <html lang="en-US">
       <body>{children}</body>
     </html>
   );

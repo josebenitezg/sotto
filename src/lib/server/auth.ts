@@ -24,13 +24,12 @@ export async function authenticated() {
 }
 export async function requireSession() {
   const workspaceId = await sessionWorkspace();
-  if (!workspaceId)
-    throw new HttpError(401, "Ingresá con tu cuenta para continuar.");
+  if (!workspaceId) throw new HttpError(401, "Sign in to continue.");
   return workspaceId;
 }
 export function requireOrigin(request: Request) {
   if (request.headers.get("origin") !== appUrl())
-    throw new HttpError(403, "Volvé a abrir Sotto e intentá de nuevo.");
+    throw new HttpError(403, "Open Sotto again and retry.");
 }
 export async function createSession(workspaceId = "installation") {
   const value = opaque();
@@ -57,7 +56,7 @@ export function errorResponse(error: unknown) {
     error instanceof Error ? error.name : "UnknownError",
   );
   return Response.json(
-    { error: "No pudimos completar el cambio. Intentá de nuevo." },
+    { error: "We could not complete the change. Please try again." },
     { status: 500 },
   );
 }

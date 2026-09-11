@@ -53,15 +53,15 @@ const actionSchema = z.discriminatedUnion("action", [
 ]);
 export async function POST(request: Request) {
   try {
-    if (isDemo()) throw new HttpError(400, "La demo no modifica Gmail.");
+    if (isDemo()) throw new HttpError(400, "The demo does not modify Gmail.");
     requireOrigin(request);
     const workspaceId = await requireSession();
     const raw = await request.text();
     if (raw.length > 4096)
-      throw new HttpError(413, "La solicitud es demasiado grande.");
+      throw new HttpError(413, "The request is too large.");
     const parsed = actionSchema.safeParse(JSON.parse(raw));
     if (!parsed.success)
-      throw new HttpError(400, "Revisá los datos del cambio.");
+      throw new HttpError(400, "Check the details of this change.");
     const action = parsed.data;
     let accountId = "accountId" in action ? action.accountId : "";
     // Requesting work does not mutate Gmail and must remain available while
@@ -71,13 +71,10 @@ export async function POST(request: Request) {
         "SELECT connected,mode FROM accounts WHERE id=$1 AND workspace_id=$2",
         [accountId, workspaceId],
       );
-      if (!account) throw new HttpError(404, "No encontramos esa cuenta.");
+      if (!account) throw new HttpError(404, "We could not find that account.");
       await requireProcessingAccess(workspaceId);
       if (!account.connected || account.mode === "paused")
-        throw new HttpError(
-          409,
-          "Conectá y reanudá esta cuenta para sincronizar.",
-        );
+        throw new HttpError(409, "Connect and resume this account to sync it.");
       const [event] = await query(
         `WITH active AS (
           SELECT id FROM accounts WHERE id=$2 AND workspace_id=$3
@@ -87,7 +84,7 @@ export async function POST(request: Request) {
         [`manual:${randomUUID()}`, accountId, workspaceId],
       );
       if (!event)
-        throw new HttpError(409, "La cuenta cambió. Volvé a abrir Cuentas.");
+        throw new HttpError(409, "The account changed. Open Accounts again.");
       await query(
         "UPDATE jobs SET state='pending',attempts=0,available_at=now() WHERE account_id=$1 AND state='failed'",
         [accountId],
@@ -101,7 +98,7 @@ export async function POST(request: Request) {
         [action.decisionId, workspaceId],
       );
       if (!decision)
-        throw new HttpError(404, "Ese correo ya no está en Sotto.");
+        throw new HttpError(404, "That email is no longer in Sotto.");
       accountId = decision.account_id;
     }
     if (action.action === "removeRule") {
@@ -109,7 +106,7 @@ export async function POST(request: Request) {
         "SELECT r.account_id FROM sender_rules r JOIN accounts a ON a.id=r.account_id WHERE r.id=$1 AND a.workspace_id=$2",
         [action.ruleId, workspaceId],
       );
-      if (!rule) throw new HttpError(404, "Esa regla ya no existe.");
+      if (!rule) throw new HttpError(404, "That rule no longer exists.");
       accountId = rule.account_id;
     }
     await withAccountLock(accountId, async () => {
@@ -117,7 +114,7 @@ export async function POST(request: Request) {
         "SELECT * FROM accounts WHERE id=$1 AND workspace_id=$2",
         [accountId, workspaceId],
       );
-      if (!account) throw new HttpError(404, "No encontramos esa cuenta.");
+      if (!account) throw new HttpError(404, "We could not find that account.");
       if (
         action.action === "move" ||
         (action.action === "mode" && action.mode !== "paused")
@@ -125,7 +122,7 @@ export async function POST(request: Request) {
         await requireProcessingAccess(workspaceId);
       if (action.action === "mode") {
         if (!account.connected)
-          throw new HttpError(409, "Conectá de nuevo esta cuenta.");
+          throw new HttpError(409, "Reconnect this account.");
         if (
           action.mode === "automatic" &&
           (!writesEnabled(accountId) ||
@@ -134,7 +131,7 @@ export async function POST(request: Request) {
         )
           throw new HttpError(
             409,
-            "Revisá las propuestas y habilitá el procesamiento antes de activar el filtro.",
+            "Review the suggestions and enable processing before turning on filtering.",
           );
         await query(
           "UPDATE accounts SET mode=$2,auto_after=CASE WHEN $2='automatic' THEN now() ELSE auto_after END WHERE id=$1",
@@ -160,7 +157,7 @@ export async function POST(request: Request) {
           [accountId],
         );
         if (!count.n)
-          throw new HttpError(409, "Esperá a tener propuestas para revisar.");
+          throw new HttpError(409, "Wait for suggestions to review.");
         await query("UPDATE accounts SET reviewed_at=now() WHERE id=$1", [
           accountId,
         ]);
@@ -171,7 +168,7 @@ export async function POST(request: Request) {
           [randomUUID(), accountId, sender],
         );
         await query(
-          "UPDATE decisions SET state='kept',reason='Este remitente está permitido.',updated_at=now() WHERE account_id=$1 AND sender=$2 AND state='suggested'",
+          "UPDATE decisions SET state='kept',reason='This sender is allowed.',updated_at=now() WHERE account_id=$1 AND sender=$2 AND state='suggested'",
           [accountId, sender],
         );
       } else if (action.action === "removeRule") {
@@ -186,7 +183,7 @@ export async function POST(request: Request) {
         )
           throw new HttpError(
             400,
-            "Escribí el correo de esta cuenta para confirmar la eliminación.",
+            "Type this account's email address to confirm deletion.",
           );
         let gmail: Gmail | undefined;
         if (account.connected) {
@@ -212,7 +209,7 @@ export async function POST(request: Request) {
             if (!identities.length)
               throw new HttpError(
                 409,
-                "No pudimos verificar el espacio de esta cuenta.",
+                "We could not verify this account's workspace.",
               );
             // The account lock excludes workers and reconnects. Foreign keys
             // cascade decisions, jobs, mailbox events and sender rules in the
@@ -249,7 +246,7 @@ export async function POST(request: Request) {
         if (!writesEnabled(accountId))
           throw new HttpError(
             409,
-            "El movimiento de correos está desactivado para esta cuenta.",
+            "Moving emails is disabled for this account.",
           );
         const gmail = await Gmail.forAccount(accountId);
         if (action.action === "move")
@@ -270,7 +267,7 @@ export async function POST(request: Request) {
         if (current?.state !== expected)
           throw new HttpError(
             409,
-            "El correo cambió de estado o quedó protegido. Revisá la decisión actual antes de continuar.",
+            "The email changed state or became protected. Review the current decision before continuing.",
           );
       }
     });
@@ -280,10 +277,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof AccountBusy)
       return errorResponse(
-        new HttpError(
-          409,
-          "Esta cuenta se está sincronizando. Intentá de nuevo en un momento.",
-        ),
+        new HttpError(409, "This account is syncing. Try again in a moment."),
       );
     return errorResponse(error);
   }

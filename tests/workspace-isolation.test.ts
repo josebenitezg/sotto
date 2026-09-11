@@ -70,6 +70,7 @@ beforeAll(async () => {
     "001_initial.sql",
     "002_billing.sql",
     "003_mailbox_deletion.sql",
+    "004_english_explanations.sql",
   ])
     await h.db.exec(
       await readFile(new URL(`../db/${f}`, import.meta.url), "utf8"),
@@ -145,6 +146,25 @@ it("loads only the signed-in workspace, including decisions and sender rules", a
   expect((await dashboard()).accounts.map((x) => x.id)).toEqual(["gmail-b"]);
   h.cookie = "expired";
   expect((await dashboard()).accounts).toEqual([]);
+});
+it("displays an English explanation without changing its audit source and ignores stale translations", async () => {
+  await h.db.query(
+    "UPDATE decisions SET reason=$1, reason_en_source=$1, reason_en=$2 WHERE id='d-a'",
+    ["Oferta comercial no solicitada.", "Unsolicited sales pitch."],
+  );
+  const translated = await dashboard();
+  expect(translated.accounts[0].name).toBe("Work");
+  expect(translated.decisions[0].reason).toBe("Unsolicited sales pitch.");
+  expect(
+    (await h.db.query("SELECT reason FROM decisions WHERE id='d-a'")).rows,
+  ).toEqual([{ reason: "Oferta comercial no solicitada." }]);
+
+  await h.db.query(
+    "UPDATE decisions SET reason='Sender added to the allowlist.' WHERE id='d-a'",
+  );
+  expect((await dashboard()).decisions[0].reason).toBe(
+    "Sender added to the allowlist.",
+  );
 });
 it("keeps the latest 200 decisions per account without hiding an older personal inbox or leaking another workspace", async () => {
   await h.db.query("DELETE FROM decisions");

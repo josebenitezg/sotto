@@ -12,8 +12,8 @@ export default async function Page({
           role="alert"
           className="mb-6 rounded-xl border border-destructive/30 bg-card p-4 text-sm text-destructive"
         >
-          No se completó la conexión. Elegí una cuenta habilitada para esta
-          instalación y aceptá el acceso a Gmail.
+          The connection did not complete. Choose an enabled account and allow
+          access to Gmail.
         </div>
       ) : null}
       <ReviewPage />

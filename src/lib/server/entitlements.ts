@@ -41,6 +41,6 @@ export async function requireProcessingAccess(workspaceId: string) {
   if (!(await processingAllowed(workspaceId)))
     throw new HttpError(
       402,
-      "Activá tu plan para continuar. Podés consultar el historial y devolver correos a la bandeja.",
+      "Activate your plan to continue. You can still view your history and return emails to your inbox.",
     );
 }

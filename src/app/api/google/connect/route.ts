@@ -15,10 +15,7 @@ import {
 export async function POST(request: Request) {
   try {
     if (!configured() || isDemo())
-      throw new HttpError(
-        503,
-        "La conexión con Google todavía no está configurada.",
-      );
+      throw new HttpError(503, "The Google connection is not configured yet.");
     requireOrigin(request);
     const state = opaque(),
       browser = opaque(),
@@ -32,14 +29,19 @@ export async function POST(request: Request) {
         await sessionWorkspace(),
       ],
     );
-    const url = googleClient().generateAuthUrl({
-      access_type: "offline",
-      prompt: "consent select_account",
-      scope: ["openid", "email", gmailScope],
-      state,
-      code_challenge: createHash("sha256").update(verifier).digest("base64url"),
-      code_challenge_method: "S256" as never,
-    });
+    const url = new URL(
+      googleClient().generateAuthUrl({
+        access_type: "offline",
+        prompt: "consent select_account",
+        scope: ["openid", "email", gmailScope],
+        state,
+        code_challenge: createHash("sha256")
+          .update(verifier)
+          .digest("base64url"),
+        code_challenge_method: "S256" as never,
+      }),
+    );
+    url.searchParams.set("hl", "en");
     const response = NextResponse.redirect(url, 303);
     response.cookies.set(oauthCookie, browser, {
       ...cookieOptions(),

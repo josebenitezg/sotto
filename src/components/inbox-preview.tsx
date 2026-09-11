@@ -17,8 +17,8 @@ const messages = [
     id: "ana",
     initials: "AM",
     from: "Ana Martínez",
-    subject: "El próximo paso, juntos",
-    preview: "Me encantó lo que hablamos. ¿Seguimos mañana?",
+    subject: "Our next step, together",
+    preview: "Loved our conversation. Shall we pick it up tomorrow?",
     time: "10:42",
     cold: false,
   },
@@ -34,9 +34,9 @@ const messages = [
   {
     id: "equipo",
     initials: "E",
-    from: "Tu equipo",
-    subject: "Ya está listo para que lo veas",
-    preview: "Te compartimos la primera versión del proyecto.",
+    from: "Your team",
+    subject: "Ready for your review",
+    preview: "Here is the first version of the project.",
     time: "10:18",
     cold: false,
   },
@@ -54,19 +54,20 @@ const messages = [
 export function InboxPreview() {
   const [quiet, setQuiet] = useState(false);
   return (
-    <div className="inbox-demo" aria-label="Demostración con correos ficticios">
+    <div className="inbox-demo" aria-label="Demo with sample emails">
       <div className="demo-toolbar">
         <span className="flex items-center gap-2">
-          <Mail size={15} /> Tu Gmail, con espacio.
+          <Mail size={15} />
+          Your Gmail, with room.
         </span>
         <span className="demo-sample">Demo</span>
       </div>
       <div className="demo-heading">
         <span className="flex items-center gap-2">
-          <Inbox size={18} /> Principal{" "}
-          <span className="demo-count">{quiet ? 2 : 4}</span>
+          <Inbox size={18} />
+          Inbox <span className="demo-count">{quiet ? 2 : 4}</span>
         </span>
-        <span className="text-xs text-muted-foreground">Hoy</span>
+        <span className="text-xs text-muted-foreground">Today</span>
       </div>
       <div className="demo-messages" data-quiet={quiet}>
         {messages.map((message, index) => (
@@ -101,13 +102,13 @@ export function InboxPreview() {
               </p>
             </div>
             {!message.cold && (
-              <Star className="demo-star" size={13} aria-label="Destacado" />
+              <Star className="demo-star" size={13} aria-label="Starred" />
             )}
           </div>
         ))}
         <div className="demo-quiet-note" aria-hidden={!quiet}>
           <Check size={16} />
-          <span>Lo importante sigue acá.</span>
+          <span>What matters stays here.</span>
         </div>
       </div>
       <div className="demo-sotto-folder" data-active={quiet}>
@@ -115,7 +116,7 @@ export function InboxPreview() {
           <SottoMark className="size-5" /> Sotto / Cold
         </span>
         <span className="flex items-center gap-2 text-xs">
-          {quiet ? "2 correos, aparte" : "Sin correos apartados"}
+          {quiet ? "2 emails set aside" : "No emails moved"}
           <ArrowDown size={13} />
         </span>
       </div>
@@ -125,8 +126,8 @@ export function InboxPreview() {
           aria-live="polite"
         >
           {quiet
-            ? "Ventas no solicitadas. Guardadas en Gmail, fuera de tu camino."
-            : "Dos conversaciones. Dos propuestas que no pediste."}
+            ? "Unsolicited pitches. Kept in Gmail, out of your way."
+            : "Two conversations. Two pitches you did not ask for."}
         </p>
         <button
           type="button"
@@ -136,18 +137,18 @@ export function InboxPreview() {
         >
           {quiet ? (
             <>
-              <RotateCcw size={14} /> Volver a ver
+              <RotateCcw size={14} />
+              See it again
             </>
           ) : (
             <>
-              Ver con Sotto <ArrowUpRight size={15} />
+              See it with Sotto
+              <ArrowUpRight size={15} />
             </>
           )}
         </button>
       </div>
-      <p className="demo-caption">
-        Ejemplo ilustrativo · no está conectado a tu correo
-      </p>
+      <p className="demo-caption">Sample inbox · not connected to your email</p>
     </div>
   );
 }

@@ -79,24 +79,24 @@ type ContextValue = {
 const WorkspaceContext = createContext<ContextValue | null>(null);
 const useWorkspace = () => useContext(WorkspaceContext)!;
 const nav = [
-  { href: "/revision", label: "Revisión", icon: Inbox },
-  { href: "/cuentas", label: "Cuentas", icon: Mail },
-  { href: "/permitidos", label: "Permitidos", icon: ShieldCheck },
-  { href: "/ajustes", label: "Ajustes", icon: Settings2 },
-  { href: "/planes", label: "Plan", icon: CreditCard },
+  { href: "/review", label: "Review", icon: Inbox },
+  { href: "/accounts", label: "Accounts", icon: Mail },
+  { href: "/allowlist", label: "Allowlist", icon: ShieldCheck },
+  { href: "/settings", label: "Settings", icon: Settings2 },
+  { href: "/pricing", label: "Plan", icon: CreditCard },
 ];
 const modeLabels = {
-  review: "En prueba",
-  automatic: "Activo",
-  paused: "Pausado",
+  review: "Review mode",
+  automatic: "Active",
+  paused: "Paused",
 };
 const categoryLabels = {
-  cold: "Venta no solicitada",
-  marketing: "Seguimiento comercial",
+  cold: "Cold outreach",
+  marketing: "Marketing",
   newsletter: "Newsletter",
-  transactional: "Operativo",
-  personal: "Relevante",
-  uncertain: "Para revisar",
+  transactional: "Transactional",
+  personal: "Relevant",
+  uncertain: "Needs review",
 };
 
 function applyDemo(data: Dashboard, action: Action): Dashboard {
@@ -204,12 +204,12 @@ export function Workspace({
         if (!response.ok) {
           const refreshed = await fetch("/api/dashboard");
           if (refreshed.ok) setData(await refreshed.json());
-          throw new Error(result.error || "No pudimos completar el cambio.");
+          throw new Error(result.error || "We could not complete the change.");
         }
         const fresh = await fetch("/api/dashboard");
         if (!fresh.ok)
           throw new Error(
-            "El cambio se envió. Actualizá la página para comprobar el resultado.",
+            "The change was submitted. Refresh the page to check the result.",
           );
         setData(await fresh.json());
       }
@@ -219,7 +219,7 @@ export function Workspace({
       setError(
         error instanceof Error
           ? error.message
-          : "No pudimos completar el cambio.",
+          : "We could not complete the change.",
       );
       return false;
     } finally {
@@ -238,20 +238,20 @@ export function Workspace({
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-card focus:p-3"
       >
-        Ir al contenido
+        Skip to content
       </a>
       <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r bg-card px-4 py-7 md:flex">
         <Link
           href="/"
           className="mb-12 flex items-center gap-2.5 px-3 text-primary"
-          aria-label="Sotto, inicio"
+          aria-label="Sotto, home"
         >
           <SottoMark />
           <span className="text-[25px] leading-8 font-semibold tracking-[-0.06em] text-foreground">
             sotto
           </span>
         </Link>
-        <nav aria-label="Navegación principal" className="space-y-1">
+        <nav aria-label="Main navigation" className="space-y-1">
           {nav.map((item) => (
             <Link
               key={item.href}
@@ -278,9 +278,9 @@ export function Workspace({
           <div className="flex items-start gap-2.5 text-xs leading-5 text-muted-foreground">
             <ShieldCheck size={16} className="mt-0.5 shrink-0" />
             <p>
-              Tu correo sigue en Gmail.
+              Your email stays in Gmail.
               <br />
-              Vos tenés la última palabra.
+              You have the final say.
             </p>
           </div>
           <a
@@ -297,7 +297,7 @@ export function Workspace({
       <div className="md:ml-60">
         <header className="flex h-16 items-center justify-between border-b bg-background px-5 md:px-8">
           <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-            <span className="hidden md:inline">Tu correo</span>
+            <span className="hidden md:inline">Your email</span>
             <ChevronRight size={14} className="hidden md:inline" />
             <span className="font-medium text-foreground md:font-normal">
               {nav.find((n) => n.href === pathname)?.label ?? "Sotto"}
@@ -309,11 +309,11 @@ export function Workspace({
                 variant="outline"
                 className="border-border bg-card text-muted-foreground"
               >
-                Vista de ejemplo
+                Sample view
               </Badge>
             ) : (
               <span className="text-xs text-muted-foreground">
-                Tu espacio privado
+                Your private workspace
               </span>
             )}
             <SottoMark className="size-6 text-primary md:hidden" />
@@ -327,8 +327,8 @@ export function Workspace({
             <div className="mb-8 flex items-start gap-2.5 text-[13px] text-muted-foreground">
               <CircleHelp size={16} className="mt-0.5 shrink-0" />
               <p>
-                Estos correos son ficticios. Podés probar los controles; tu
-                Gmail no cambia.
+                These are sample emails. Try the controls; your Gmail stays
+                unchanged.
               </p>
             </div>
           ) : null}
@@ -344,7 +344,7 @@ export function Workspace({
         </main>
       </div>
       <nav
-        aria-label="Navegación móvil"
+        aria-label="Mobile navigation"
         className="fixed inset-x-0 bottom-0 z-30 flex justify-around border-t bg-card pt-2 pb-[max(12px,env(safe-area-inset-bottom))] md:hidden"
       >
         {nav.map((item) => (
@@ -420,7 +420,7 @@ function ConnectButton({ outline = false }: { outline?: boolean }) {
         aria-describedby={noticeId}
       >
         <GoogleMark />
-        Conectar con Google
+        Connect with Google
       </Button>
     </form>
   );
@@ -436,7 +436,7 @@ function Status({ account }: { account: Account }) {
       )}
     >
       <span className="size-1.5 rounded-full bg-current" />
-      {account.connected ? modeLabels[account.mode] : "Desconectada"}
+      {account.connected ? modeLabels[account.mode] : "Disconnected"}
     </span>
   );
 }
@@ -472,13 +472,13 @@ function AccountPicker({
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
-        aria-label="Seleccionar cuenta"
+        aria-label="Select account"
         className="h-9 min-w-44 bg-card"
       >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {all ? <SelectItem value="all">Todas las cuentas</SelectItem> : null}
+        {all ? <SelectItem value="all">All accounts</SelectItem> : null}
         {data.accounts.map((a) => (
           <SelectItem key={a.id} value={a.id}>
             {a.name}
@@ -493,8 +493,8 @@ function Onboarding() {
   return (
     <>
       <PageTitle
-        title="Un poco menos de ruido."
-        description="Sotto separa las ventas no solicitadas para que tu bandeja tenga espacio para lo que importa."
+        title="A little less noise."
+        description="Sotto sets unsolicited sales emails aside, leaving room for what matters."
       />
       <section className="overflow-hidden rounded-xl border bg-card">
         <div className="p-6 md:p-8">
@@ -502,18 +502,18 @@ function Onboarding() {
             <Inbox size={24} strokeWidth={1.5} />
           </div>
           <h2 className="text-base font-semibold">
-            Empezá por tu correo de trabajo
+            Start with your work email
           </h2>
           <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-            Conectá tu cuenta y revisá lo que Sotto propone apartar. Después
-            podés sumar tu correo personal.
+            Connect your account and review what Sotto suggests moving. You can
+            add your personal email later.
           </p>
           <div className="mt-6">
             <ConnectButton />
           </div>
           {!data.configured ? (
             <p className="mt-3 text-xs text-warning">
-              La conexión con Google todavía está pendiente de configuración.
+              The Google connection is still being configured.
             </p>
           ) : null}
         </div>
@@ -521,18 +521,18 @@ function Onboarding() {
           {[
             {
               icon: ListFilter,
-              title: "Primero, una prueba",
-              text: "Revisás las propuestas antes de activar el filtro.",
+              title: "Review it first",
+              text: "Review suggestions before turning on automatic filtering.",
             },
             {
               icon: ShieldCheck,
-              title: "Lo dudoso se queda",
-              text: "Contactos, clientes y correos operativos tienen prioridad.",
+              title: "When in doubt, keep it",
+              text: "Contacts, customers, and operational emails come first.",
             },
             {
               icon: Undo2,
-              title: "Siempre podés volver atrás",
-              text: "Apartar un correo no lo elimina. Sigue en tu Gmail.",
+              title: "You can always undo a move",
+              text: "Moving an email does not delete it. It stays in Gmail.",
             },
           ].map((row) => (
             <div
@@ -555,11 +555,11 @@ function Onboarding() {
         </div>
       </section>
       <p className="mt-6 max-w-[68ch] text-xs leading-5 text-muted-foreground">
-        Al conectarte, Sotto podrá leer correos y cambiar sus etiquetas. Los
-        mensajes que necesiten clasificación se procesarán con el proveedor de
-        IA configurado en tu instalación.{" "}
-        <Link href="/privacidad" className="underline underline-offset-2">
-          Ver cómo cuidamos tus datos
+        Connecting lets Sotto read emails and change their labels. Messages that
+        need classification are processed by the AI provider configured for your
+        installation.{" "}
+        <Link href="/privacy" className="underline underline-offset-2">
+          See how we handle your data
         </Link>
         .
       </p>
@@ -612,8 +612,8 @@ export function ReviewPage() {
   return (
     <>
       <PageTitle
-        title="Lo importante, a la vista."
-        description="Revisá qué correos merecen tu atención y cuáles pueden ir aparte."
+        title="What matters, in view."
+        description="Review which emails need your attention and which can move aside."
         action={<AccountPicker value={accountId} onChange={setAccountId} all />}
       />
       {anyReview ? (
@@ -623,24 +623,24 @@ export function ReviewPage() {
               <ListFilter size={19} strokeWidth={1.75} />
             </div>
             <div>
-              <p className="font-medium">Probá el criterio de Sotto</p>
+              <p className="font-medium">Get to know Sotto's judgment</p>
               <p className="mt-0.5 text-[13px] text-muted-foreground">
-                En modo de prueba, Sotto propone y vos decidís qué apartar.
+                In review mode, Sotto suggests and you decide what to move.
               </p>
             </div>
           </div>
           <Button variant="outline" asChild>
-            <Link href="/cuentas">
-              Ver mis cuentas
+            <Link href="/accounts">
+              View my accounts
               <ArrowRight />
             </Link>
           </Button>
         </div>
       ) : null}
       <div className="mb-4 flex items-baseline justify-between gap-3">
-        <h2 className="text-base font-semibold">Tu revisión</h2>
+        <h2 className="text-base font-semibold">Your review</h2>
         <span className="text-xs text-muted-foreground">
-          {scoped.length} correos en esta vista
+          {scoped.length} emails in this view
         </span>
       </div>
       {syncing.length > 0 ? (
@@ -648,26 +648,26 @@ export function ReviewPage() {
           className="mb-5 space-y-3 rounded-xl border bg-card p-4"
           role="status"
         >
-          <p className="text-sm font-medium">Estamos revisando tu bandeja</p>
+          <p className="text-sm font-medium">Reviewing your inbox</p>
           {syncing.map((account) => (
             <SyncProgress key={account.id} account={account} />
           ))}
           <p className="text-xs text-muted-foreground">
-            Podés cerrar esta página. La revisión continúa y los resultados
-            aparecen acá.
+            You can close this page. Review continues in the background, and
+            results appear here.
           </p>
         </div>
       ) : null}
       <div
         className="mb-4 flex flex-wrap gap-1"
         role="group"
-        aria-label="Filtrar decisiones"
+        aria-label="Filter decisions"
       >
         {(
           [
-            { key: "suggested", label: "Para apartar" },
-            { key: "kept", label: "Conservados" },
-            { key: "moved", label: "Apartados" },
+            { key: "suggested", label: "Suggested" },
+            { key: "kept", label: "Kept" },
+            { key: "moved", label: "Moved" },
           ] as const
         ).map((tab) => (
           <Button
@@ -690,7 +690,7 @@ export function ReviewPage() {
         ))}
       </div>
       <section
-        aria-label="Decisiones de correo"
+        aria-label="Email decisions"
         className="overflow-hidden rounded-xl border bg-card"
       >
         {visible.length ? (
@@ -733,16 +733,16 @@ export function ReviewPage() {
             title={
               filter === "suggested"
                 ? syncing.length > 0
-                  ? "La revisión sigue en curso"
-                  : "Nada para revisar por ahora"
+                  ? "Review is still running"
+                  : "Nothing to review right now"
                 : filter === "moved"
-                  ? "Todavía no apartamos correos"
-                  : "Acá vas a ver lo que se conserva"
+                  ? "No emails moved yet"
+                  : "Emails you keep will appear here"
             }
             detail={
               filter === "suggested"
-                ? "Las próximas propuestas van a aparecer acá, con una explicación."
-                : "Cada decisión queda registrada para que puedas revisarla."
+                ? "New suggestions will appear here with an explanation."
+                : "Every decision is recorded so you can review it."
             }
           />
         )}
@@ -750,21 +750,21 @@ export function ReviewPage() {
       <div className="mt-5 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
         <ShieldCheck size={15} className="mt-0.5 shrink-0" />
         <p>
-          Un remitente nuevo también puede ser una buena oportunidad. Si hay
-          dudas, el correo se queda.
+          A new sender can be a good opportunity. When in doubt, the email
+          stays.
         </p>
       </div>
       {anyReview && scoped.length > 0 ? (
         <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t pt-6">
           <div>
-            <p className="font-medium">¿El criterio tiene sentido?</p>
+            <p className="font-medium">Happy with the suggestions?</p>
             <p className="mt-0.5 text-[13px] text-muted-foreground">
-              Podés activar el filtro cuando termines de revisar.
+              Turn on automatic filtering when you finish reviewing.
             </p>
           </div>
           <Button variant="outline" asChild>
-            <Link href="/cuentas">
-              Configurar el filtro
+            <Link href="/accounts">
+              Set up filtering
               <ArrowRight />
             </Link>
           </Button>
@@ -792,7 +792,9 @@ export function ReviewPage() {
                   {categoryLabels[selected.category]}
                 </Badge>
                 <div>
-                  <p className="mb-2 font-medium">Por qué tomó esta decisión</p>
+                  <p className="mb-2 font-medium">
+                    Why Sotto made this decision
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     {selected.reason}
                   </p>
@@ -814,14 +816,14 @@ export function ReviewPage() {
                           if (
                             await act(
                               { action: "move", decisionId: selected.id },
-                              "Correo apartado",
+                              "Email moved",
                             )
                           )
                             setSelectedId(null);
                         }}
                       >
                         <ArrowDownToLine />
-                        Apartar este correo
+                        Move this email
                       </Button>
                       <Button
                         variant="outline"
@@ -831,19 +833,18 @@ export function ReviewPage() {
                           if (
                             await act(
                               { action: "keep", decisionId: selected.id },
-                              "Se queda en tu bandeja",
+                              "Kept in your inbox",
                             )
                           )
                             setSelectedId(null);
                         }}
                       >
                         <Check />
-                        Conservar en mi bandeja
+                        Keep in my inbox
                       </Button>
                       {!selectedWritesEnabled ? (
                         <p className="text-xs text-warning">
-                          El movimiento de correos está desactivado para esta
-                          cuenta.
+                          Moving emails is disabled for this account.
                         </p>
                       ) : null}
                     </>
@@ -855,20 +856,20 @@ export function ReviewPage() {
                         if (
                           await act(
                             { action: "restore", decisionId: selected.id },
-                            "Correo restaurado",
+                            "Email restored",
                           )
                         )
                           setSelectedId(null);
                       }}
                     >
                       <Undo2 />
-                      Volver a mi bandeja
+                      Return to my inbox
                     </Button>
                   ) : (
                     <p className="text-[13px] text-muted-foreground">
                       {["moving", "restoring"].includes(selected.state)
-                        ? "El cambio se está procesando."
-                        : "Este correo se conserva en Gmail."}
+                        ? "The change is being processed."
+                        : "This email stays in Gmail."}
                     </p>
                   )}
                   <Button
@@ -883,14 +884,14 @@ export function ReviewPage() {
                             accountId: selected.accountId,
                             sender: selected.sender,
                           },
-                          "Remitente permitido",
+                          "Sender allowed",
                         )
                       )
                         setSelectedId(null);
                     }}
                   >
                     <ShieldCheck />
-                    Siempre permitir este remitente
+                    Always allow this sender
                   </Button>
                   {selected.gmailUrl ? (
                     <Button variant="outline" className="w-full" asChild>
@@ -899,7 +900,7 @@ export function ReviewPage() {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        Abrir en Gmail
+                        Open in Gmail
                         <ExternalLink />
                       </a>
                     </Button>
@@ -922,26 +923,26 @@ function SyncProgress({ account }: { account: Account }) {
     <div className="space-y-1.5 text-xs text-muted-foreground">
       <p>
         <span className="font-medium text-foreground">{account.name}</span> ·{" "}
-        {done} de {total} correos procesados
-        {pending > 0 ? ` · ${pending} pendientes` : ""}
+        {done} of {total} emails processed
+        {pending > 0 ? ` · ${pending} pending` : ""}
       </p>
       {total > 0 ? (
         <progress
           className="h-1.5 w-full accent-primary"
           value={done}
           max={total}
-          aria-label={`Avance de ${account.name}`}
+          aria-label={`Progress for ${account.name}`}
         />
       ) : null}
       {retrying > 0 || failed > 0 ? (
         <p className="text-warning">
-          {retrying > 0 ? `${retrying} correos esperando un reintento. ` : ""}
-          {failed > 0 ? `${failed} necesitan reintentar Sincronizar.` : ""}
+          {retrying > 0 ? `${retrying} emails waiting for a retry. ` : ""}
+          {failed > 0 ? `${failed} need another Sync attempt.` : ""}
         </p>
       ) : null}
       <p>
-        Correo de Recibidos desde el{" "}
-        {new Date(since).toLocaleDateString("es", {
+        Inbox emails since{" "}
+        {new Date(since).toLocaleDateString("en-US", {
           day: "numeric",
           month: "long",
           timeZone: "UTC",
@@ -972,8 +973,8 @@ export function AccountsPage() {
   return (
     <>
       <PageTitle
-        title="Cada cuenta, a su ritmo."
-        description="Conectá tus correos y elegí cuándo empieza a trabajar el filtro."
+        title="Each account, at your pace."
+        description="Connect your accounts and choose when filtering starts."
         action={<ConnectButton outline />}
       />
       <section className="overflow-hidden rounded-xl border bg-card">
@@ -1001,12 +1002,12 @@ export function AccountsPage() {
               <div className="mt-5 sm:pl-14">
                 <p className="text-[13px] text-muted-foreground">
                   {!account.connected
-                    ? "Volvé a conectarla para continuar."
+                    ? "Reconnect this account to continue."
                     : account.mode === "review"
-                      ? "Sotto propone qué apartar. Los correos siguen en tu bandeja."
+                      ? "Sotto suggests what to move. Emails stay in your inbox."
                       : account.mode === "paused"
-                        ? "El filtro está en pausa. No se procesan correos nuevos."
-                        : "Las ventas no solicitadas van a Sotto/Cold. Lo dudoso se queda."}
+                        ? "Filtering is paused. New emails are not processed."
+                        : "Cold outreach goes to Sotto/Cold. Uncertain messages stay."}
                 </p>
                 {account.lastError ? (
                   <p className="mt-3 text-[13px] text-destructive">
@@ -1028,12 +1029,12 @@ export function AccountsPage() {
                                 accountId: account.id,
                                 mode: "paused",
                               },
-                              "Filtro pausado",
+                              "Filtering paused",
                             )
                           }
                         >
                           <Pause />
-                          Pausar
+                          Pause
                         </Button>
                       ) : (
                         <Button
@@ -1047,11 +1048,11 @@ export function AccountsPage() {
                                 accountId: account.id,
                                 mode: "review",
                               },
-                              "Modo de prueba activado",
+                              "Review mode enabled",
                             )
                           }
                         >
-                          Reanudar en prueba
+                          Resume in review mode
                         </Button>
                       )}
                       {account.mode === "review" ? (
@@ -1069,7 +1070,7 @@ export function AccountsPage() {
                             setConfirm({ account, action: "automatic" })
                           }
                         >
-                          Activar filtro
+                          Enable filtering
                           <ArrowRight />
                         </Button>
                       ) : account.mode === "automatic" ? (
@@ -1084,11 +1085,11 @@ export function AccountsPage() {
                                 accountId: account.id,
                                 mode: "review",
                               },
-                              "Modo de prueba activado",
+                              "Review mode enabled",
                             )
                           }
                         >
-                          Volver a prueba
+                          Switch to review mode
                         </Button>
                       ) : null}
                       <Button
@@ -1098,12 +1099,12 @@ export function AccountsPage() {
                         onClick={() =>
                           act(
                             { action: "sync", accountId: account.id },
-                            "Sincronización solicitada",
+                            "Sync requested",
                           )
                         }
                       >
                         <RefreshCw />
-                        Sincronizar
+                        Sync
                       </Button>
                       <Button
                         size="sm"
@@ -1113,7 +1114,7 @@ export function AccountsPage() {
                           setConfirm({ account, action: "disconnect" })
                         }
                       >
-                        Desconectar
+                        Disconnect
                       </Button>
                     </>
                   ) : (
@@ -1129,20 +1130,20 @@ export function AccountsPage() {
                       setConfirm({ account, action: "deleteGmailData" });
                     }}
                   >
-                    Eliminar datos de Gmail
+                    Delete Gmail data
                   </Button>
                 </div>
                 {!data.demo &&
                 !account.writesEnabled &&
                 account.mode === "review" ? (
                   <p className="mt-3 text-xs text-warning">
-                    El movimiento de correos está desactivado para esta cuenta.
+                    Moving emails is disabled for this account.
                   </p>
                 ) : null}
                 <p className="mt-4 text-xs text-muted-foreground">
                   {account.lastSync
-                    ? `Última sincronización: ${new Date(account.lastSync).toLocaleString("es", { dateStyle: "short", timeStyle: "short", timeZone: "UTC" })} UTC`
-                    : "Esperando la primera sincronización"}
+                    ? `Last synced: ${new Date(account.lastSync).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short", timeZone: "UTC" })} UTC`
+                    : "Waiting for the first sync"}
                 </p>
                 <div className="mt-3">
                   <SyncProgress account={account} />
@@ -1155,9 +1156,8 @@ export function AccountsPage() {
       <div className="mt-8 flex gap-3 text-sm text-muted-foreground">
         <UsersRound size={18} className="mt-0.5 shrink-0" />
         <p className="max-w-[65ch]">
-          Tus cuentas comparten este espacio, pero mantienen sus propias reglas
-          y decisiones. Podés empezar por el trabajo y sumar la personal
-          después.
+          Your accounts share this workspace, with separate rules and decisions.
+          Start with work and add your personal account later.
         </p>
       </div>
       <AlertDialog
@@ -1173,30 +1173,30 @@ export function AccountsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {confirm?.action === "automatic"
-                ? "Activar el filtro"
+                ? "Enable filtering"
                 : confirm?.action === "deleteGmailData"
-                  ? "Eliminar datos de Gmail"
-                  : "Desconectar esta cuenta"}
+                  ? "Delete Gmail data"
+                  : "Disconnect this account"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirm?.action === "automatic"
-                ? `Confirmás que revisaste las propuestas de ${confirm.account.email}. Desde ahora, Sotto podrá apartar nuevos correos de las categorías que elegiste. Podés pausarlo y deshacer cada movimiento.`
+                ? `You confirm that you have reviewed the suggestions for ${confirm.account.email}. Sotto can now move new emails in your selected categories. You can pause filtering and undo each move.`
                 : confirm?.action === "deleteGmailData"
-                  ? `Sotto eliminará de su base de datos activa la conexión, credencial, preferencias, remitentes permitidos y registros de procesamiento de ${confirm.account.email}. Se detendrá el filtro de esta cuenta. Los correos y etiquetas quedarán como están en Gmail; ya no podrás deshacer movimientos desde su historial en Sotto. Esta eliminación no se puede deshacer.`
-                  : `Sotto dejará de procesar ${confirm?.account.email} y borrará su credencial local. Los correos y etiquetas quedan en Gmail; el registro de decisiones se conserva en Sotto. Si Google no responde, podés revocar el permiso desde tu Cuenta de Google.`}
+                  ? `Sotto will remove the connection, credential, preferences, allowed senders, and processing records for ${confirm.account.email} from its active database. Filtering stops for this account. Emails and labels stay as they are in Gmail; moves can no longer be undone from Sotto's history. This deletion cannot be undone.`
+                  : `Sotto will stop processing ${confirm?.account.email} and delete its local credential. Emails and labels stay in Gmail; decision history stays in Sotto. If Google does not respond, you can revoke access from your Google Account.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {confirm?.action === "deleteGmailData" ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Tu acceso, datos del plan y otras cuentas se conservan. Volver a
-                conectar Google autoriza una nueva revisión. Si Google no
-                responde al intento de revocar el permiso, podés revocarlo en tu
-                Cuenta de Google; el borrado local se completa igualmente.
+                Your sign-in, plan data, and other accounts are kept.
+                Reconnecting Google authorizes a new review. If Google does not
+                respond to the revocation request, you can revoke access in your
+                Google Account; local deletion still completes.
               </p>
               <div className="space-y-2">
                 <Label htmlFor={confirmEmailId}>
-                  Escribí {confirm.account.email} para confirmar
+                  Type {confirm.account.email} to confirm
                 </Label>
                 <Input
                   id={confirmEmailId}
@@ -1213,7 +1213,7 @@ export function AccountsPage() {
           ) : null}
           <InlineError />
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className={
                 confirm?.action === "deleteGmailData"
@@ -1233,7 +1233,7 @@ export function AccountsPage() {
                   if (
                     !(await act(
                       { action: "reviewed", accountId: confirm.account.id },
-                      "Revisión confirmada",
+                      "Review confirmed",
                     ))
                   )
                     return;
@@ -1244,7 +1244,7 @@ export function AccountsPage() {
                         accountId: confirm.account.id,
                         mode: "automatic",
                       },
-                      "Filtro activado",
+                      "Filtering enabled",
                     )
                   )
                     setConfirm(null);
@@ -1256,7 +1256,7 @@ export function AccountsPage() {
                         accountId: confirm.account.id,
                         confirmEmail: confirmEmail.trim(),
                       },
-                      "Datos de Gmail eliminados de Sotto",
+                      "Gmail data deleted from Sotto",
                     )
                   ) {
                     setConfirm(null);
@@ -1265,19 +1265,19 @@ export function AccountsPage() {
                 } else if (
                   await act(
                     { action: "disconnect", accountId: confirm.account.id },
-                    "Cuenta desconectada de Sotto",
+                    "Account disconnected from Sotto",
                   )
                 )
                   setConfirm(null);
               }}
             >
               {busy
-                ? "Guardando…"
+                ? "Saving…"
                 : confirm?.action === "automatic"
-                  ? "Activar filtro"
+                  ? "Enable filtering"
                   : confirm?.action === "deleteGmailData"
-                    ? "Eliminar datos de Gmail"
-                    : "Desconectar"}
+                    ? "Delete Gmail data"
+                    : "Disconnect"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1295,8 +1295,8 @@ export function RulesPage() {
   return (
     <>
       <PageTitle
-        title="Estos correos se quedan."
-        description="Dale prioridad a las personas con las que querés seguir en contacto."
+        title="These emails stay."
+        description="Keep the people you want to hear from close."
         action={
           <Button
             size="lg"
@@ -1304,7 +1304,7 @@ export function RulesPage() {
             onClick={() => setOpen(true)}
           >
             <Plus />
-            Permitir remitente
+            Allow sender
           </Button>
         }
       />
@@ -1319,14 +1319,14 @@ export function RulesPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{rule.sender}</p>
                   <p className="text-xs text-muted-foreground">
-                    {data.accounts.find((a) => a.id === rule.accountId)?.name} ·
-                    Siempre en mi bandeja
+                    {data.accounts.find((a) => a.id === rule.accountId)?.name}·
+                    Always in my inbox
                   </p>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={`Quitar permiso de ${rule.sender}`}
+                  aria-label={`Remove allowance for ${rule.sender}`}
                   onClick={() => setRemoveId(rule.id)}
                 >
                   <X />
@@ -1336,22 +1336,22 @@ export function RulesPage() {
           </ul>
         ) : (
           <Empty
-            title="Un lugar para tus contactos de confianza"
-            detail="Agregá un remitente para que Sotto conserve sus correos, incluso cuando parezcan comerciales."
+            title="A place for trusted contacts"
+            detail="Add a sender to keep their emails in your inbox, even when they look commercial."
             icon={ShieldCheck}
           />
         )}
       </section>
       <p className="mt-5 max-w-[65ch] text-xs leading-5 text-muted-foreground">
-        Además, Sotto conserva las conversaciones en las que participaste, los
-        correos de tu organización y los mensajes que marcaste con una estrella.
+        Sotto also keeps conversations you have participated in, emails from
+        your organization, and messages you have starred.
       </p>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="w-full sm:max-w-[440px]">
           <SheetHeader className="p-6 pt-10">
-            <SheetTitle>Permitir un remitente</SheetTitle>
+            <SheetTitle>Allow a sender</SheetTitle>
             <SheetDescription>
-              Sus próximos correos se quedan en tu bandeja.
+              Their future emails stay in your inbox.
             </SheetDescription>
           </SheetHeader>
           <form
@@ -1365,7 +1365,7 @@ export function RulesPage() {
                     accountId,
                     sender: email.trim().toLowerCase(),
                   },
-                  "Remitente permitido",
+                  "Sender allowed",
                 )
               ) {
                 setOpen(false);
@@ -1374,7 +1374,7 @@ export function RulesPage() {
             }}
           >
             <div className="space-y-2">
-              <Label htmlFor="sender">Correo del remitente</Label>
+              <Label htmlFor="sender">Sender email</Label>
               <Input
                 id="sender"
                 type="email"
@@ -1386,7 +1386,7 @@ export function RulesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>En esta cuenta</Label>
+              <Label>For this account</Label>
               <AccountPicker value={accountId} onChange={setAccountId} />
             </div>
             <InlineError />
@@ -1395,7 +1395,7 @@ export function RulesPage() {
               disabled={busy || !accountId}
               className="w-full"
             >
-              {busy ? "Guardando…" : "Permitir remitente"}
+              {busy ? "Saving…" : "Allow sender"}
             </Button>
           </form>
         </SheetContent>
@@ -1408,15 +1408,15 @@ export function RulesPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Quitar esta excepción</AlertDialogTitle>
+            <AlertDialogTitle>Remove this exception</AlertDialogTitle>
             <AlertDialogDescription>
-              Sotto volverá a evaluar los próximos correos de este remitente.
-              Sus mensajes actuales no cambian.
+              Sotto will evaluate future emails from this sender again. Existing
+              messages stay unchanged.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <InlineError />
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               disabled={busy}
               onClick={async (e) => {
@@ -1424,13 +1424,13 @@ export function RulesPage() {
                 if (
                   await act(
                     { action: "removeRule", ruleId: removeId },
-                    "Excepción quitada",
+                    "Exception removed",
                   )
                 )
                   setRemoveId(null);
               }}
             >
-              Quitar excepción
+              Remove exception
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1446,25 +1446,25 @@ export function SettingsPage() {
   return (
     <>
       <PageTitle
-        title="A tu manera."
-        description="Elegí cuánto ruido querés sacar de cada bandeja."
+        title="Make it yours."
+        description="Choose what to move out of each inbox."
         action={
           account ? (
             <AccountPicker value={accountId} onChange={setAccountId} />
           ) : undefined
         }
       />
-      <h2 className="mb-4 text-base font-semibold">Qué puede apartar</h2>
+      <h2 className="mb-4 text-base font-semibold">What Sotto can move</h2>
       <section className="divide-y overflow-hidden rounded-xl border bg-card">
         <SettingRow
-          title="Ventas no solicitadas"
-          description="Propuestas comerciales de personas con las que no conversaste."
+          title="Cold outreach"
+          description="Individual sales pitches from people you have not spoken with."
           checked
           disabled
         />
         <SettingRow
-          title="Seguimientos comerciales"
-          description="Ofertas de herramientas en las que te registraste o que ya usás."
+          title="Marketing"
+          description="Brand campaigns, promotions, and product offers."
           checked={account?.policy.marketing ?? false}
           disabled={!account || busy}
           onChange={(value) =>
@@ -1476,13 +1476,13 @@ export function SettingsPage() {
                 marketing: value,
                 newsletters: account.policy.newsletters,
               },
-              "Guardado",
+              "Saved",
             )
           }
         />
         <SettingRow
-          title="Newsletters y promociones"
-          description="Boletines y campañas que preferís leer en otro momento."
+          title="Newsletters"
+          description="Editorial newsletters and recurring digests you prefer to read later."
           checked={account?.policy.newsletters ?? false}
           disabled={!account || busy}
           onChange={(value) =>
@@ -1494,37 +1494,37 @@ export function SettingsPage() {
                 marketing: account.policy.marketing,
                 newsletters: value,
               },
-              "Guardado",
+              "Saved",
             )
           }
         />
       </section>
       <p className="mt-3 text-xs text-muted-foreground">
-        Las ventas van a Sotto/Cold. Las otras categorías, a Sotto/Lectura.
+        Cold outreach goes to Sotto/Cold. Other enabled categories go to
+        Sotto/Reading.
       </p>
       {account && <PreferencesEditor key={account.id} account={account} />}
       <h2 className="mt-10 mb-4 text-base font-semibold">
-        Siempre bajo tu control
+        Always under your control
       </h2>
       <section className="divide-y overflow-hidden rounded-xl border bg-card">
         {[
           {
             icon: ShieldCheck,
-            title: "Ante la duda, conservar",
+            title: "When in doubt, keep it",
             description:
-              "Posibles clientes, inversores, trámites y avisos útiles se quedan.",
+              "Potential customers, investors, paperwork, and useful notices stay.",
           },
           {
             icon: Undo2,
-            title: "Apartar no es borrar",
-            description:
-              "Cada movimiento tiene una explicación y se puede deshacer.",
+            title: "Moved, still yours",
+            description: "Every move has an explanation and can be undone.",
           },
           {
             icon: RefreshCw,
-            title: "Una revisión de respaldo",
+            title: "A backup check",
             description:
-              "Si se pierde un aviso de Gmail, Sotto recupera los cambios pendientes.",
+              "If a Gmail notification is missed, Sotto catches up on pending changes.",
           },
         ].map((row) => (
           <div key={row.title} className="flex items-start gap-4 p-5">
@@ -1542,13 +1542,13 @@ export function SettingsPage() {
         ))}
       </section>
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <Link href="/privacidad" className="underline underline-offset-4">
-          Privacidad y acceso a tus datos
+        <Link href="/privacy" className="underline underline-offset-4">
+          Privacy and data access
         </Link>
         {data.authenticated ? (
           <form action="/api/logout" method="post">
             <Button type="submit" variant="ghost" size="sm">
-              Cerrar sesión
+              Sign out
             </Button>
           </form>
         ) : (
@@ -1557,7 +1557,7 @@ export function SettingsPage() {
             target="_blank"
             rel="noreferrer"
           >
-            Sotto es open source ↗
+            Sotto is open source ↗
           </a>
         )}
       </div>
@@ -1582,23 +1582,23 @@ function PreferencesEditor({ account }: { account: Account }) {
             newsletters: account.policy.newsletters,
             instructions,
           },
-          "Preferencias guardadas",
+          "Preferences saved",
         );
       }}
     >
       <Label htmlFor="ai-preferences" className="text-base font-semibold">
-        Qué es importante para vos
+        What matters to you
       </Label>
       <p id="ai-preferences-help" className="text-[13px] text-muted-foreground">
-        Contale a la IA qué hacés y qué propuestas te interesan. Lo tendrá en
-        cuenta al leer los próximos correos.
+        Tell the AI what you do and which opportunities interest you. It will
+        consider this when reading future emails.
       </p>
       <Textarea
         id="ai-preferences"
         aria-describedby="ai-preferences-help"
         maxLength={1500}
         rows={4}
-        placeholder="Por ejemplo: conservo consultas de posibles clientes e inversores. Prefiero apartar ofertas de agencias y servicios de prospección."
+        placeholder="For example: keep inquiries from potential customers and investors. Move pitches from agencies and lead generation services."
         value={instructions}
         onChange={(event) => setInstructions(event.target.value)}
       />
@@ -1607,7 +1607,7 @@ function PreferencesEditor({ account }: { account: Account }) {
         type="submit"
         disabled={busy || instructions === (account.policy.instructions || "")}
       >
-        Guardar preferencias
+        Save preferences
       </Button>
     </form>
   );
@@ -1644,7 +1644,7 @@ function SettingRow({
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <span role="status" className="text-xs text-muted-foreground">
-          {saved ? "Guardado" : ""}
+          {saved ? "Saved" : ""}
         </span>
         <Switch
           id={id}

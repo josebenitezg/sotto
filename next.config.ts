@@ -4,14 +4,26 @@ const config: NextConfig = {
   turbopack: { root: process.cwd() },
   serverExternalPackages: ["pg"],
   async redirects() {
-    if (!process.env.APP_URL) return [];
+    const pages = [
+      ["revision", "review"],
+      ["cuentas", "accounts"],
+      ["permitidos", "allowlist"],
+      ["ajustes", "settings"],
+      ["planes", "pricing"],
+      ["privacidad", "privacy"],
+    ].map(([source, destination]) => ({
+      source: `/${source}`,
+      destination: `/${destination}`,
+      permanent: true,
+    }));
+    if (!process.env.APP_URL) return pages;
     const canonical = new URL(process.env.APP_URL);
     if (
       canonical.protocol !== "https:" ||
       canonical.hostname === "localhost" ||
       canonical.hostname.startsWith("www.")
     )
-      return [];
+      return pages;
     // OAuth state cookies and the callback must use the same host.
     const alias = `www.${canonical.hostname}`.replace(
       /[.*+?^${}()|[\]\\]/g,
@@ -24,6 +36,7 @@ const config: NextConfig = {
         destination: `${canonical.origin}/:path*`,
         permanent: true,
       },
+      ...pages,
     ];
   },
   async headers() {

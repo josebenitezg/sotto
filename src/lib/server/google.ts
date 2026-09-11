@@ -63,7 +63,7 @@ export function normalizeMessage(raw: RawMessage): Mail {
     id: raw.id,
     threadId: raw.threadId,
     from: headers.from ?? "",
-    subject: (headers.subject ?? "(Sin asunto)").slice(0, 500),
+    subject: (headers.subject ?? "(No subject)").slice(0, 500),
     text: text.replace(/https?:\/\/[^\s<>]+/gi, "[enlace]").slice(0, 16000),
     labels: raw.labelIds ?? [],
     headers,
@@ -132,7 +132,7 @@ export class Gmail {
     );
     return !!result.messages?.length;
   }
-  async ensureLabel(name: "Sotto/Cold" | "Sotto/Lectura") {
+  async ensureLabel(name: "Sotto/Cold" | "Sotto/Reading") {
     if (!writesEnabled(this.accountId))
       throw new Error("Mailbox writes disabled");
     const { labels } = await this.request<{

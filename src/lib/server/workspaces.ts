@@ -41,7 +41,7 @@ export async function connectIdentity(
     )
       throw new HttpError(
         409,
-        "Esa cuenta ya pertenece a otro espacio de Sotto.",
+        "That account already belongs to another Sotto workspace.",
       );
     if (
       access?.gmail_deleted_at &&
@@ -52,7 +52,7 @@ export async function connectIdentity(
     )
       throw new HttpError(
         409,
-        "Los datos de Gmail se eliminaron después de iniciar esta conexión. Volvé a conectar Google para autorizarla de nuevo.",
+        "Gmail data was deleted after this connection started. Connect Google again to authorize it.",
       );
     // Isolation is independent of paid plans. Only an existing identity or
     // a browser-bound linking session can select an existing workspace.
@@ -81,7 +81,7 @@ export async function connectIdentity(
         [workspaceId],
       );
       if (count.n >= 2)
-        throw new HttpError(409, "El plan incluye hasta dos cuentas Gmail.");
+        throw new HttpError(409, "The plan includes up to two Gmail accounts.");
     }
     if (!refreshToken && !existing?.token_cipher)
       throw new Error("Offline access missing");
@@ -95,7 +95,7 @@ export async function connectIdentity(
       [
         identity.sub,
         identity.email.toLowerCase(),
-        identity.email.endsWith("@gmail.com") ? "Personal" : "Trabajo",
+        identity.email.endsWith("@gmail.com") ? "Personal" : "Work",
         cipher,
         workspaceId,
       ],

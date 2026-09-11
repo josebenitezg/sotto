@@ -29,11 +29,11 @@ it("enables account controls only for the permitted account, even when the dashb
   );
   const activateButtons = [
     ...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g),
-  ].filter(([, , content]) => content.includes("Activar filtro"));
+  ].filter(([, , content]) => content.includes("Enable filtering"));
   expect(activateButtons).toHaveLength(2);
   expect(activateButtons[0][1]).toMatch(/\bdisabled=""/);
   expect(activateButtons[1][1]).not.toMatch(/\bdisabled=/);
   expect(html).toContain(
-    "El movimiento de correos está desactivado para esta cuenta.",
+    "Moving emails is disabled for this account.",
   );
 });

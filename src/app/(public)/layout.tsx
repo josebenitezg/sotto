@@ -6,8 +6,8 @@ export default function PublicLayout({
 }) {
   return (
     <div className="public-site">
-      <a className="skip-link" href="#contenido">
-        Ir al contenido
+      <a className="skip-link" href="#content">
+        Skip to content
       </a>
       <PublicHeader />
       {children}

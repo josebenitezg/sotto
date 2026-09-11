@@ -3,13 +3,13 @@ import Link from "next/link";
 export function GoogleDataNotice({ id }: { id: string }) {
   return (
     <p id={id} className="text-xs leading-5 text-muted-foreground">
-      Sotto lee tu Gmail para organizarlo. Cuando necesita IA, envía a OpenAI el
-      remitente, el asunto, hasta 16.000 caracteres de texto, tu dirección de
-      correo y tus preferencias. No abre adjuntos ni enlaces, ni envía o borra
-      correos. Al continuar, autorizás este uso; podés pausar o desconectar tu
-      cuenta.{" "}
-      <Link href="/privacidad" className="underline underline-offset-4">
-        Cómo usamos tus datos
+      Sotto reads your Gmail to organize it. When AI is needed, it sends OpenAI
+      the sender, subject, up to 16,000 characters of text, your email address,
+      and your preferences. It does not open attachments or links, send emails,
+      or delete them. By continuing, you authorize this use; you can pause or
+      disconnect your account.{" "}
+      <Link href="/privacy" className="underline underline-offset-4">
+        How we use your data
       </Link>
       .
     </p>

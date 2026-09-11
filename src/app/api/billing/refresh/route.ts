@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     await refreshBilling(await requireSession());
     return request.headers.get("accept")?.includes("application/json")
       ? Response.json({ ok: true })
-      : NextResponse.redirect(`${appUrl()}/planes`, 303);
+      : NextResponse.redirect(`${appUrl()}/pricing`, 303);
   } catch (error) {
     return errorResponse(error);
   }

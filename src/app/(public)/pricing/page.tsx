@@ -32,20 +32,20 @@ export default async function PlansPage({
   const amount = Number(process.env.PLAN_PRICE_CENTS || "900") / 100;
   const params = await searchParams;
   const date = (value: Date) =>
-    new Intl.DateTimeFormat("es", {
+    new Intl.DateTimeFormat("en-US", {
       dateStyle: "medium",
       timeStyle: "short",
       timeZone: "UTC",
     }).format(value) + " UTC";
   return (
-    <main id="contenido" className="public-document space-y-8">
+    <main id="content" className="public-document space-y-8">
       <div>
         <h1 className="text-[28px] leading-8 font-semibold tracking-tight">
-          Menos ruido. Un plan simple.
+          Less noise. One simple plan.
         </h1>
         <p className="mt-3 max-w-[58ch] text-sm leading-6 text-muted-foreground">
-          Probá Sotto durante tres días. Seguí usando Gmail, con las propuestas
-          comerciales aparte y cada decisión a la vista.
+          Try Sotto for three days. Keep using Gmail, with sales pitches set
+          aside and every decision in view.
         </p>
       </div>
       <section
@@ -60,18 +60,18 @@ export default async function PlansPage({
             US${amount}
           </span>
           <span className="ml-2 text-sm text-muted-foreground">
-            por persona al mes
+            per person, per month
           </span>
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Tres días de prueba. Hasta dos cuentas Gmail.
+          A three-day trial. Up to two Gmail accounts.
         </p>
         <ul className="my-7 space-y-3 text-sm">
           {[
-            "IA que interpreta el mensaje y tus preferencias",
-            "Cuentas de trabajo y personal en un solo espacio",
-            "Motivo de cada decisión y opción de deshacer",
-            "Tu correo sigue en Gmail",
+            "AI that considers the message and your preferences",
+            "Work and personal accounts in one workspace",
+            "A reason for every decision and an option to undo",
+            "Your email stays in Gmail",
           ].map((line) => (
             <li key={line} className="flex gap-3">
               <Check size={17} className="mt-0.5 shrink-0 text-primary" />
@@ -81,53 +81,52 @@ export default async function PlansPage({
         </ul>
         {workspace?.internal ? (
           <p className="text-sm text-muted-foreground">
-            Tu instalación personal ya tiene acceso. No necesita una
-            suscripción.
+            Your personal installation already has access. No subscription is
+            needed.
           </p>
         ) : !available ? (
           <>
             <Button size="lg" disabled>
-              Prueba disponible próximamente
+              Free trial coming soon
             </Button>
             <p className="mt-3 text-sm text-muted-foreground">
-              Estamos terminando la conexión. La prueba y los cobros todavía no
-              están habilitados.
+              We are finishing the setup. Trials and payments are not enabled
+              yet.
             </p>
           </>
         ) : !workspace ? (
           <form action="/api/google/connect" method="post">
             <Button type="submit" size="lg" disabled={!configured()}>
-              Conectar con Google
+              Connect with Google
             </Button>
             <p className="mt-3 text-sm text-muted-foreground">
-              Primero conectás Gmail. La prueba comienza cuando la activás en el
-              siguiente paso.
+              Connect Gmail first. Your trial starts when you activate it in the
+              next step.
             </p>
           </form>
         ) : active ? (
           <div className="space-y-4">
             <p className="text-sm">
               {workspace.subscription_status === "trialing"
-                ? `Tu prueba termina el ${date(workspace.trial_end)}.`
+                ? `Your trial ends on ${date(workspace.trial_end)}.`
                 : workspace.cancel_at_period_end
-                  ? `Tu plan está cancelado y conserva acceso hasta el ${date(workspace.paid_until)}.`
-                  : "Tu suscripción está activa."}
+                  ? `Your plan is canceled. You keep access until ${date(workspace.paid_until)}.`
+                  : "Your subscription is active."}
             </p>
-            <BillingAction action="portal">Gestionar suscripción</BillingAction>
+            <BillingAction action="portal">Manage subscription</BillingAction>
           </div>
         ) : (
           <BillingAction action="checkout">
             {workspace.trial_used
-              ? "Activar suscripción"
-              : "Comenzar mis 3 días de prueba"}
+              ? "Start subscription"
+              : "Start my 3-day trial"}
           </BillingAction>
         )}
         <p className="mt-5 text-xs leading-5 text-muted-foreground">
           {trialRequiresCard()
-            ? "Se pide tarjeta al iniciar. Al finalizar los tres días, Stripe cobra el precio mensual indicado salvo que canceles antes."
-            : "Sin tarjeta para probar. Si no elegís continuar, la prueba termina sin cobros. Al contratar la suscripción, el cobro es mensual hasta que canceles."}{" "}
-          Los impuestos aplicables se muestran en el checkout cuando
-          corresponda.
+            ? "A card is required to start. After three days, Stripe charges the listed monthly price unless you cancel beforehand."
+            : "No card is required for the trial. If you do not continue, it ends without a charge. Once you subscribe, billing is monthly until you cancel."}{" "}
+          Applicable taxes are shown at checkout.
         </p>
       </section>
       {workspace && hosted() && !workspace.internal && (
@@ -137,18 +136,17 @@ export default async function PlansPage({
           )}
           {!active && workspace.trial_used && (
             <p className="text-sm text-muted-foreground">
-              El procesamiento está pausado. Podés seguir consultando tu
-              historial, devolver correos a la bandeja y desconectar tus
-              cuentas.
+              Processing is paused. You can still view your history, return
+              emails to your inbox, and disconnect your accounts.
             </p>
           )}
           <div className="flex flex-wrap gap-3">
             <BillingAction action="refresh" secondary>
-              Actualizar estado
+              Refresh status
             </BillingAction>
             {workspace.stripe_customer_id && !active && (
               <BillingAction action="portal" secondary>
-                Gestionar pagos
+                Manage payments
               </BillingAction>
             )}
           </div>
@@ -156,23 +154,23 @@ export default async function PlansPage({
       )}
       <section className="space-y-3 text-sm leading-6 text-muted-foreground">
         <h2 className="font-semibold text-foreground">
-          También podés instalarlo vos.
+          You can host it yourself, too.
         </h2>
         <p>
-          Sotto es de código abierto bajo licencia MIT. La instalación propia no
-          necesita esta suscripción; usás tu infraestructura y tu proveedor de
-          IA.
+          Sotto is open source under the MIT license. Self-hosting does not
+          require this subscription; you use your own infrastructure and AI
+          provider.
         </p>
         <a
           href="https://github.com/josebenitezg/sotto"
           className="text-primary underline underline-offset-4"
         >
-          Ver el proyecto en GitHub
+          View the project on GitHub
         </a>
       </section>
       <p className="text-xs text-muted-foreground">
-        <Link className="underline underline-offset-4" href="/privacidad">
-          Privacidad y uso de tus datos
+        <Link className="underline underline-offset-4" href="/privacy">
+          Privacy and your data
         </Link>
       </p>
     </main>

@@ -31,7 +31,7 @@ export async function dashboard(): Promise<Dashboard> {
            count(*) FILTER (WHERE state IN ('pending','running') AND last_error IS NOT NULL)::int AS retrying
          FROM jobs WHERE account_id=a.id
        ) j ON true WHERE a.workspace_id=$1
-       ORDER BY CASE WHEN a.name='Trabajo' THEN 0 ELSE 1 END,a.created_at`,
+       ORDER BY CASE WHEN a.name IN ('Trabajo','Work') THEN 0 ELSE 1 END,a.created_at`,
       [workspaceId],
     ),
     query(
@@ -49,7 +49,7 @@ export async function dashboard(): Promise<Dashboard> {
   const accounts = rawAccounts.map((a) => ({
     id: a.id,
     email: a.email,
-    name: a.name,
+    name: a.name === "Trabajo" ? "Work" : a.name,
     mode: a.mode,
     policy: a.policy,
     connected: a.connected,
@@ -75,7 +75,8 @@ export async function dashboard(): Promise<Dashboard> {
     sender: d.sender,
     subject: d.subject,
     category: d.category,
-    reason: d.reason,
+    reason:
+      d.reason_en_source === d.reason && d.reason_en ? d.reason_en : d.reason,
     state: d.state,
     confidence: d.confidence,
     createdAt: iso(d.created_at),

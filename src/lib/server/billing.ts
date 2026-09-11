@@ -57,9 +57,9 @@ export function checkoutParameters(
           }),
     },
     metadata: { sotto_workspace_id: workspaceId, application: "sotto" },
-    success_url: `${appUrl()}/planes?checkout=success`,
-    cancel_url: `${appUrl()}/planes?checkout=canceled`,
-    locale: "es",
+    success_url: `${appUrl()}/pricing?checkout=success`,
+    cancel_url: `${appUrl()}/pricing?checkout=canceled`,
+    locale: "en",
   };
 }
 
@@ -67,7 +67,7 @@ function serviceAvailable() {
   if (!billingReady())
     throw new HttpError(
       503,
-      "Estamos terminando de preparar Sotto. La prueba todavía no comienza.",
+      "We are finishing the setup. Your trial has not started yet.",
     );
 }
 
@@ -86,7 +86,7 @@ export async function checkout(workspaceId: string) {
       workspaceId,
     ]);
     if (!workspace || workspace.internal)
-      throw new HttpError(409, "Este espacio no necesita una suscripción.");
+      throw new HttpError(409, "This workspace does not need a subscription.");
     const {
       rows: [account],
     } = await db.query(
@@ -94,7 +94,7 @@ export async function checkout(workspaceId: string) {
       [workspaceId],
     );
     if (!account)
-      throw new HttpError(409, "Conectá Gmail antes de comenzar tu prueba.");
+      throw new HttpError(409, "Connect Gmail before starting your trial.");
     const api = stripe();
     const price = await api.prices.retrieve(required("STRIPE_PRICE_ID"));
     if (
@@ -139,7 +139,7 @@ export async function checkout(workspaceId: string) {
         await api.billingPortal.sessions.create({
           customer,
           configuration: required("STRIPE_PORTAL_CONFIGURATION_ID"),
-          return_url: `${appUrl()}/planes`,
+          return_url: `${appUrl()}/pricing`,
         })
       ).url;
     // Provider history also prevents another trial if the completion webhook
@@ -180,18 +180,18 @@ export async function checkout(workspaceId: string) {
 
 export async function portal(workspaceId: string) {
   if (!hosted() || isDemo())
-    throw new HttpError(404, "No hay facturación en esta instalación.");
+    throw new HttpError(404, "Billing is not enabled for this installation.");
   const [workspace] = await query(
     "SELECT stripe_customer_id FROM workspaces WHERE id=$1",
     [workspaceId],
   );
   if (!workspace?.stripe_customer_id)
-    throw new HttpError(409, "Todavía no tenés una suscripción.");
+    throw new HttpError(409, "You do not have a subscription yet.");
   return (
     await stripe().billingPortal.sessions.create({
       customer: workspace.stripe_customer_id,
       configuration: required("STRIPE_PORTAL_CONFIGURATION_ID"),
-      return_url: `${appUrl()}/planes`,
+      return_url: `${appUrl()}/pricing`,
     })
   ).url;
 }
@@ -265,8 +265,7 @@ export async function reconcileCustomer(customerId: string) {
 }
 
 export async function refreshBilling(workspaceId: string) {
-  if (!hosted() || isDemo())
-    throw new HttpError(404, "Facturación desactivada.");
+  if (!hosted() || isDemo()) throw new HttpError(404, "Billing is disabled.");
   const [workspace] = await query(
     "SELECT stripe_customer_id FROM workspaces WHERE id=$1",
     [workspaceId],

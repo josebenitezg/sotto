@@ -35,7 +35,10 @@ export async function dashboard(): Promise<Dashboard> {
       [workspaceId],
     ),
     query(
-      "SELECT d.*,a.email FROM decisions d JOIN accounts a ON a.id=d.account_id WHERE a.workspace_id=$1 ORDER BY d.created_at DESC LIMIT 200",
+      `SELECT d.*,a.email FROM accounts a JOIN LATERAL (
+         SELECT * FROM decisions WHERE account_id=a.id
+         ORDER BY created_at DESC LIMIT 200
+       ) d ON true WHERE a.workspace_id=$1 ORDER BY d.created_at DESC`,
       [workspaceId],
     ),
     query(

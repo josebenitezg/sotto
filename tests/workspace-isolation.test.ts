@@ -146,6 +146,42 @@ it("loads only the signed-in workspace, including decisions and sender rules", a
   h.cookie = "expired";
   expect((await dashboard()).accounts).toEqual([]);
 });
+it("keeps the latest 200 decisions per account without hiding an older personal inbox or leaking another workspace", async () => {
+  await h.db.query("DELETE FROM decisions");
+  await h.db.query(
+    "INSERT INTO accounts(id,email,name,token_cipher,workspace_id) VALUES('personal-a','personal@example.com','Personal','synthetic','a')",
+  );
+  await h.db
+    .query(`INSERT INTO decisions(id,account_id,message_id,thread_id,sender,subject,category,confidence,reason,state,ai_decision,created_at)
+    SELECT 'work-' || n,'gmail-a','work-message-' || n,'work-thread-' || n,
+      'sales@example.com','Synthetic pitch','cold',0.9,'Pitch','suggested','move',
+      '2026-09-01'::timestamptz + n * interval '1 second'
+    FROM generate_series(1,230) AS n`);
+  await h.db
+    .query(`INSERT INTO decisions(id,account_id,message_id,thread_id,sender,subject,category,confidence,reason,state,ai_decision,created_at)
+    SELECT id,account_id,id,id,'sales@example.com','Synthetic pitch','cold',0.9,'Pitch','suggested','move',created_at::timestamptz
+    FROM (VALUES
+      ('personal-old','personal-a','2026-08-01'),
+      ('personal-new','personal-a','2026-08-02'),
+      ('foreign-new','gmail-b','2026-10-01')
+    ) AS seeds(id,account_id,created_at)`);
+
+  const data = await dashboard();
+  expect(data.decisions.map((d) => d.id)).toEqual([
+    ...Array.from({ length: 200 }, (_, i) => `work-${230 - i}`),
+    "personal-new",
+    "personal-old",
+  ]);
+  expect(
+    data.decisions.filter((d) => d.accountId === "personal-a"),
+  ).toHaveLength(2);
+  h.cookie = "token-b";
+  expect((await dashboard()).decisions.map((d) => d.id)).toEqual([
+    "foreign-new",
+  ]);
+  h.cookie = "expired";
+  expect((await dashboard()).decisions).toEqual([]);
+});
 it("rejects foreign account, decision and rule IDs before any Gmail access", async () => {
   for (const body of [
     { action: "disconnect", accountId: "gmail-b" },

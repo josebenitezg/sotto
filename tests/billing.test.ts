@@ -454,6 +454,47 @@ describe("signed events and provider-authoritative access", () => {
     await reconcileCustomer("cus_a");
     expect((await get()).allowance_period).not.toBe(first.allowance_period);
   });
+  it("honors an explicit portal cancellation date even when cancel_at_period_end is false", async () => {
+    const sub = {
+      ...subscription("active"),
+      cancel_at: Math.floor(Date.now() / 1000) + 600,
+      cancel_at_period_end: false,
+    };
+    h.subscriptions = [sub];
+    await reconcileCustomer("cus_a");
+    const [w] = (
+      await h.db.query<{
+        cancel_at_period_end: boolean;
+        paid_until: Date;
+        allowance_resets_at: Date;
+      }>(
+        "SELECT cancel_at_period_end,paid_until,allowance_resets_at FROM workspaces WHERE id=$1",
+        ["a"],
+      )
+    ).rows;
+    expect(w.cancel_at_period_end).toBe(true);
+    expect(w.paid_until.getTime()).toBe(sub.cancel_at * 1000);
+    expect(w.allowance_resets_at.getTime()).toBe(sub.cancel_at * 1000);
+    expect(
+      hasAccess(
+        {
+          subscription_status: "active",
+          trial_end: null,
+          paid_until: w.paid_until,
+        },
+        sub.cancel_at * 1000,
+      ),
+    ).toBe(false);
+    h.subscriptions = [{ ...sub, status: "trialing" }];
+    await reconcileCustomer("cus_a");
+    const [trial] = (
+      await h.db.query<{ trial_end: Date }>(
+        "SELECT trial_end FROM workspaces WHERE id=$1",
+        ["a"],
+      )
+    ).rows;
+    expect(trial.trial_end.getTime()).toBe(sub.cancel_at * 1000);
+  });
   it("verifies the raw request signature before touching billing state", async () => {
     const payload = JSON.stringify(event("evt_signed"));
     const signature = stripe().webhooks.generateTestHeaderString({

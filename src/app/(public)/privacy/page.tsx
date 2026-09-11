@@ -7,10 +7,10 @@ export default function PrivacyPage() {
       <h1 className="text-2xl leading-8 font-semibold">Privacy</h1>
       <p className="text-muted-foreground">
         Sotto is an open-source tool for organizing Gmail. The sotto.email
-        service is operated by Perception Technologies Inc. and processes data
-        on this installation's infrastructure. If you host your own copy, you
-        choose and control the providers. Each installation maintains its own
-        database.
+        service is operated by Jose Maria Benitez Genes under the Sotto name and
+        processes data on this installation's infrastructure. If you host your
+        own copy, you choose and control the providers. Each installation
+        maintains its own database.
       </p>
       <h2>What we access</h2>
       <p className="text-muted-foreground">

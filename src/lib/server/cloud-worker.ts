@@ -4,6 +4,7 @@ import { AccountBusy, workAccount } from "@/lib/server/engine";
 import { enqueueAccount } from "@/lib/server/queue";
 import { isDemo } from "@/lib/server/config";
 import { accountProcessingAllowed } from "@/lib/server/entitlements";
+import { accountAllowance } from "@/lib/server/allowances";
 export async function consumeMailbox(
   payload: unknown,
   metadata: { messageId: string },
@@ -34,16 +35,21 @@ export async function consumeMailbox(
     return;
   }
   if (!(await accountProcessingAllowed(accountId))) return;
+  const allowance = await accountAllowance(accountId);
   const [pending] = await query(
-    "SELECT min(available_at) AS next_at FROM jobs WHERE account_id=$1 AND state IN ('pending','running')",
-    [accountId],
+    `SELECT (SELECT min(available_at) FROM jobs j WHERE j.account_id=$1 AND j.state IN ('pending','running')
+      AND ($2 OR EXISTS (SELECT 1 FROM message_allowances m WHERE m.account_id=j.account_id AND m.message_id=j.message_id))) AS next_at,
+      (SELECT sync_page_token IS NOT NULL FROM accounts WHERE id=$1) AS scan_pending`,
+    [accountId, !allowance?.exhausted],
   );
-  if (pending?.next_at) {
+  if (pending?.next_at || (pending?.scan_pending && !allowance?.exhausted)) {
     const delay = Math.min(
       3600,
       Math.max(
         1,
-        Math.ceil((new Date(pending.next_at).getTime() - Date.now()) / 1000),
+        pending.next_at
+          ? Math.ceil((new Date(pending.next_at).getTime() - Date.now()) / 1000)
+          : 1,
       ),
     );
     await enqueueAccount(accountId, `${metadata.messageId}:next`, delay);

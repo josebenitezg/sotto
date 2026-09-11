@@ -61,7 +61,16 @@ export type Rule = {
   sender: string;
   createdAt: string;
 };
+export type MailAllowance = {
+  limit: number;
+  used: number;
+  remaining: number;
+  trial: boolean;
+  resetsAt: string | null;
+  exhausted: boolean;
+};
 export type Dashboard = {
+  allowance?: MailAllowance | null;
   accessActive?: boolean;
   accounts: Account[];
   decisions: Decision[];

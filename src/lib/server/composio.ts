@@ -157,12 +157,18 @@ export async function ensureComposioTrigger(connection: ComposioConnection) {
   return result.trigger_id;
 }
 export async function stopComposioTrigger(connection: ComposioConnection) {
-  if (connection.triggerId)
-    await composioRequest(
-      `/trigger_instances/manage/${encodeURIComponent(connection.triggerId)}`,
-      undefined,
-      "DELETE",
-    );
+  if (connection.triggerId) {
+    try {
+      await composioRequest(
+        `/trigger_instances/manage/${encodeURIComponent(connection.triggerId)}`,
+        undefined,
+        "DELETE",
+      );
+    } catch (error) {
+      if (!(error instanceof ComposioError) || error.status !== 404)
+        throw error;
+    }
+  }
 }
 export async function deleteComposioConnection(id: string) {
   identifier.parse(id);

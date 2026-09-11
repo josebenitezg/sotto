@@ -12,6 +12,7 @@ import { Gmail } from "@/lib/server/google";
 import { classifierConfigured } from "@/lib/server/ai";
 import { enqueueAccount } from "@/lib/server/queue";
 import { requireProcessingAccess } from "@/lib/server/entitlements";
+import { workspaceAllowance } from "@/lib/server/allowances";
 import { startFiltering } from "@/lib/server/filtering";
 import {
   withAccountLock,
@@ -75,6 +76,11 @@ export async function POST(request: Request) {
       );
       if (!account) throw new HttpError(404, "We could not find that account.");
       await requireProcessingAccess(workspaceId);
+      if ((await workspaceAllowance(workspaceId))?.exhausted)
+        throw new HttpError(
+          402,
+          "Your included emails have been used. Open Pricing to see when your allowance renews. There are no overage charges.",
+        );
       if (!account.connected || account.mode === "paused")
         throw new HttpError(409, "Connect and resume this account to sync it.");
       const [event] = await query(

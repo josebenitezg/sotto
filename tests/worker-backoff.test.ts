@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
@@ -34,6 +34,48 @@ vi.mock("../src/lib/server/classifier", async (original) => ({
 }));
 import { workAccount } from "../src/lib/server/engine";
 import { ClassifierRateLimit } from "../src/lib/server/processing-error";
+
+it("finishes a reserved retry at quota without reading unreserved mail or looping behind it", async () => {
+  vi.stubEnv("BILLING_ENABLED", "true");
+  vi.stubEnv("GOOGLE_PUBSUB_TOPIC", "");
+  vi.stubEnv("ENABLE_MAILBOX_WRITES", "false");
+  h.db = new PGlite();
+  h.gmail.mockReset();
+  h.classify.mockReset();
+  try {
+    for (const f of (await readdir("db"))
+      .filter((f) => f.endsWith(".sql"))
+      .sort())
+      await h.db.exec(await readFile(`db/${f}`, "utf8"));
+    await h.db
+      .exec(`INSERT INTO workspaces(id,email,billing_plan,subscription_status,trial_end,allowance_period,allowance_trial) VALUES('quota','quota@example.com','solo','trialing',now()+interval '1 day','trial:quota',true);
+  INSERT INTO accounts(id,email,name,token_cipher,workspace_id,history_id,mode) VALUES('quota-mail','quota@example.com','Quota','synthetic','quota','100','review');
+  INSERT INTO usage_periods VALUES('quota','trial:quota',50);
+  INSERT INTO message_allowances VALUES('quota-mail','reserved','quota','trial:quota');
+  INSERT INTO jobs(account_id,message_id) VALUES('quota-mail','unreserved'),('quota-mail','reserved');`);
+    const message = vi.fn().mockResolvedValue({ labels: [] });
+    const request = vi.fn();
+    h.gmail.mockResolvedValue({ message, request });
+    await workAccount("quota-mail", 3);
+    await workAccount("quota-mail", 3);
+    expect(message.mock.calls).toEqual([["reserved"]]);
+    expect(request).not.toHaveBeenCalled();
+    expect(h.classify).not.toHaveBeenCalled();
+    expect(
+      (
+        await h.db.query(
+          "SELECT message_id,state,attempts FROM jobs ORDER BY id",
+        )
+      ).rows,
+    ).toEqual([
+      { message_id: "unreserved", state: "pending", attempts: 0 },
+      { message_id: "reserved", state: "done", attempts: 1 },
+    ]);
+  } finally {
+    await h.db.close();
+    vi.unstubAllEnvs();
+  }
+});
 
 it("stops the batch on a provider limit and defers the whole mailbox without touching another account", async () => {
   vi.stubEnv("BILLING_ENABLED", "false");

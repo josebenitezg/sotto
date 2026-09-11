@@ -1,6 +1,13 @@
 import Stripe from "stripe";
 import { randomUUID } from "node:crypto";
-import { appUrl, configured, hosted, isDemo, required } from "./config";
+import {
+  appUrl,
+  configured,
+  hosted,
+  isDemo,
+  required,
+  composioEnabled,
+} from "./config";
 import { HttpError } from "./auth";
 import { query, transaction } from "./db";
 import { hasAccess } from "./entitlements";
@@ -24,6 +31,9 @@ export const billingReady = () =>
   !isDemo() &&
   configured() &&
   process.env.CHECKOUT_ENABLED === "true" &&
+  (!composioEnabled() ||
+    (process.env.COMPOSIO_NOTIFICATION_MODE === "poll" &&
+      process.env.COMPOSIO_POLLING_READY === "true")) &&
   [
     "STRIPE_SECRET_KEY",
     "STRIPE_PRICE_SOLO_ID",
@@ -57,6 +67,11 @@ export function checkoutParameters(
     payment_method_collection:
       trialUsed || trialRequiresCard() ? "always" : "if_required",
     payment_method_types: ["card"],
+    custom_text: {
+      submit: {
+        message: `${plans[plan].emails} checked emails per monthly billing period${trialUsed ? "" : `; the 3-day trial includes ${plans[plan].trialEmails}`}. No overage charges. New processing pauses at the limit. Allowances are shared across connected accounts and do not roll over.`,
+      },
+    },
     subscription_data: {
       metadata: { sotto_workspace_id: workspaceId, application: "sotto", plan },
       ...(trialUsed
@@ -286,9 +301,20 @@ export async function reconcileCustomer(customerId: string) {
     const trialEnd = subscription.trial_end
       ? new Date(subscription.trial_end * 1000)
       : null;
+    const allowanceTrial = subscription.status === "trialing";
+    const allowanceStart = allowanceTrial
+      ? subscription.trial_start
+      : items[0].current_period_start;
+    const allowancePeriod = allowanceStart
+      ? `${subscription.id}:${allowanceTrial ? "trial" : "paid"}:${allowanceStart}`
+      : null;
+    const allowanceResetsAt = allowanceTrial
+      ? trialEnd
+      : new Date(items[0].current_period_end * 1000);
     await db.query(
       `UPDATE workspaces SET stripe_subscription_id=$2,subscription_status=$3,
-      trial_used=trial_used OR $4,trial_end=$5,paid_until=$6,cancel_at_period_end=$7,billing_plan=$8,billing_updated_at=now()
+      trial_used=trial_used OR $4,trial_end=$5,paid_until=$6,cancel_at_period_end=$7,billing_plan=$8,
+      allowance_period=$9,allowance_resets_at=$10,allowance_trial=$11,billing_updated_at=now()
       WHERE id=$1`,
       [
         workspace.id,
@@ -299,6 +325,9 @@ export async function reconcileCustomer(customerId: string) {
         paidUntil,
         subscription.cancel_at_period_end,
         plan,
+        allowancePeriod,
+        allowanceResetsAt,
+        allowanceTrial,
       ],
     );
     return hasAccess({

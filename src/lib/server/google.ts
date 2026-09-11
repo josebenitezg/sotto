@@ -11,6 +11,7 @@ import {
   type ComposioConnection,
 } from "./composio";
 import { composioGmailRequest } from "./composio-gmail";
+import { usesComposioPolling } from "./polling";
 
 export const gmailScope = "https://www.googleapis.com/auth/gmail.modify";
 export function googleClient() {
@@ -214,6 +215,15 @@ export class Gmail {
   }
   async ensureNotifications() {
     if (this.composio && this.accountId) {
+      if (await usesComposioPolling(this.accountId)) {
+        await stopComposioTrigger(this.composio);
+        await query(
+          "UPDATE accounts SET composio_trigger_id=NULL,last_watch=now(),watch_expires=NULL WHERE id=$1 AND composio_account_id=$2",
+          [this.accountId, this.composio.id],
+        );
+        this.composio.triggerId = null;
+        return;
+      }
       const triggerId = await ensureComposioTrigger(this.composio);
       await query(
         "UPDATE accounts SET composio_trigger_id=$2,last_watch=now(),watch_expires=NULL WHERE id=$1 AND composio_account_id=$3",

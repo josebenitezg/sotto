@@ -19,6 +19,7 @@ const h = vi.hoisted(() => ({
   customers: new Map<string, any>(),
   create: vi.fn(),
   retrieve: vi.fn(),
+  expire: vi.fn(),
   customer: vi.fn(),
   price: vi.fn(),
   portal: vi.fn(),
@@ -56,7 +57,9 @@ vi.mock("stripe", async (importOriginal) => {
       prices = { retrieve: h.price };
       customers = { create: h.customer };
       subscriptions = { list: h.list };
-      checkout = { sessions: { create: h.create, retrieve: h.retrieve } };
+      checkout = {
+        sessions: { create: h.create, retrieve: h.retrieve, expire: h.expire },
+      };
       billingPortal = { sessions: { create: h.portal } };
       webhooks = new RealStripe("sk_test_synthetic").webhooks;
     },
@@ -77,7 +80,7 @@ import { stripe } from "../src/lib/server/billing";
 
 beforeAll(async () => {
   h.db = new PGlite();
-  for (const name of ["001_initial.sql", "002_billing.sql"])
+  for (const name of ["001_initial.sql", "002_billing.sql", "007_plans.sql"])
     await h.db.exec(
       await readFile(new URL(`../db/${name}`, import.meta.url), "utf8"),
     );
@@ -100,11 +103,11 @@ beforeEach(async () => {
     GOOGLE_CLIENT_ID: "synthetic",
     GOOGLE_CLIENT_SECRET: "synthetic",
     STRIPE_SECRET_KEY: "sk_test_synthetic",
-    STRIPE_PRICE_ID: "price_sotto",
+    STRIPE_PRICE_SOLO_ID: "price_solo",
+    STRIPE_PRICE_DUO_ID: "price_sotto",
     STRIPE_WEBHOOK_SECRET: "whsec_synthetic",
     STRIPE_PORTAL_CONFIGURATION_ID: "bpc_sotto",
     STRIPE_MODE: "test",
-    PLAN_PRICE_CENTS: "900",
     TRIAL_REQUIRE_CARD: "false",
   }))
     vi.stubEnv(key, value);
@@ -138,6 +141,7 @@ beforeEach(async () => {
     return h.checkouts.get(opts.idempotencyKey);
   });
   h.retrieve.mockResolvedValue({
+    id: "cs_a",
     status: "open",
     url: "https://checkout.stripe.com/c/pay/synthetic",
   });
@@ -191,6 +195,49 @@ function event(id = "evt_a", live = false) {
   } as unknown as Stripe.Event;
 }
 describe("billing access and checkout recovery", () => {
+  it("uses the selected Solo price with a card and a three-day trial", async () => {
+    vi.stubEnv("TRIAL_REQUIRE_CARD", "true");
+    h.price.mockResolvedValue({
+      id: "price_solo",
+      active: true,
+      currency: "usd",
+      unit_amount: 500,
+      recurring: { interval: "month", interval_count: 1 },
+    });
+    await checkout("a", "solo");
+    expect(h.price).toHaveBeenCalledWith("price_solo");
+    const params = h.create.mock.calls[0][0];
+    expect(params.line_items).toEqual([{ price: "price_solo", quantity: 1 }]);
+    expect(params.payment_method_collection).toBe("always");
+    expect(params.subscription_data.trial_period_days).toBe(3);
+    expect(params.subscription_data.metadata.plan).toBe("solo");
+  });
+  it("rejects an arbitrary plan or a Solo checkout with two connected accounts", async () => {
+    await expect(checkout("a", "untrusted" as any)).rejects.toMatchObject({
+      status: 400,
+    });
+    await h.db.query(
+      "INSERT INTO accounts(id,email,name,token_cipher,workspace_id) VALUES('extra','extra@example.com','Work','synthetic','a')",
+    );
+    await expect(checkout("a", "solo")).rejects.toMatchObject({ status: 409 });
+    expect(h.create).not.toHaveBeenCalled();
+  });
+  it("expires an open checkout before switching plans, preserving retry safety", async () => {
+    await checkout("a", "duo");
+    h.price.mockResolvedValue({
+      active: true,
+      currency: "usd",
+      unit_amount: 500,
+      recurring: { interval: "month", interval_count: 1 },
+    });
+    expect(await checkout("a", "solo")).toBeNull();
+    expect(h.expire).toHaveBeenCalledWith("cs_a");
+    await checkout("a", "solo");
+    expect(h.create.mock.calls[1][0].line_items[0].price).toBe("price_solo");
+    expect(h.create.mock.calls[1][1].idempotencyKey).not.toBe(
+      h.create.mock.calls[0][1].idempotencyKey,
+    );
+  });
   it("stops access at the exact trial deadline and fails closed for non-paying states", () => {
     const end = Date.now() + 3 * 86400000;
     const access = {
@@ -239,6 +286,24 @@ describe("billing access and checkout recovery", () => {
     expect(h.checkouts.size).toBe(1);
     expect(h.create.mock.calls[0][1].idempotencyKey).toBe(
       h.create.mock.calls[1][1].idempotencyKey,
+    );
+  });
+  it("recovers and expires a lost checkout before retrying a different plan", async () => {
+    h.failSave = true;
+    await expect(checkout("a", "duo")).rejects.toThrow("Lost database");
+    h.price.mockResolvedValue({
+      active: true,
+      currency: "usd",
+      unit_amount: 500,
+      recurring: { interval: "month", interval_count: 1 },
+    });
+    expect(await checkout("a", "solo")).toBeNull();
+    expect(h.create.mock.calls[1]).toEqual(h.create.mock.calls[0]);
+    expect(h.expire).toHaveBeenCalledWith("cs_a");
+    await checkout("a", "solo");
+    expect(h.create.mock.calls[2][0].line_items[0].price).toBe("price_solo");
+    expect(h.create.mock.calls[2][1].idempotencyKey).not.toBe(
+      h.create.mock.calls[0][1].idempotencyKey,
     );
   });
   it("uses provider history to prevent a second trial even if the webhook was missed", async () => {
@@ -330,6 +395,29 @@ describe("signed events and provider-authoritative access", () => {
     await expect(processStripeEvent(event("evt_live", true))).rejects.toThrow(
       "environment mismatch",
     );
+  });
+  it("stores the verified plan and pauses an over-capacity downgrade until an account is disconnected", async () => {
+    const sub = subscription();
+    sub.items.data[0].price.id = "price_solo";
+    h.subscriptions = [sub];
+    await reconcileCustomer("cus_a");
+    expect(
+      (
+        await h.db.query(
+          "SELECT billing_plan,trial_used FROM workspaces WHERE id='a'",
+        )
+      ).rows[0],
+    ).toEqual({ billing_plan: "solo", trial_used: true });
+    await h.db.query(
+      "INSERT INTO accounts(id,email,name,token_cipher,workspace_id) VALUES('extra','extra@example.com','Work','synthetic','a')",
+    );
+    expect(await accountProcessingAllowed("gmail-a")).toBe(false);
+    await h.db.query("UPDATE accounts SET connected=false WHERE id='extra'");
+    expect(await accountProcessingAllowed("gmail-a")).toBe(true);
+    sub.items.data[0].price.id = "price_sotto";
+    await reconcileCustomer("cus_a");
+    await h.db.query("UPDATE accounts SET connected=true WHERE id='extra'");
+    expect(await accountProcessingAllowed("extra")).toBe(true);
   });
   it("verifies the raw request signature before touching billing state", async () => {
     const payload = JSON.stringify(event("evt_signed"));

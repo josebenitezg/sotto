@@ -142,6 +142,7 @@ async function contextFor(
     [accountId],
   );
   const context: Context = {
+    accountId,
     accountEmail: account.email,
     policy: account.policy,
     allowedSenders: rules.map((r) => r.sender),

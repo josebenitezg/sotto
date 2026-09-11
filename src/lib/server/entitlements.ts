@@ -1,11 +1,14 @@
 import { hosted } from "./config";
 import { query } from "./db";
 import { HttpError } from "./auth";
+import { mailboxLimit } from "../plans";
 export type Entitlement = {
   internal?: boolean;
   subscription_status: string;
   trial_end: Date | string | null;
   paid_until: Date | string | null;
+  billing_plan?: string;
+  connected_accounts?: number;
 };
 export function hasAccess(
   workspace: Entitlement | undefined,
@@ -13,6 +16,10 @@ export function hasAccess(
 ) {
   if (!workspace) return false;
   if (workspace.internal) return true;
+  if (
+    (workspace.connected_accounts ?? 0) > mailboxLimit(workspace.billing_plan)
+  )
+    return false;
   const end =
     workspace.subscription_status === "trialing"
       ? workspace.trial_end
@@ -24,7 +31,9 @@ export function hasAccess(
 export async function processingAllowed(workspaceId: string) {
   if (!hosted()) return true;
   const [workspace] = await query<Entitlement>(
-    "SELECT internal,subscription_status,trial_end,paid_until FROM workspaces WHERE id=$1",
+    `SELECT internal,subscription_status,trial_end,paid_until,billing_plan,
+      (SELECT count(*)::int FROM accounts WHERE workspace_id=workspaces.id AND connected=true) AS connected_accounts
+      FROM workspaces WHERE id=$1`,
     [workspaceId],
   );
   return hasAccess(workspace);
@@ -32,7 +41,9 @@ export async function processingAllowed(workspaceId: string) {
 export async function accountProcessingAllowed(accountId: string) {
   if (!hosted()) return true;
   const [workspace] = await query<Entitlement>(
-    "SELECT w.internal,w.subscription_status,w.trial_end,w.paid_until FROM workspaces w JOIN accounts a ON a.workspace_id=w.id WHERE a.id=$1",
+    `SELECT w.internal,w.subscription_status,w.trial_end,w.paid_until,w.billing_plan,
+      (SELECT count(*)::int FROM accounts WHERE workspace_id=w.id AND connected=true) AS connected_accounts
+      FROM workspaces w JOIN accounts a ON a.workspace_id=w.id WHERE a.id=$1`,
     [accountId],
   );
   return hasAccess(workspace);

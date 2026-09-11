@@ -75,6 +75,7 @@ beforeAll(async () => {
     "004_english_explanations.sql",
     "005_automatic_connection.sql",
     "006_composio.sql",
+    "007_plans.sql",
   ])
     await h.db.exec(
       await readFile(new URL(`../db/${f}`, import.meta.url), "utf8"),
@@ -111,7 +112,7 @@ beforeEach(async () => {
   vi.stubEnv("MAILBOX_WRITE_ACCOUNT_IDS", undefined);
   await h.db.exec("TRUNCATE workspaces CASCADE; TRUNCATE composio_cleanup");
   await h.db.query(
-    "INSERT INTO workspaces(id,email) VALUES('a','a@example.com'),('b','b@example.com')",
+    "INSERT INTO workspaces(id,email,billing_plan) VALUES('a','a@example.com','duo'),('b','b@example.com','duo')",
   );
   await h.db.query(
     "INSERT INTO accounts(id,email,name,token_cipher,workspace_id) VALUES('gmail-a','a@example.com','Trabajo','synthetic','a'),('gmail-b','b@example.com','Trabajo','synthetic','b')",
@@ -150,6 +151,20 @@ it("loads only the signed-in workspace, including decisions and sender rules", a
   expect((await dashboard()).accounts.map((x) => x.id)).toEqual(["gmail-b"]);
   h.cookie = "expired";
   expect((await dashboard()).accounts).toEqual([]);
+});
+it("reports expired access without hiding history or mailbox controls", async () => {
+  vi.stubEnv("BILLING_ENABLED", "true");
+  await h.db.query(
+    "UPDATE workspaces SET subscription_status='trialing',trial_end=now()-interval '1 second' WHERE id='a'",
+  );
+  const expired = await dashboard();
+  expect(expired.accessActive).toBe(false);
+  expect(expired.accounts.map((a) => a.id)).toEqual(["gmail-a"]);
+  expect(expired.decisions.map((d) => d.id)).toEqual(["d-a"]);
+  await h.db.query(
+    "UPDATE workspaces SET subscription_status='active',paid_until=now()+interval '1 day' WHERE id='a'",
+  );
+  expect((await dashboard()).accessActive).toBe(true);
 });
 it("displays an English explanation without changing its audit source and ignores stale translations", async () => {
   await h.db.query(
@@ -885,6 +900,24 @@ it("isolates a new signup and limits linked active mailboxes while allowing repl
       "a",
     ),
   ).rejects.toMatchObject({ status: 409 });
+});
+it("allows only one connected Gmail on Solo, then permits a second on Duo", async () => {
+  await h.db.query("UPDATE workspaces SET billing_plan='solo' WHERE id='a'");
+  await expect(
+    connectIdentity(
+      { sub: "extra", email: "extra@example.com" },
+      "synthetic",
+      "a",
+    ),
+  ).rejects.toMatchObject({ code: "account_limit" });
+  await h.db.query("UPDATE workspaces SET billing_plan='duo' WHERE id='a'");
+  expect(
+    await connectIdentity(
+      { sub: "extra", email: "extra@example.com" },
+      "synthetic",
+      "a",
+    ),
+  ).toBe("a");
 });
 
 it("starts filtering on explicitly authorized connections without a pretend review, and preserves old OAuth behavior", async () => {

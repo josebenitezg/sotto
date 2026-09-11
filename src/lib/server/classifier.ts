@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { emailAddress } from "./google";
 import { aiConnection } from "./ai";
+import { recordAiUsage } from "./ai-usage";
 import { ClassifierRateLimit, retryAfterSeconds } from "./processing-error";
 import type { Classification, Mail, Policy } from "../types";
 export const CLASSIFIER_POLICY_VERSION = "v2-campaigns";
@@ -20,6 +21,7 @@ const classificationSchema = z.object({
   protected: z.boolean(),
 });
 export type Context = {
+  accountId?: string;
   accountEmail: string;
   policy: Policy;
   allowedSenders: string[];
@@ -171,9 +173,11 @@ export async function classify(
   }
   if (!response.ok) throw new Error(`Classifier HTTP ${response.status}`);
   const data = (await response.json()) as {
+    usage?: unknown;
     status?: string;
     output?: { content?: { type: string; text?: string }[] }[];
   };
+  await recordAiUsage(context.accountId, connection.model, data.usage);
   if (data.status !== "completed") throw new Error("Incomplete classification");
   const output = data.output
     ?.flatMap((o) => o.content ?? [])

@@ -6,6 +6,7 @@ import { transaction } from "./db";
 import { ConnectionError } from "./connection-error";
 import { seal } from "./crypto";
 import type { ComposioConnection } from "./composio";
+import { mailboxLimit } from "../plans";
 
 // A verified Google identity can sign in to its existing workspace. Linking a
 // second inbox requires a browser-bound OAuth intent from that workspace.
@@ -68,7 +69,7 @@ export async function connectIdentity(
     const {
       rows: [workspace],
     } = await db.query(
-      "SELECT id,internal FROM workspaces WHERE id=$1 FOR UPDATE",
+      "SELECT id,internal,billing_plan FROM workspaces WHERE id=$1 FOR UPDATE",
       [workspaceId],
     );
     await db.query(
@@ -82,7 +83,8 @@ export async function connectIdentity(
         "SELECT count(*)::int AS n FROM accounts WHERE workspace_id=$1 AND connected=true",
         [workspaceId],
       );
-      if (count.n >= 2) throw new ConnectionError("account_limit", 409);
+      if (count.n >= mailboxLimit(workspace.billing_plan))
+        throw new ConnectionError("account_limit", 409);
     }
     if (!composio && !refreshToken && !existing?.token_cipher)
       throw new Error("Offline access missing");

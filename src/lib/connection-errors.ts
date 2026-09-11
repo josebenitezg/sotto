@@ -9,7 +9,7 @@ const messages = {
   not_allowed:
     "This Google account isn't enabled for the private pilot. Ask the Sotto owner to add it.",
   account_limit:
-    "Your plan includes up to two Gmail accounts. Disconnect an account before adding another.",
+    "Your plan's Gmail account limit has been reached. Change your plan in Pricing or disconnect an account before adding another.",
   workspace_conflict:
     "This Google account is already connected to another Sotto workspace.",
   data_deleted:

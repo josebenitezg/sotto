@@ -285,6 +285,18 @@ export function Workspace({
             {error}
           </p>
         ) : null}
+        {data.accessActive === false && (
+          <p
+            role="status"
+            className="mb-6 rounded-sm border px-3 py-2.5 text-[13px] leading-[18px]"
+          >
+            Filtering is paused until your plan is active.{" "}
+            <Link href="/pricing" className="underline underline-offset-2">
+              View your plan
+            </Link>
+            . Your history and Undo are still available.
+          </p>
+        )}
         {children}
       </main>
       <Toaster
@@ -379,15 +391,17 @@ function ConnectButton({ outline = false }: { outline?: boolean }) {
 }
 function Status({ account }: { account: Account }) {
   const {
-    data: { demo },
+    data: { demo, accessActive },
   } = useWorkspace();
   const label = !account.connected
     ? "Disconnected"
-    : account.lastError
-      ? "Needs attention"
-      : account.mode === "automatic" && !account.writesEnabled && !demo
-        ? "Filtering unavailable"
-        : modeLabels[account.mode];
+    : accessActive === false
+      ? "Plan paused"
+      : account.lastError
+        ? "Needs attention"
+        : account.mode === "automatic" && !account.writesEnabled && !demo
+          ? "Filtering unavailable"
+          : modeLabels[account.mode];
   const tone = !account.connected
     ? "text-muted-foreground"
     : label === "Filtering on"
@@ -788,7 +802,8 @@ function GmailFolderLink({ account }: { account: Account }) {
 
 function FilteringControls({ account }: { account: Account }) {
   const { data, act, busy } = useWorkspace();
-  const canFilter = data.demo || account.writesEnabled;
+  const canFilter =
+    data.demo || (account.writesEnabled && data.accessActive !== false);
   return (
     <div className="flex flex-wrap items-center gap-2">
       {account.mode === "automatic" ? (
@@ -832,7 +847,8 @@ function AccountRow({
   children?: ReactNode;
 }) {
   const { data, act, busy } = useWorkspace();
-  const canFilter = data.demo || account.writesEnabled;
+  const canFilter =
+    data.demo || (account.writesEnabled && data.accessActive !== false);
   return (
     <div className="px-4 py-4">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">

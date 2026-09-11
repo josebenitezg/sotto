@@ -62,6 +62,7 @@ export type Rule = {
   createdAt: string;
 };
 export type Dashboard = {
+  accessActive?: boolean;
   accounts: Account[];
   decisions: Decision[];
   rules: Rule[];

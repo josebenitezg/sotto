@@ -1,21 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import {
-  ArrowDown,
-  ArrowUpRight,
-  Check,
-  Inbox,
-  Mail,
-  RotateCcw,
-  Star,
-} from "lucide-react";
 import { SottoMark } from "./brand";
 
 const messages = [
   {
     id: "ana",
-    initials: "AM",
     from: "Ana Martínez",
     subject: "Our next step, together",
     preview: "Loved our conversation. Shall we pick it up tomorrow?",
@@ -24,7 +14,6 @@ const messages = [
   },
   {
     id: "growth",
-    initials: "G",
     from: "Growth Partners",
     subject: "Quick question about your growth",
     preview: "We help companies like yours book more meetings…",
@@ -32,8 +21,7 @@ const messages = [
     cold: true,
   },
   {
-    id: "equipo",
-    initials: "E",
+    id: "team",
     from: "Your team",
     subject: "Ready for your review",
     preview: "Here is the first version of the project.",
@@ -42,7 +30,6 @@ const messages = [
   },
   {
     id: "pipeline",
-    initials: "P",
     from: "Pipeline Studio",
     subject: "15 minutes this week?",
     preview: "Just following up on my previous email…",
@@ -54,25 +41,26 @@ const messages = [
 export function InboxPreview() {
   const [quiet, setQuiet] = useState(false);
   return (
-    <div className="inbox-demo" aria-label="Demo with sample emails">
-      <div className="demo-toolbar">
+    <div
+      className="overflow-hidden rounded-lg border bg-background-2"
+      aria-label="Demo with sample emails"
+    >
+      <div className="flex h-11 items-center justify-between border-b px-4 text-[13px]">
         <span className="flex items-center gap-2">
-          <Mail size={15} />
-          Your Gmail, with room.
+          Inbox
+          <span className="mono text-xs text-muted-foreground">
+            {quiet ? 2 : 4}
+          </span>
         </span>
-        <span className="demo-sample">Demo</span>
+        <span className="text-xs text-muted-foreground">Demo</span>
       </div>
-      <div className="demo-heading">
-        <span className="flex items-center gap-2">
-          <Inbox size={18} />
-          Inbox <span className="demo-count">{quiet ? 2 : 4}</span>
-        </span>
-        <span className="text-xs text-muted-foreground">Today</span>
-      </div>
-      <div className="demo-messages" data-quiet={quiet}>
+      <div
+        className="demo-messages relative h-64 overflow-hidden"
+        data-quiet={quiet}
+      >
         {messages.map((message, index) => (
           <div
-            className={`demo-message ${message.cold ? "demo-message-cold" : "demo-message-keep"}`}
+            className={`demo-message absolute inset-x-0 top-0 flex h-16 items-center gap-3 border-b px-4 ${message.cold ? "demo-message-cold" : "demo-message-keep"}`}
             key={message.id}
             style={
               {
@@ -82,73 +70,51 @@ export function InboxPreview() {
             }
             aria-hidden={quiet && message.cold}
           >
-            <span
-              className={`demo-avatar ${message.cold ? "demo-avatar-cold" : ""}`}
-            >
-              {message.initials}
-            </span>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-[13px] font-medium">
+              <div className="flex items-baseline justify-between gap-3">
+                <span
+                  className={`truncate text-[13px] ${message.cold ? "text-muted-foreground" : "font-medium"}`}
+                >
                   {message.from}
                 </span>
-                <span className="text-[10px] text-muted-foreground">
+                <span className="mono text-xs text-muted-foreground">
                   {message.time}
                 </span>
               </div>
-              <p className="truncate text-xs">{message.subject}</p>
-              <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+              <p className="truncate text-[13px] leading-[18px] text-muted-foreground">
+                <span className={message.cold ? "" : "text-foreground"}>
+                  {message.subject}
+                </span>
+                <span aria-hidden="true"> · </span>
                 {message.preview}
               </p>
             </div>
-            {!message.cold && (
-              <Star className="demo-star" size={13} aria-label="Starred" />
-            )}
           </div>
         ))}
-        <div className="demo-quiet-note" aria-hidden={!quiet}>
-          <Check size={16} />
-          <span>What matters stays here.</span>
-        </div>
-      </div>
-      <div className="demo-sotto-folder" data-active={quiet}>
-        <span className="flex items-center gap-2 font-medium">
-          <SottoMark className="size-5" /> Sotto / Cold
-        </span>
-        <span className="flex items-center gap-2 text-xs">
-          {quiet ? "2 emails set aside" : "No emails moved"}
-          <ArrowDown size={13} />
-        </span>
-      </div>
-      <div className="demo-action-row">
         <p
-          className="max-w-[200px] text-xs leading-5 text-muted-foreground"
-          aria-live="polite"
+          className="demo-quiet-note absolute inset-x-0 top-[152px] text-center text-[13px] text-muted-foreground"
+          aria-hidden={!quiet}
         >
-          {quiet
-            ? "Unsolicited pitches. Kept in Gmail, out of your way."
-            : "Two conversations. Two pitches you did not ask for."}
+          Two pitches moved to Sotto/Cold.
         </p>
+      </div>
+      <div className="flex items-center justify-between gap-4 px-4 py-3">
+        <span className="flex items-center gap-2 text-[13px] text-muted-foreground">
+          <SottoMark className="size-4" />
+          Sotto/Cold
+          <span className="mono text-xs" aria-live="polite">
+            {quiet ? 2 : 0}
+          </span>
+        </span>
         <button
           type="button"
-          className="demo-action pressable"
+          className="pressable h-8 rounded-sm border border-border px-3 text-[13px] transition-colors duration-[120ms] hover:border-border-hover hover:bg-gray-100"
           onClick={() => setQuiet(!quiet)}
           aria-pressed={quiet}
         >
-          {quiet ? (
-            <>
-              <RotateCcw size={14} />
-              See it again
-            </>
-          ) : (
-            <>
-              See it with Sotto
-              <ArrowUpRight size={15} />
-            </>
-          )}
+          {quiet ? "Undo" : "Filter"}
         </button>
       </div>
-      <p className="demo-caption">Sample inbox · not connected to your email</p>
     </div>
   );
 }

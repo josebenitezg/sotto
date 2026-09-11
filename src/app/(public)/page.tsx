@@ -1,34 +1,36 @@
 import Link from "next/link";
-import {
-  ArrowDown,
-  ArrowRight,
-  ArrowUpRight,
-  Check,
-  Github,
-  Undo2,
-} from "lucide-react";
-import { GoogleMark, SottoMark } from "@/components/brand";
+import { ArrowRight } from "lucide-react";
+import { GoogleMark } from "@/components/brand";
 import { InboxPreview } from "@/components/inbox-preview";
 import { GoogleDataNotice } from "@/components/google-data-notice";
 import { configured, isDemo } from "@/lib/server/config";
 import { sessionWorkspace } from "@/lib/server/auth";
 
+const steps = [
+  ["Connect Gmail", "Work, personal, or both."],
+  [
+    "Sotto filters",
+    "The last 7 days, then new mail. Uncertain messages stay in your inbox.",
+  ],
+  ["Check Sotto/Cold when you like", "Pause anytime. Undo any move."],
+];
+
 const questions = [
   [
     "Does Sotto replace Gmail?",
-    "No. Keep using Gmail as usual. Sotto moves unsolicited sales emails into a label you can check whenever you like.",
+    "No. Cold sales emails move to a label in Gmail. Everything else is untouched.",
   ],
   [
-    "How does it decide what to move?",
-    "AI considers each message, the conversation, and your preferences. Connecting starts filtering the last 7 days of your inbox, then new emails. Uncertain messages stay in your inbox.",
+    "How does it decide?",
+    "AI reads the message, the conversation, and your preferences. When in doubt, the email stays.",
   ],
   [
     "What if it moves something important?",
-    "See the reason for each decision, return the email to your inbox, and add the sender to your allowlist. Sotto does not delete messages or mark them as read.",
+    "Every move shows its reason. Return the email to your inbox and allow the sender in one step. Sotto never deletes or marks as read.",
   ],
   [
     "What happens to my data?",
-    "Sotto reads the email data needed for classification and sends a limited portion to the AI provider. It does not store full message bodies or open attachments. Our privacy policy explains the permissions, providers, and data we store.",
+    "Sotto reads what it needs to classify and sends a limited portion to the AI provider. Full bodies and attachments are not stored. See the privacy policy.",
   ],
 ];
 
@@ -36,181 +38,103 @@ export default async function LandingPage() {
   const ready = configured() && !isDemo();
   const signedIn = ready && !!(await sessionWorkspace());
   return (
-    <main id="content">
-      <section className="landing-hero">
-        <div className="hero-copy">
-          <div className="hero-eyebrow">
-            <span className="quiet-dot" />
-            Fewer cold emails. More calm.
-          </div>
-          <h1 className="display-title">
+    <main id="content" className="mx-auto w-full max-w-[1120px] px-6">
+      <section className="grid items-center gap-12 py-16 md:py-24 lg:grid-cols-[1fr_1.05fr] lg:gap-16">
+        <div className="max-w-[520px]">
+          <h1 className="text-[clamp(40px,5vw,60px)] leading-[1.02] font-semibold tracking-[-0.04em]">
             Your inbox,
             <br />
-            <em>a little quieter.</em>
+            <span className="text-muted-foreground">a little quieter.</span>
           </h1>
-          <p className="hero-description">
-            Keep the conversations that matter in view.
-            <br className="hidden lg:block" />
-            Give unsolicited pitches a place of their own.
-            <br />
-            Let Sotto take care of the noise.
+          <p className="mt-6 max-w-[42ch] text-base leading-6 text-muted-foreground">
+            Sotto moves cold sales emails out of your Gmail inbox and shows you
+            why. Everything else stays.
           </p>
           {signedIn ? (
-            <Link href="/review" className="google-cta pressable">
-              Open my inbox
+            <Link
+              href="/review"
+              className="pressable mt-8 inline-flex h-10 items-center gap-2 rounded-sm bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/85"
+            >
+              Open Sotto
               <ArrowRight size={16} />
             </Link>
           ) : (
             <form
               action="/api/google/connect"
               method="post"
-              className="hero-connect"
+              className="mt-8 max-w-[420px]"
             >
               <input type="hidden" name="intent" value="filter" />
-              <div className="mb-4 max-w-md">
-                <GoogleDataNotice id="hero-permission" />
-              </div>
               <button
                 type="submit"
-                className="google-cta pressable"
+                className="pressable inline-flex h-10 items-center gap-2.5 rounded-sm bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors duration-[120ms] hover:bg-primary/85 disabled:pointer-events-none disabled:opacity-50"
                 disabled={!ready}
-                aria-describedby="hero-permission hero-google-status"
+                aria-describedby="hero-permission hero-status"
               >
-                <span className="google-cta-icon">
-                  <GoogleMark />
-                </span>
+                <GoogleMark />
                 Connect with Google
-                <ArrowRight size={16} />
               </button>
+              <p
+                id="hero-status"
+                className="mt-3 text-xs text-muted-foreground"
+              >
+                {ready
+                  ? "For Gmail and Google Workspace."
+                  : "Google sign-in is coming soon."}
+              </p>
+              <div className="mt-4">
+                <GoogleDataNotice id="hero-permission" />
+              </div>
             </form>
           )}
-          <p id="hero-google-status" className="hero-footnote">
-            {ready
-              ? "For Gmail and Google Workspace."
-              : "Google sign-in is coming soon."}
-          </p>
-          <a href="#how-it-works" className="hero-discover">
-            A small change to your day
-            <ArrowDown size={14} />
-          </a>
         </div>
-        <div className="hero-product">
-          <div className="product-margin-note">
-            Not everything needs your attention.
-            <span aria-hidden="true">↴</span>
-          </div>
-          <InboxPreview />
-        </div>
+        <InboxPreview />
       </section>
-      <div className="landing-trust">
-        <span>
-          <SottoMark className="size-4" />
-          AI that considers the context
-        </span>
-        <span>
-          <Undo2 size={14} />
-          Every move can be undone
-        </span>
-        <a href="https://github.com/josebenitezg/sotto">
-          <Github size={14} />
-          Open source, inside and out <ArrowUpRight size={12} />
-        </a>
-      </div>
-      <section id="how-it-works" className="how-section">
-        <div className="section-intro">
-          <p className="section-kicker">Keep it simple</p>
-          <h2 className="display-heading">
-            A place for every email.
-            <br />
-            <em>A little room for you.</em>
-          </h2>
-        </div>
-        <div className="how-grid">
-          <article>
-            <span className="step-number">01</span>
-            <h3>Connect your Gmail.</h3>
-            <p>
-              Work, personal, or both. Your email stays right where it belongs.
-            </p>
-          </article>
-          <article>
-            <span className="step-number">02</span>
-            <h3>Let Sotto sort it.</h3>
-            <p>
-              AI checks the last 7 days of your inbox and keeps watching for new
-              mail. Uncertain messages stay in your inbox.
-            </p>
-          </article>
-          <article>
-            <span className="step-number">03</span>
-            <h3>Get back to your day.</h3>
-            <p>
-              Find cold outreach under Sotto/Cold in Gmail. Pause anytime, and
-              undo any move.
-            </p>
-          </article>
-        </div>
+
+      <section aria-labelledby="how" className="py-16 md:py-24">
+        <h2 id="how" className="text-2xl leading-8 font-semibold">
+          How it works
+        </h2>
+        <ol className="hairline mt-6 rounded-md border">
+          {steps.map(([title, detail], index) => (
+            <li
+              key={title}
+              className="grid gap-1 px-4 py-4 sm:grid-cols-[40px_1fr_1.4fr] sm:items-baseline sm:gap-4"
+            >
+              <span className="mono text-xs text-muted-foreground">
+                0{index + 1}
+              </span>
+              <span className="font-medium">{title}</span>
+              <span className="text-[13px] leading-[18px] text-muted-foreground">
+                {detail}
+              </span>
+            </li>
+          ))}
+        </ol>
       </section>
-      <section className="quiet-manifesto">
-        <SottoMark className="size-10" />
-        <p>
-          You already have an inbox.
-          <br />
-          Give yours room to
-          <em>breathe.</em>
-        </p>
-        <span>Fewer interruptions. The same Gmail.</span>
-      </section>
-      <section className="landing-bottom">
-        <div className="faq-section">
-          <p className="section-kicker">Before you begin</p>
-          <h2 className="display-heading">
-            A little clarity.
-            <br />
-            <em>A few answers.</em>
-          </h2>
-          <div className="faq-list">
-            {questions.map(([question, answer]) => (
-              <details key={question}>
-                <summary>
-                  {question}
-                  <span aria-hidden="true">+</span>
-                </summary>
-                <p>{answer}</p>
-              </details>
-            ))}
-          </div>
+
+      <section aria-labelledby="faq" className="pb-24">
+        <h2 id="faq" className="text-2xl leading-8 font-semibold">
+          Questions
+        </h2>
+        <div className="hairline mt-6 border-y">
+          {questions.map(([question, answer]) => (
+            <details key={question} className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-4 text-sm marker:hidden [&::-webkit-details-marker]:hidden">
+                {question}
+                <span
+                  aria-hidden="true"
+                  className="text-muted-foreground transition-transform duration-150 ease-(--ease-out) group-open:rotate-45"
+                >
+                  +
+                </span>
+              </summary>
+              <p className="max-w-[64ch] pb-5 text-[13px] leading-5 text-muted-foreground">
+                {answer}
+              </p>
+            </details>
+          ))}
         </div>
-        <aside className="landing-plan">
-          <SottoMark className="size-8" />
-          <p className="mt-5 text-sm">One plan. More room.</p>
-          <h2 className="display-heading mt-4">
-            3 days
-            <br />
-            <em>to try it out.</em>
-          </h2>
-          <ul className="my-6 space-y-3 text-sm">
-            {[
-              "Up to two Gmail accounts",
-              "Review and automatic filtering",
-              "Your email, under your control",
-            ].map((text) => (
-              <li key={text} className="flex items-center gap-2">
-                <Check size={15} />
-                {text}
-              </li>
-            ))}
-          </ul>
-          <Link href="/pricing" className="plan-link pressable">
-            Explore the plan
-            <ArrowUpRight size={16} />
-          </Link>
-          <p className="mt-4 text-xs leading-5 opacity-75">
-            We are getting access ready.
-            <br />
-            Your trial starts when you activate it.
-          </p>
-        </aside>
       </section>
     </main>
   );

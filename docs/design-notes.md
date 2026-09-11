@@ -1,14 +1,27 @@
-# Landing and login
+# Design notes
 
-The public entry point gives Sotto an editorial identity while retaining the quieter application design. Instrument Serif carries the large display text; Geist handles controls and the fictional inbox. All fonts are served locally. The warm canvas, green accent and restrained motion follow the app's existing principles.
+The 2026-09 redesign moved Sotto to a single dark theme, one typeface family, and roughly half the words. The rules live in [DESIGN.md](../DESIGN.md); this file records where they came from and what was consciously dropped.
 
-The interactive inbox is explicitly fictional. Its toggle shows how two unsolicited pitches move aside while two conversations remain. It is a client-only illustration and never reads Gmail. Keyboard focus, an announced result and reduced-motion behavior are included. Login readiness is server-derived; the page does not pretend Google is connected when credentials are absent.
+## Sources
 
-References consulted:
+- [Vercel design.md](https://vercel.com/design.md) and the [blog post on how agents use it](https://vercel.com/blog/how-our-agents-build-on-brand-pages-with-design-md). Borrowed: a priority order, observable rules instead of adjectives, a hard-reject list, and the split between judgment (markdown) and mechanics (CSS tokens).
+- [Vercel web interface guidelines](https://vercel.com/design/guidelines). Borrowed: hit targets, `:focus-visible`, `touch-action: manipulation`, `color-scheme: dark`, theme color meta, tabular numerals, ellipsis on in-progress labels, links are links.
+- [Geist colors](https://vercel.com/geist/colors). Borrowed: the 10-step gray scale and its role mapping (100 to 300 component backgrounds, 400 to 600 borders, 900 and 1000 text). Hex values are Sotto's own; they are not copied from Vercel.
+- [Emil Kowalski's skills](https://github.com/emilkowalski/skills), `emil-design-eng`, `animate`, and `review-animations`. Borrowed: the frequency test for whether to animate, duration table, `cubic-bezier(0.23, 1, 0.32, 1)` as the default ease-out, `scale(0.97)` press feedback, never `scale(0)`, exits faster than enters, hover gated to `(hover: hover)`, reduced motion keeps opacity and drops transforms.
+- [Ryo Lu](https://x.com/ryolu_): design as seeing the structure under the surface. Applied as: fewer surfaces, each one earned by a list, an overlay, or the demo.
 
-- [A1 typographic landings](https://www.a1.gallery/websites/typographic-landing): type hierarchy, generous spacing and a strong product-first composition.
-- [Linear](https://linear.app/): concise hierarchy and product demonstration.
-- [Mailman](https://mailmanhq.com/): explaining an email utility without presenting it as a replacement inbox.
-- The requested [X search](https://x.com/search?q=landing%20page&src=typeahead_click) could not be reliably loaded during this pass. No specific X post is claimed as a reference.
+## What was removed
 
-Public routes: `/`, `/login`, `/planes`, `/privacidad`. Review moves to `/revision`; the workspace requires a valid session except in explicitly enabled demo mode.
+- The light theme, the warm paper palette, the teal accent, and Instrument Serif.
+- The sidebar and the mobile bottom bar. Navigation is one tab row under a 56px header on every viewport.
+- The landing trust strip, manifesto, plan card, italic margin note, eyebrow, and discover link.
+- The login aside panel.
+- Description sentences under page titles, the "Always under your control" settings section, footnotes under lists, and the sidebar blurb.
+- Avatar squares and icon tiles in lists and empty states.
+
+## What was kept on purpose
+
+- The Google data notice next to every Connect button and the full privacy page. These are disclosures for Google's verification; they were restyled, not shortened.
+- The billing terms on the pricing page.
+- The landing demo and its toggle. It is the only choreographed motion and stays visibly fictional.
+- The `Start filtering` label and the "Moving emails is disabled for this account." message, which the write-gate test asserts.

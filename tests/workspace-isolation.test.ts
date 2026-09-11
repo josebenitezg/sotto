@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { createHmac } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import {
   beforeAll,
@@ -64,6 +65,7 @@ import { consumeMailbox } from "../src/lib/server/cloud-worker";
 import { AccountBusy } from "../src/lib/server/engine";
 import { POST as gmailEvent } from "../src/app/api/gmail/events/route";
 import { createSession } from "../src/lib/server/auth";
+import { POST as composioEvent } from "../src/app/api/composio/events/route";
 beforeAll(async () => {
   h.db = new PGlite();
   for (const f of [
@@ -72,6 +74,7 @@ beforeAll(async () => {
     "003_mailbox_deletion.sql",
     "004_english_explanations.sql",
     "005_automatic_connection.sql",
+    "006_composio.sql",
   ])
     await h.db.exec(
       await readFile(new URL(`../db/${f}`, import.meta.url), "utf8"),
@@ -106,7 +109,7 @@ beforeEach(async () => {
   }))
     vi.stubEnv(key, value);
   vi.stubEnv("MAILBOX_WRITE_ACCOUNT_IDS", undefined);
-  await h.db.exec("TRUNCATE workspaces CASCADE");
+  await h.db.exec("TRUNCATE workspaces CASCADE; TRUNCATE composio_cleanup");
   await h.db.query(
     "INSERT INTO workspaces(id,email) VALUES('a','a@example.com'),('b','b@example.com')",
   );
@@ -1042,4 +1045,165 @@ it("keeps activation durable after queue publication fails and refuses filtering
     (await h.db.query("SELECT account_id,processed_at FROM mailbox_events"))
       .rows,
   ).toEqual([{ account_id: "gmail-a", processed_at: null }]);
+});
+
+it("migrates a Google identity to Composio without losing history or allowing another workspace to claim it", async () => {
+  await h.db.query(
+    "UPDATE accounts SET mode='paused',history_id='9007199254740993',last_watch=now(),watch_expires=now()+interval '1 day' WHERE id='gmail-a'",
+  );
+  const connection = { id: "ca-a", userId: "sotto-private-a" };
+  await expect(
+    connectIdentity(
+      { sub: "gmail-a", email: "a@example.com" },
+      undefined,
+      "b",
+      new Date(),
+      false,
+      connection,
+    ),
+  ).rejects.toMatchObject({ status: 409 });
+  expect(
+    await connectIdentity(
+      { sub: "gmail-a", email: "a@example.com" },
+      undefined,
+      "a",
+      new Date(),
+      false,
+      connection,
+    ),
+  ).toBe("a");
+  expect(
+    (
+      await h.db.query(
+        "SELECT workspace_id,mode,history_id,token_cipher,mail_provider,composio_account_id,composio_user_id,last_watch,watch_expires FROM accounts WHERE id='gmail-a'",
+      )
+    ).rows,
+  ).toEqual([
+    {
+      workspace_id: "a",
+      mode: "paused",
+      history_id: "9007199254740993",
+      token_cipher: "",
+      mail_provider: "composio",
+      composio_account_id: "ca-a",
+      composio_user_id: "sotto-private-a",
+      last_watch: null,
+      watch_expires: null,
+    },
+  ]);
+  expect(
+    (await h.db.query("SELECT id FROM decisions WHERE account_id='gmail-a'"))
+      .rows,
+  ).toEqual([{ id: "d-a" }]);
+  expect(
+    (await h.db.query("SELECT id FROM sender_rules WHERE account_id='gmail-a'"))
+      .rows,
+  ).toEqual([{ id: "r-a" }]);
+  await connectIdentity(
+    { sub: "gmail-a", email: "a@example.com" },
+    undefined,
+    "a",
+    new Date(),
+    false,
+    { id: "ca-new", userId: "sotto-private-new" },
+  );
+  expect(
+    (await h.db.query("SELECT connection_id FROM composio_cleanup")).rows,
+  ).toEqual([{ connection_id: "ca-a" }]);
+});
+
+it("routes signed Composio events by connection and owner, retries queue failure and ignores paused or deleted accounts", async () => {
+  vi.stubEnv("COMPOSIO_WEBHOOK_SECRET", "synthetic-signing-secret");
+  vi.stubEnv("COMPOSIO_AUTH_CONFIG_ID", "ac-pilot");
+  await h.db.query(
+    "UPDATE accounts SET mail_provider='composio',composio_account_id='ca-a',composio_user_id='owner-a' WHERE id='gmail-a'",
+  );
+  const push = (user = "owner-a", config = "ac-pilot") => {
+    const raw = JSON.stringify({
+      type: "composio.trigger.message",
+      metadata: {
+        trigger_slug: "GMAIL_NEW_GMAIL_MESSAGE",
+        connected_account_id: "ca-a",
+        user_id: user,
+        auth_config_id: config,
+      },
+      data: { body: "never store this" },
+    });
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = createHmac("sha256", "synthetic-signing-secret")
+      .update(`delivery.${timestamp}.${raw}`)
+      .digest("base64");
+    return new Request("https://sotto.example/api/composio/events", {
+      method: "POST",
+      body: raw,
+      headers: {
+        "webhook-id": "delivery",
+        "webhook-timestamp": timestamp,
+        "webhook-signature": `v1,${signature}`,
+      },
+    });
+  };
+  expect((await composioEvent(push("owner-b"))).status).toBe(204);
+  expect((await composioEvent(push("owner-a", "ac-foreign"))).status).toBe(204);
+  expect(h.enqueue).not.toHaveBeenCalled();
+  h.enqueue.mockRejectedValueOnce(new Error("Queue temporarily unavailable"));
+  expect((await composioEvent(push())).status).toBe(503);
+  expect((await composioEvent(push())).status).toBe(204);
+  expect(h.enqueue.mock.calls).toEqual([
+    ["gmail-a", "composio:delivery"],
+    ["gmail-a", "composio:delivery"],
+  ]);
+  expect(
+    (await h.db.query("SELECT id,account_id,history_id FROM mailbox_events"))
+      .rows,
+  ).toEqual([
+    { id: "composio:delivery", account_id: "gmail-a", history_id: "0" },
+  ]);
+  h.enqueue.mockClear();
+  await h.db.query("UPDATE accounts SET mode='paused' WHERE id='gmail-a'");
+  expect((await composioEvent(push())).status).toBe(204);
+  expect(h.enqueue).not.toHaveBeenCalled();
+  h.gmail.mockRejectedValue(new Error("Provider unavailable"));
+  expect((await action(request(deletion))).status).toBe(200);
+  expect((await composioEvent(push())).status).toBe(204);
+  expect(h.enqueue).not.toHaveBeenCalled();
+  expect((await h.db.query("SELECT id FROM mailbox_events")).rows).toEqual([]);
+  expect(
+    (await h.db.query("SELECT connection_id FROM composio_cleanup")).rows,
+  ).toEqual([{ connection_id: "ca-a" }]);
+});
+
+it("disconnects Composio locally while retaining retryable revocation if the provider fails", async () => {
+  await h.db.query(
+    "UPDATE accounts SET mail_provider='composio',composio_account_id='ca-a',composio_user_id='owner-a',composio_trigger_id='ti-a' WHERE id='gmail-a'",
+  );
+  h.gmail.mockResolvedValue({
+    stop: vi.fn().mockRejectedValue(new Error("offline")),
+    revoke: vi.fn().mockRejectedValue(new Error("offline")),
+  });
+  expect(
+    (await action(request({ action: "disconnect", accountId: "gmail-a" })))
+      .status,
+  ).toBe(200);
+  expect(
+    (
+      await h.db.query(
+        "SELECT connected,composio_account_id,composio_user_id,composio_trigger_id FROM accounts WHERE id='gmail-a'",
+      )
+    ).rows,
+  ).toEqual([
+    {
+      connected: false,
+      composio_account_id: null,
+      composio_user_id: null,
+      composio_trigger_id: null,
+    },
+  ]);
+  expect(
+    (await h.db.query("SELECT connection_id FROM composio_cleanup")).rows,
+  ).toEqual([{ connection_id: "ca-a" }]);
+  expect(
+    (await h.db.query("SELECT id FROM decisions WHERE account_id='gmail-a'"))
+      .rows,
+  ).toEqual([{ id: "d-a" }]);
 });

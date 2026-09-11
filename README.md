@@ -6,7 +6,7 @@ Connect your work and personal Google accounts. The connection notice authorizes
 
 ## Status
 
-Early implementation. Self-hosted installations support one owner with multiple accounts. An optional hosted mode isolates each person’s workspace and adds subscription billing. The interface is in English. It includes OAuth connection, AI classification with per-account preferences, Pub/Sub event ingestion, durable processing, review mode, label changes and undo.
+Early implementation. Self-hosted installations support one owner with multiple accounts. An optional hosted mode isolates each person’s workspace and adds subscription billing. The interface is in English. It includes OAuth connection, AI classification with per-account preferences, Google Pub/Sub or Composio event ingestion, durable processing, review mode, label changes and undo.
 
 Local checks use synthetic messages, mocked Gmail calls and an embedded PostgreSQL engine. They do **not** certify live Google OAuth, Pub/Sub delivery, real-mail classification accuracy or deployment reliability. Run a review pilot on your installation before enabling writes. Public signup and payments are disabled by default. Hosted billing and signup require the additional setup in [billing](docs/billing.md).
 
@@ -23,7 +23,7 @@ Open [the landing](http://localhost:3000) or [the demo workspace](http://localho
 
 ## Run with Gmail
 
-You need PostgreSQL, a Google OAuth web client, Gmail API access and either an OpenAI API key or Vercel AI Gateway access. Pub/Sub is optional for a polling pilot and required for push delivery.
+You need PostgreSQL, an OpenAI API key, and either a managed Composio Gmail connection or your own Google OAuth web client. See [Composio setup](docs/composio.md) for managed connections. Direct Google connections use Gmail API access and optional Pub/Sub for push delivery. OpenAI is used directly by default.
 
 ```sh
 cp .env.example .env.local
@@ -48,14 +48,14 @@ See [setup](docs/setup.md) for Google configuration and [architecture](docs/arch
 - AI explicitly chooses keep, review or move based on meaning and your preferences. Confidence is informational; sender authentication and enabled categories still constrain moves.
 - Signup follow-ups and newsletters are separate, opt-in categories.
 - Gmail reads stay unread. No send, delete, spam or unsubscribe operations are implemented.
-- Messages go to `Sotto/Cold` or `Sotto/Lectura`, remain searchable and can be restored.
-- Automatic activation applies to newly arriving messages. It does not bulk-clean your old inbox.
+- Messages go to `Sotto/Cold` or `Sotto/Reading`, remain searchable and can be restored.
+- The initial scan covers the last seven days of Inbox, then continues with newly arriving messages. Reconnecting preserves existing decisions and history.
 
 ## Data and permissions
 
-Google's required `gmail.modify` scope also grants sending capability. Sotto does not implement sending, but this is a limitation of the granted scope, not a narrower permission guarantee.
+Direct Google connections request `gmail.modify`, which also grants sending capability. Composio managed connections may request full Gmail access, including permanent deletion. Sotto exposes only fixed reading and label operations; this is an application restriction, not a narrower Google permission guarantee. Review the actual consent screen.
 
-Credentials are encrypted at rest. The database contains account details, sender/subject metadata and decision history, but no full message bodies. Selected email text and account preferences are sent to OpenAI, directly or through Vercel AI Gateway, with `store:false`; this does not guarantee zero provider retention. See [security](SECURITY.md) and the installation's privacy page before connecting work email.
+Direct Google refresh tokens are encrypted in Sotto. With Composio, Google credentials are held by Composio and Sotto stores connection identifiers; Gmail data passes through that provider. The database contains account details, sender/subject metadata and decision history, but no full message bodies. Selected email text and account preferences are sent directly to OpenAI with `store:false`; this does not guarantee zero provider retention. See [security](SECURITY.md) and the installation's privacy page before connecting work email.
 
 ## Development
 

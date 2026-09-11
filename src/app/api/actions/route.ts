@@ -200,6 +200,11 @@ export async function POST(request: Request) {
             /* A damaged credential must not prevent local disconnection. */
           }
         }
+        if (account.composio_account_id)
+          await query(
+            "INSERT INTO composio_cleanup(connection_id) VALUES($1) ON CONFLICT DO NOTHING",
+            [account.composio_account_id],
+          );
         // Persist the local stop before any remote request can fail or time out.
         if (action.action === "deleteGmailData") {
           await transaction(async (db) => {
@@ -228,7 +233,7 @@ export async function POST(request: Request) {
           });
         } else {
           await query(
-            "UPDATE accounts SET connected=false,mode='paused',token_cipher='',watch_expires=NULL WHERE id=$1",
+            "UPDATE accounts SET connected=false,mode='paused',token_cipher='',watch_expires=NULL,composio_account_id=NULL,composio_user_id=NULL,composio_trigger_id=NULL WHERE id=$1",
             [accountId],
           );
         }
@@ -240,6 +245,11 @@ export async function POST(request: Request) {
           }
           try {
             await gmail.revoke();
+            if (account.composio_account_id)
+              await query(
+                "DELETE FROM composio_cleanup WHERE connection_id=$1",
+                [account.composio_account_id],
+              );
           } catch {
             /* Google permissions can also be revoked at myaccount.google.com. */
           }

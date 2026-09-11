@@ -18,10 +18,16 @@ export function configured() {
     "APP_URL",
     "ENCRYPTION_KEY",
     "ALLOWED_GOOGLE_EMAILS",
-    "GOOGLE_CLIENT_ID",
-    "GOOGLE_CLIENT_SECRET",
+    ...(composioEnabled()
+      ? [
+          "COMPOSIO_API_KEY",
+          "COMPOSIO_AUTH_CONFIG_ID",
+          "COMPOSIO_WEBHOOK_SECRET",
+        ]
+      : ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]),
   ].every((key) => !!process.env[key]?.trim());
 }
+export const composioEnabled = () => process.env.GMAIL_PROVIDER === "composio";
 export const isDemo = () => process.env.DEMO_MODE === "true";
 export const hosted = () => process.env.BILLING_ENABLED === "true";
 export const publicSignup = () =>

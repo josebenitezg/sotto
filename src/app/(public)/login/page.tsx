@@ -11,9 +11,10 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ connection_error?: string }>;
 }) {
-  if (!isDemo() && (await sessionWorkspace())) redirect("/review");
-  const ready = configured() && !isDemo();
   const { connection_error: error } = await searchParams;
+  if (!isDemo() && (await sessionWorkspace()))
+    redirect(error ? "/review?connection_error=1" : "/review");
+  const ready = configured() && !isDemo();
   return (
     <main
       id="content"

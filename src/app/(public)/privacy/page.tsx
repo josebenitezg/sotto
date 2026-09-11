@@ -28,36 +28,38 @@ export default function PrivacyPage() {
       </p>
       <h2>What we store</h2>
       <p className="text-muted-foreground">
-        The encrypted Google connection, rules, message identifiers, sender,
-        subject, and decision history. Sotto does not store full message bodies.
-        You can delete a Gmail connection's data from Accounts, as explained
-        below.
+        Connection identifiers, encrypted credentials for direct Google
+        connections, rules, message identifiers, sender, subject, and decision
+        history. Sotto does not store full message bodies. You can delete a
+        Gmail connection's data from Accounts, as explained below.
       </p>
       <h2 id="data-protection">How we protect Google user data</h2>
       <p className="text-muted-foreground">
         At sotto.email, we protect Google user data in transit with encrypted
         connections: HTTPS between your browser and Sotto and between our server
-        and Google or OpenAI, and TLS with certificate verification for our
-        database connection. Stored application data, including Gmail metadata
-        and decision history, is encrypted at rest by our database provider,
-        Neon, using AES-256 encryption.
+        and Google, Composio, or OpenAI, and TLS with certificate verification
+        for our database connection. Stored application data, including Gmail
+        metadata and decision history, is encrypted at rest by our database
+        provider, Neon, using AES-256 encryption.
       </p>
       <p className="text-muted-foreground">
-        Google refresh tokens receive an additional layer of encryption in Sotto
-        using AES-256-GCM, bound to the corresponding account. The encryption
-        key and provider API credentials are kept in private server environment
-        configuration, separate from the database, and are not included in
-        browser code or the public source repository. Sotto does not collect or
-        store your Google password.
+        For direct Google connections, refresh tokens receive an additional
+        layer of encryption in Sotto using AES-256-GCM, bound to the
+        corresponding account. The encryption key and provider API credentials
+        are kept in private server environment configuration, separate from the
+        database, and are not included in browser code or the public source
+        repository. Sotto does not collect or store your Google password.
       </p>
       <p className="text-muted-foreground">
         Access to mailbox data and controls requires an authenticated session.
         The server checks workspace ownership before returning mailbox data or
         accepting changes. Session cookies are Secure and HttpOnly, sessions
         expire, and session identifiers are stored as hashes in the database.
-        Google connections use PKCE and single-use, browser-bound authorization
-        state. Changes from the browser require an origin check, and Gmail
-        notification requests require a verified Google identity token.
+        Direct Google connections use PKCE and single-use, browser-bound
+        authorization state. Composio connections require the originating
+        browser to complete authorization before they can be used. Changes from
+        the browser require an origin check. Notifications require a verified
+        Google identity token or a valid Composio webhook signature.
       </p>
       <p className="text-muted-foreground">
         We also limit the data we retain: full message bodies are processed for
@@ -103,14 +105,24 @@ export default function PrivacyPage() {
       </p>
       <h2>Providers and retention</h2>
       <p className="text-muted-foreground">
-        Google manages Gmail access and change notifications. Vercel hosts Sotto
-        and its processing queue; Neon stores encrypted connections and
-        application records; OpenAI receives the data needed for classification.
-        These providers process information to deliver the service. We do not
-        send message bodies to the queue or the payment system.
+        Google provides Gmail. Connections through Composio use its managed
+        Google authorization: Composio stores the Google credentials and handles
+        Gmail reads, label changes, and new-message notifications on our behalf.
+        Gmail data passes through Composio; its project is configured not to
+        store request and response log data. This setting does not guarantee
+        zero retention of operational or security records. Existing direct
+        Google connections continue to use Google until reconnected. Vercel
+        hosts Sotto and its processing queue; Neon stores encrypted connections
+        and application records; OpenAI receives the data needed for
+        classification. These providers process information to deliver the
+        service. We do not send message bodies to the queue or the payment
+        system.
       </p>
       <p className="text-muted-foreground">
-        We retain the credential until you disconnect or delete Gmail data.
+        We retain the connection until you disconnect or delete Gmail data. For
+        Composio connections, Sotto stores an account identifier instead of a
+        Google refresh token. Disconnecting also requests revocation and
+        deletion at Composio; failed requests are retried during daily cleanup.
         History, preferences, and job identifiers are retained until you delete
         them: they support reviewing decisions, undoing moves, and avoiding
         duplicate processing. Disconnecting preserves this history; deleting
@@ -156,17 +168,20 @@ export default function PrivacyPage() {
       </p>
       <h2>The Google permission we request</h2>
       <p className="text-muted-foreground">
-        Google groups reading, modification, and sending within the permission
-        needed to change message labels. Sotto uses that access to read and
-        organize messages; it does not implement sending, deleting, or marking
-        messages as read.
+        Direct Google connections request gmail.modify, which includes reading,
+        modifying, and sending email. A managed Composio connection may request
+        full Gmail access, which also permits permanent deletion; the Google
+        consent screen shows the permission being granted. Sotto only uses fixed
+        operations for reading, labeling, and restoring messages. It does not
+        implement sending, deleting, or marking messages as read.
       </p>
       <h2>Pausing or disconnecting</h2>
       <p className="text-muted-foreground">
         You can pause an account, disconnect it, or revoke access from your
         Google Account. Disconnecting stops processing and deletes its local
-        credential, even if Google does not respond to the revocation request.
-        You can check or revoke that permission directly in{" "}
+        credential or provider connection identifier, even if the provider does
+        not respond to the revocation request. You can check or revoke that
+        permission directly in{" "}
         <a
           href="https://myaccount.google.com/connections"
           className="underline underline-offset-4"

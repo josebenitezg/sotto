@@ -194,50 +194,97 @@
 }
 
 /*
-  Landing demo. The only choreographed motion in the product. Rows are
-  absolutely positioned so the survivors can slide up with a transform.
-  The kicked row dissolves through a 4px dot grid: --dot is the hole radius.
-  The mask colors are geometry, not palette.
+  Landing demo. The one choreographed motion in the product. Rows are
+  absolutely positioned so survivors slide with transforms only. A cold
+  row leaves its inbox slot by dissolving through a 4px dot grid (--dot is
+  the visible dot radius: 3px covers a cell, 0px is gone) and a second copy
+  dissolves in under the Sotto/Cold group. The mask colors are alpha, not
+  palette.
 */
 @property --dot {
   syntax: "<length>";
   inherits: false;
-  initial-value: 0px;
+  initial-value: 3px;
 }
-.demo-row {
+.demo-row,
+.demo-group {
   position: absolute;
   inset-inline: 0;
+  cursor: default;
+}
+.demo-row {
   height: 56px;
-  --dot: 0px;
-  mask-image: radial-gradient(
+  --dot: 3px;
+  -webkit-mask-image: radial-gradient(
     circle,
-    transparent var(--dot),
-    #000 calc(var(--dot) + 0.5px)
+    #000 var(--dot),
+    transparent var(--dot)
   );
+  mask-image: radial-gradient(circle, #000 var(--dot), transparent var(--dot));
+  -webkit-mask-size: 4px 4px;
   mask-size: 4px 4px;
   transition:
-    transform 320ms var(--ease-in-out) 120ms,
-    opacity 200ms var(--ease-out),
-    --dot 400ms var(--ease-out);
+    transform 320ms var(--ease-in-out) 160ms,
+    --dot 200ms var(--ease-out) 80ms,
+    visibility 0s linear 0s;
 }
-.demo-row[data-gone="true"] {
-  --dot: 3px;
-  opacity: 0;
+.demo-group {
+  height: 40px;
+  transition: transform 320ms var(--ease-in-out) 160ms;
+}
+/* Out of the inbox: the dissolve is the exit, 120ms after the line arrives. */
+.demo-row[data-out="true"] {
+  --dot: 0px;
+  visibility: hidden;
   pointer-events: none;
   transition:
-    transform 400ms var(--ease-out),
-    opacity 160ms var(--ease-out) 240ms,
-    --dot 400ms var(--ease-out);
+    transform 320ms var(--ease-in-out) 160ms,
+    --dot 240ms var(--ease-out) 120ms,
+    visibility 0s linear 360ms;
+}
+/* The copy under Sotto/Cold: hidden until its inbox row has left. */
+.demo-row[data-in] {
+  --dot: 0px;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 320ms var(--ease-in-out) 160ms,
+    --dot 200ms var(--ease-out),
+    visibility 0s linear 200ms;
+}
+.demo-row[data-in="true"] {
+  --dot: 3px;
+  visibility: visible;
+  transition:
+    transform 320ms var(--ease-in-out) 160ms,
+    --dot 320ms var(--ease-out) 320ms,
+    visibility 0s linear 320ms;
 }
 .demo-line {
-  transform: translateY(calc(var(--scan) * 280px));
+  transform: translateY(var(--scan, 0px));
   opacity: 0;
   transition:
     transform 120ms var(--ease-out),
-    opacity 200ms ease;
+    opacity 160ms var(--ease-out);
 }
-.demo-line[data-active="true"] {
+.demo-list[data-line="true"] .demo-line {
   opacity: 1;
+}
+.demo-list[data-sweeping="true"] .demo-line {
+  transition-property: opacity;
+}
+/* Engines without registered properties get a plain fade instead of dots. */
+.demo[data-no-dither="true"] .demo-row {
+  -webkit-mask-image: none;
+  mask-image: none;
+  transition:
+    transform 320ms var(--ease-in-out) 160ms,
+    opacity 200ms var(--ease-out),
+    visibility 0s linear 200ms;
+}
+.demo[data-no-dither="true"] .demo-row[data-out="true"],
+.demo[data-no-dither="true"] .demo-row[data-in="false"] {
+  opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -253,11 +300,23 @@
   .pressable:active {
     transform: none;
   }
+  /* Reduced motion: rows jump into place; only opacity changes over time. */
   .demo-row,
-  .demo-row[data-gone="true"] {
-    transition-property: opacity;
-    transition-duration: 200ms;
-    transition-delay: 0ms;
+  .demo-row[data-out="true"],
+  .demo-row[data-in],
+  .demo-row[data-in="true"] {
+    -webkit-mask-image: none;
+    mask-image: none;
+    transition:
+      opacity 160ms var(--ease-out),
+      visibility 0s linear 160ms;
+  }
+  .demo-group {
+    transition: none;
+  }
+  .demo-row[data-out="true"],
+  .demo-row[data-in="false"] {
+    opacity: 0;
   }
   .demo-line {
     display: none;

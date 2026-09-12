@@ -1,3 +1,4 @@
+import { User } from "lucide-react";
 import type { Viewer } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -9,7 +10,7 @@ export function Avatar({
   viewer: Pick<Viewer, "email" | "name" | "picture">;
   className?: string;
 }) {
-  const label = viewer.name || viewer.email;
+  const initial = (viewer.name || viewer.email || "").slice(0, 1);
   return viewer.picture ? (
     // Google avatar URLs are not on an allowlisted next/image host; a plain
     // img with no referrer is what Google expects for these.
@@ -33,7 +34,7 @@ export function Avatar({
         className,
       )}
     >
-      {label.slice(0, 1)}
+      {initial || <User size={14} strokeWidth={1.75} />}
     </span>
   );
 }

@@ -43,6 +43,13 @@ it("falls back to an initial when there is no picture", () => {
   expect(html).toMatch(/aria-hidden="true"[^>]*>o</);
 });
 
+it("never borrows another address when the identity has none", () => {
+  const html = shell({ viewer: { email: null, name: null, picture: null } });
+  expect(html).toContain('aria-label="Account"');
+  expect(html).not.toContain("owner@");
+  expect(html).not.toContain('alex@studio.example"</span>');
+});
+
 it("keeps a plain Sign out when the session has no viewer", () => {
   const html = shell({ viewer: null });
   expect(html).toContain(">Sign out<");

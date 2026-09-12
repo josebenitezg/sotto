@@ -20,12 +20,17 @@ export async function sessionWorkspace(): Promise<string | null> {
   );
   return session?.workspace_id ?? null;
 }
-/** Who is signed in, for the header. Falls back to the workspace's own address. */
+/**
+ * Who is signed in, for the header. Sessions from before identities were
+ * recorded fall back to the workspace's own address. A session whose identity
+ * has since deleted its Gmail data shows no address at all, never another
+ * account's.
+ */
 export async function sessionViewer(): Promise<Viewer | null> {
   const value = (await cookies()).get(sessionCookie)?.value;
   if (!value) return null;
   const [row] = await query(
-    `SELECT w.email AS workspace_email,i.name,i.picture,a.email
+    `SELECT s.identity_id,w.email AS workspace_email,i.name,i.picture,a.email
      FROM sessions s JOIN workspaces w ON w.id=s.workspace_id
      LEFT JOIN workspace_identities i ON i.id=COALESCE(
        s.identity_id,
@@ -36,7 +41,7 @@ export async function sessionViewer(): Promise<Viewer | null> {
   );
   if (!row) return null;
   return {
-    email: row.email ?? row.workspace_email,
+    email: row.email ?? (row.identity_id ? null : row.workspace_email),
     name: row.name ?? null,
     picture: row.picture ?? null,
   };

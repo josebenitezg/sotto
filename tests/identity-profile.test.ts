@@ -101,6 +101,35 @@ it("shows the signed-in identity's name and picture, and falls back to the addre
   expect(await sessionViewer()).toBeNull();
 });
 
+it("shows no address once the signed-in identity's Gmail data is deleted", async () => {
+  const workspace = await connectIdentity(
+    {
+      sub: "id-owner",
+      email: "owner@corp.example",
+      name: "Owner",
+      picture: "https://lh3.googleusercontent.com/a/owner2",
+    },
+    "refresh",
+    null,
+  );
+  await connectIdentity(
+    { sub: "id-second", email: "second@corp.example", name: "Second" },
+    "refresh",
+    workspace,
+  );
+  h.cookie = await createSession(workspace, "id-second");
+  // What the deletion action leaves behind for that identity.
+  await h.db.query("DELETE FROM accounts WHERE id='id-second'");
+  await h.db.query(
+    "UPDATE workspace_identities SET name=NULL,picture=NULL,gmail_deleted_at=now() WHERE id='id-second'",
+  );
+  expect(await sessionViewer()).toEqual({
+    email: null,
+    name: null,
+    picture: null,
+  });
+});
+
 it("does not erase a stored profile when a later connection has none", async () => {
   const workspace = await connectIdentity(
     {

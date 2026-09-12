@@ -70,7 +70,8 @@ export type MailAllowance = {
   exhausted: boolean;
 };
 export type Viewer = {
-  email: string;
+  /** Null when the signed-in identity's Gmail data was deleted. */
+  email: string | null;
   name: string | null;
   picture: string | null;
 };

@@ -39,9 +39,9 @@ Dark only. `<html class="dark">`, `color-scheme: dark`, theme color `#000000`. D
 
 Canvas and surfaces:
 
-| Token            | Value     | Use                                        |
-| ---------------- | --------- | ------------------------------------------ |
-| `--background`   | `#000000` | Page canvas                                |
+| Token            | Value     | Use                              |
+| ---------------- | --------- | -------------------------------- |
+| `--background`   | `#000000` | Page canvas                      |
 | `--background-2` | `#0a0a0a` | Sheets, dialogs, popovers, menus |
 
 Gray scale (component roles):
@@ -111,6 +111,7 @@ The page is one continuous black canvas. Earn a surface only for:
 
 - A list. Lists are the primary composition: a single 1px border around the group, hairline dividers between rows, no card per row.
 - An overlay: sheet, dialog, select menu, toast.
+- The landing demo, which reuses the list surface.
 
 Never nest a bordered box in a bordered box. Never place two bordered sections directly under each other without a heading or 24px between them. Never use a card to hold one paragraph.
 
@@ -152,15 +153,18 @@ All controls are shadcn/Radix from `src/components/ui`. Variants are fixed; do n
 
 Default to stillness. Only `transform`, `opacity`, and `clip-path` animate. Never `transition: all`. Never animate anything triggered by a keyboard shortcut or a page navigation.
 
-| What                 | Duration | Easing                                        |
-| -------------------- | -------- | --------------------------------------------- |
-| Press feedback       | 160ms    | `--ease-out` `cubic-bezier(0.23, 1, 0.32, 1)` |
-| Hover color          | 120ms    | `ease`                                        |
-| Select menu, popover | 150ms    | `--ease-out`, origin at trigger               |
-| Sheet, dialog enter  | 200ms    | `--ease-out`                                  |
-| Sheet, dialog exit   | 160ms    | `--ease-out`                                  |
+| What                      | Duration | Easing                                                                               |
+| ------------------------- | -------- | ------------------------------------------------------------------------------------ |
+| Press feedback            | 160ms    | `--ease-out` `cubic-bezier(0.23, 1, 0.32, 1)`                                        |
+| Hover color               | 120ms    | `ease`                                                                               |
+| Select menu, popover      | 150ms    | `--ease-out`, origin at trigger                                                      |
+| Sheet, dialog enter       | 200ms    | `--ease-out`                                                                         |
+| Sheet, dialog exit        | 160ms    | `--ease-out`                                                                         |
+| Demo row kicked (landing) | 400ms    | `--ease-out`; 32px translate plus dot-grid dissolve, opacity drops in the last 160ms |
+| Demo rows closing the gap | 320ms    | `--ease-in-out`, starts 120ms after the kick                                         |
+| Demo reading line sweep   | 1800ms   | ease-in-out in JS; the one marketing-length motion, plays once                       |
 
-Enter from `scale(0.97)` and `opacity: 0`, never from `scale(0)`. Exits are faster than enters. Hover motion is gated behind `@media (hover: hover) and (pointer: fine)`. Under `prefers-reduced-motion`, keep opacity and color changes and remove every transform.
+Enter from `scale(0.97)` and `opacity: 0`, never from `scale(0)`. Exits are faster than enters. Hover motion is gated behind `@media (hover: hover) and (pointer: fine)`. Under `prefers-reduced-motion`, keep opacity and color changes and remove every transform. The landing demo is the one exception to stillness: it plays once, it is labeled Demo, and under reduced motion it renders its final state with opacity only.
 
 ## States
 
@@ -175,7 +179,7 @@ Every surface designs all of these before shipping:
 
 ## Page compositions
 
-**Landing.** One screen. Header (wordmark, Pricing, Sign in). Left: display headline, one sentence, Connect with Google (Open Sotto when signed in), the data notice, and a readiness line only when sign-in is off. Right: the demo, which is the how-it-works. Footer with Terms, Privacy, GitHub. Nothing else: no steps, no questions, no trust strip, no manifesto, no plan card. On a phone the demo sits below the button, one swipe down.
+**Landing.** One screen. Header (wordmark, Pricing, Sign in). Two columns above 1024px, stacked below. Left: display headline in one color, "Cold sales emails, out of your inbox.", one sentence, Connect with Google (Open Sotto when signed in), a readiness line only when sign-in is off, the data notice. Right: the demo, a fictional inbox in the app's own list surface, labeled Demo, that filters itself: a reading line sweeps down once on load, each cold row it passes slides 32px right and dissolves through a 4px dot grid while the rows below close the gap; with a mouse the line follows the cursor and moving back up restores the rows, which is the undo; Replay for touch and keyboard. Footer with Terms, Privacy, GitHub. Nothing else: no steps, no questions, no trust strip, no plan card.
 
 **Login.** Centered 360px column: mark, title Sign in, one sentence saying which account to use, Connect with Google, the data notice. Connection errors appear above the button. The wordmark is the way back.
 

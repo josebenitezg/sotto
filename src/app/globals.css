@@ -193,6 +193,53 @@
   }
 }
 
+/*
+  Landing demo. The only choreographed motion in the product. Rows are
+  absolutely positioned so the survivors can slide up with a transform.
+  The kicked row dissolves through a 4px dot grid: --dot is the hole radius.
+  The mask colors are geometry, not palette.
+*/
+@property --dot {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+.demo-row {
+  position: absolute;
+  inset-inline: 0;
+  height: 56px;
+  --dot: 0px;
+  mask-image: radial-gradient(
+    circle,
+    transparent var(--dot),
+    #000 calc(var(--dot) + 0.5px)
+  );
+  mask-size: 4px 4px;
+  transition:
+    transform 320ms var(--ease-in-out) 120ms,
+    opacity 200ms var(--ease-out),
+    --dot 400ms var(--ease-out);
+}
+.demo-row[data-gone="true"] {
+  --dot: 3px;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 400ms var(--ease-out),
+    opacity 160ms var(--ease-out) 240ms,
+    --dot 400ms var(--ease-out);
+}
+.demo-line {
+  transform: translateY(calc(var(--scan) * 280px));
+  opacity: 0;
+  transition:
+    transform 120ms var(--ease-out),
+    opacity 200ms ease;
+}
+.demo-line[data-active="true"] {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -205,5 +252,14 @@
   }
   .pressable:active {
     transform: none;
+  }
+  .demo-row,
+  .demo-row[data-gone="true"] {
+    transition-property: opacity;
+    transition-duration: 200ms;
+    transition-delay: 0ms;
+  }
+  .demo-line {
+    display: none;
   }
 }

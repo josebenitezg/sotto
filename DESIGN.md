@@ -42,7 +42,7 @@ Canvas and surfaces:
 | Token            | Value     | Use                                        |
 | ---------------- | --------- | ------------------------------------------ |
 | `--background`   | `#000000` | Page canvas                                |
-| `--background-2` | `#0a0a0a` | Header, sheets, popovers, the landing demo |
+| `--background-2` | `#0a0a0a` | Sheets, dialogs, popovers, menus |
 
 Gray scale (component roles):
 
@@ -75,17 +75,17 @@ Rules:
 
 ## Typography
 
-Geist Sans for everything readable. Geist Mono for email addresses, timestamps, counts, and identifiers. Nothing else.
+Geist Sans for everything readable. Geist Mono for email addresses, timestamps, counts, and identifiers. Nothing else. The wordmark is the lowercase logotype "sotto"; prose always says Sotto.
 
-| Role    | Size/line                | Weight | Tracking | Use                                            |
-| ------- | ------------------------ | ------ | -------- | ---------------------------------------------- |
-| display | 48/52 to 64/64 (`clamp`) | 600    | -0.04em  | Landing headline only                          |
-| title   | 24/32                    | 600    | -0.02em  | Page title, one per page                       |
-| heading | 14/20                    | 500    | 0        | Section labels, sheet titles, row primary line |
-| body    | 14/20                    | 400    | 0        | Everything by default                          |
-| small   | 13/18                    | 400    | 0        | Secondary line in a row, notices               |
-| caption | 12/16                    | 400    | 0        | Footers, timestamps, tab counts                |
-| mono    | 13/18                    | 400    | 0        | Addresses, times, counts (`tabular-nums`)      |
+| Role    | Size/line                | Weight | Tracking | Use                                                                             |
+| ------- | ------------------------ | ------ | -------- | ------------------------------------------------------------------------------- |
+| display | 48/52 to 64/64 (`clamp`) | 600    | -0.04em  | Landing headline only                                                           |
+| title   | 24/32                    | 600    | -0.02em  | Page title, one per page                                                        |
+| heading | 14/20                    | 500    | 0        | Section labels, sheet titles, row primary line                                  |
+| body    | 14/20                    | 400    | 0        | Everything by default                                                           |
+| small   | 13/18                    | 400    | 0        | Secondary line in a row, notices. Utility `text-small`; never spell 13px inline |
+| caption | 12/16                    | 400    | 0        | Footers, timestamps, tab counts                                                 |
+| mono    | 13/18                    | 400    | 0        | Addresses, times, counts (`tabular-nums`)                                       |
 
 Headings use `text-wrap: balance`. Body uses `text-wrap: pretty`. Reading width is 60 to 68 characters; the privacy page is the only long-form surface.
 
@@ -103,7 +103,7 @@ Scale: 4, 8, 12, 16, 24, 32, 48, 64. Within a group use 4 to 12. Between groups 
 
 Header height is 56px on every surface. Workspace navigation is a horizontal tab row under the header, on every viewport. Tabs scroll horizontally on small screens with the scrollbar hidden. There is no sidebar and no bottom bar.
 
-Radius: 6px controls (`--radius-sm`), 8px surfaces (`--radius-md`), 12px large framed objects such as the landing demo (`--radius-lg`). A child's radius is never larger than its parent's.
+Radius: 6px controls (`--radius-sm`), 8px surfaces (`--radius-md`), 12px reserved for large framed objects (`--radius-lg`, currently unused). A child's radius is never larger than its parent's.
 
 ## Surfaces
 
@@ -111,7 +111,6 @@ The page is one continuous black canvas. Earn a surface only for:
 
 - A list. Lists are the primary composition: a single 1px border around the group, hairline dividers between rows, no card per row.
 - An overlay: sheet, dialog, select menu, toast.
-- The landing demo.
 
 Never nest a bordered box in a bordered box. Never place two bordered sections directly under each other without a heading or 24px between them. Never use a card to hold one paragraph.
 
@@ -143,6 +142,8 @@ All controls are shadcn/Radix from `src/components/ui`. Variants are fixed; do n
 
 **Toast.** Sonner, bottom right, `--background-2`, 1px border. 2 to 5 words, no description.
 
+**Error and notice text.** Plain text, 13/18, no box. Errors in `--destructive` next to the control that caused them, page-level ones above the content. Borders are for lists and overlays only.
+
 **Empty state.** Inside the list surface. Title 14/20 medium, one sentence 13/18 `--gray-900`. No icon tile.
 
 **Progress.** 2px track `--gray-300`, fill `--gray-1000`. One line of mono text above it.
@@ -151,14 +152,13 @@ All controls are shadcn/Radix from `src/components/ui`. Variants are fixed; do n
 
 Default to stillness. Only `transform`, `opacity`, and `clip-path` animate. Never `transition: all`. Never animate anything triggered by a keyboard shortcut or a page navigation.
 
-| What                 | Duration | Easing                                            |
-| -------------------- | -------- | ------------------------------------------------- |
-| Press feedback       | 160ms    | `--ease-out` `cubic-bezier(0.23, 1, 0.32, 1)`     |
-| Hover color          | 120ms    | `ease`                                            |
-| Select menu, popover | 150ms    | `--ease-out`, origin at trigger                   |
-| Sheet, dialog enter  | 200ms    | `--ease-out`                                      |
-| Sheet, dialog exit   | 160ms    | `--ease-out`                                      |
-| Landing demo rows    | 240ms    | `--ease-in-out` `cubic-bezier(0.77, 0, 0.175, 1)` |
+| What                 | Duration | Easing                                        |
+| -------------------- | -------- | --------------------------------------------- |
+| Press feedback       | 160ms    | `--ease-out` `cubic-bezier(0.23, 1, 0.32, 1)` |
+| Hover color          | 120ms    | `ease`                                        |
+| Select menu, popover | 150ms    | `--ease-out`, origin at trigger               |
+| Sheet, dialog enter  | 200ms    | `--ease-out`                                  |
+| Sheet, dialog exit   | 160ms    | `--ease-out`                                  |
 
 Enter from `scale(0.97)` and `opacity: 0`, never from `scale(0)`. Exits are faster than enters. Hover motion is gated behind `@media (hover: hover) and (pointer: fine)`. Under `prefers-reduced-motion`, keep opacity and color changes and remove every transform.
 

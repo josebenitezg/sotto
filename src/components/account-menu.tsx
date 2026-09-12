@@ -25,9 +25,7 @@ export function AccountMenu({ viewer }: { viewer: Viewer }) {
       <DropdownMenuContent>
         <DropdownMenuLabel className="flex flex-col gap-0.5">
           {viewer.name ? (
-            <span className="text-[13px] leading-[18px] text-foreground">
-              {viewer.name}
-            </span>
+            <span className="text-small text-foreground">{viewer.name}</span>
           ) : null}
           <span className="mono truncate">{viewer.email}</span>
         </DropdownMenuLabel>

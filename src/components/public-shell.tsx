@@ -32,14 +32,14 @@ export function PublicHeader({
         {inApp ? null : (
           <Link
             href="/pricing"
-            className="flex h-8 items-center rounded-sm px-3 text-[13px] text-muted-foreground transition-colors duration-[120ms] hover:text-foreground"
+            className="flex h-9 items-center rounded-sm px-3 text-small text-muted-foreground transition-colors duration-[120ms] hover:text-foreground"
           >
             Pricing
           </Link>
         )}
         <Link
           href={inApp ? "/review" : "/login"}
-          className="flex h-8 items-center rounded-sm border border-border px-3 text-[13px] text-foreground transition-colors duration-[120ms] hover:border-border-hover hover:bg-gray-100"
+          className="flex h-9 items-center rounded-sm border border-border px-3 text-small text-foreground transition-colors duration-[120ms] hover:border-border-hover hover:bg-gray-100"
         >
           {inApp ? "Open Sotto" : "Sign in"}
         </Link>
@@ -55,11 +55,7 @@ export function PublicHeader({
 
 export function PublicFooter() {
   return (
-    <footer className="mx-auto flex w-full max-w-[1120px] flex-wrap items-center justify-between gap-4 px-6 py-8 text-xs text-muted-foreground">
-      <span className="inline-flex items-center gap-2">
-        <SottoMark className="size-4" />
-        Sotto
-      </span>
+    <footer className="mx-auto flex w-full max-w-[1120px] items-center justify-end px-6 py-8 text-xs text-muted-foreground">
       <nav aria-label="Footer" className="flex items-center gap-6">
         <Link
           href="/terms"

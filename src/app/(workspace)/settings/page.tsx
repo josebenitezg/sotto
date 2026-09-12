@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { BillingAction } from "@/components/billing-action";
 import { Button } from "@/components/ui/button";
-import { SettingsPage } from "@/components/workspace";
+import { SectionLabel, SettingsPage } from "@/components/workspace";
 import { isPlanId, mailboxLimit, plans } from "@/lib/plans";
 import { sessionWorkspace } from "@/lib/server/auth";
 import { workspaceAllowance } from "@/lib/server/allowances";
@@ -73,16 +73,11 @@ export default async function Page() {
                   }`
                 : "Processing is paused. Your history, Undo and Disconnect remain available.";
   const subscription = workspace ? (
-    <section aria-labelledby="subscription-heading" className="mb-10">
-      <h2
-        id="subscription-heading"
-        className="mb-3 text-[13px] leading-[18px] font-medium text-muted-foreground"
-      >
-        Subscription
-      </h2>
+    <section aria-labelledby="subscription-heading" className="mb-12">
+      <SectionLabel id="subscription-heading">Subscription</SectionLabel>
       <div className="space-y-4 rounded-md border p-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-1 text-[13px] leading-5">
+          <div className="space-y-1 text-small">
             <p className="font-medium">
               {workspace.stripe_subscription_id && plan
                 ? `Sotto ${plan.name} · $${plan.priceCents / 100}/month`
@@ -110,16 +105,13 @@ export default async function Page() {
           </div>
           <Link
             href="/pricing"
-            className="text-[13px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            className="text-small text-muted-foreground underline underline-offset-2 hover:text-foreground"
           >
             {workspace.stripe_subscription_id ? "Change plan" : "View plans"}
           </Link>
         </div>
         {overLimit && (
-          <p
-            role="alert"
-            className="text-[13px] leading-[18px] text-destructive"
-          >
+          <p role="alert" className="text-small text-destructive">
             Your plan covers {mailboxLimit(workspace.billing_plan)} Gmail
             account. Disconnect an extra account or change plan to resume
             filtering.

@@ -23,5 +23,5 @@ The 2026-09 redesign moved Sotto to a single dark theme, one typeface family, an
 
 - The Google data notice next to every Connect button and the full privacy page. These are disclosures for Google's verification; they were restyled, not shortened.
 - The billing terms on the pricing page.
-- The landing demo and its toggle. It is the only choreographed motion and stays visibly fictional.
+- The landing demo and its toggle were kept in the first pass and removed on 2026-09-12: a seven-lens audit and a three-proposal panel agreed that a static list of two sample decisions, labeled Demo, proves the same thing with no client code and no motion.
 - The `Start filtering` label and the "Moving emails is disabled for this account." message, which the write-gate test asserts.

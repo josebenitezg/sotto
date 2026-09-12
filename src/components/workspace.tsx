@@ -251,7 +251,7 @@ export function Workspace({
             <AccountMenu viewer={data.viewer} />
           ) : data.authenticated ? (
             <form action="/api/logout" method="post">
-              <Button type="submit" variant="ghost" size="sm">
+              <Button type="submit" variant="ghost">
                 Sign out
               </Button>
             </form>
@@ -269,7 +269,7 @@ export function Workspace({
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex h-10 shrink-0 items-center px-2 text-[13px] transition-colors duration-[120ms] focus-visible:-outline-offset-2 after:absolute after:inset-x-2 after:bottom-0 after:h-px after:bg-foreground after:opacity-0 after:content-['']",
+                  "relative flex h-10 shrink-0 items-center px-2 text-small transition-colors duration-[120ms] focus-visible:-outline-offset-2 after:absolute after:inset-x-2 after:bottom-0 after:h-px after:bg-foreground after:opacity-0 after:content-['']",
                   active
                     ? "text-foreground after:opacity-100"
                     : "text-muted-foreground hover:text-foreground",
@@ -283,21 +283,15 @@ export function Workspace({
       </header>
       <main
         id="main"
-        className="mx-auto w-full max-w-[880px] px-4 pt-8 pb-16 md:px-6 md:pt-10"
+        className="mx-auto w-full max-w-[880px] px-4 pt-8 pb-16 md:px-6"
       >
         {error ? (
-          <p
-            role="alert"
-            className="mb-6 rounded-sm border border-destructive/40 px-3 py-2.5 text-[13px] leading-[18px] text-destructive"
-          >
+          <p role="alert" className="mb-6 text-small text-destructive">
             {error}
           </p>
         ) : null}
         {data.accessActive === false && (
-          <p
-            role="status"
-            className="mb-6 rounded-sm border px-3 py-2.5 text-[13px] leading-[18px]"
-          >
+          <p role="status" className="mb-6 text-small">
             {atAccountLimit(data) &&
             data.accounts.filter((a) => a.connected).length >
               (data.accountLimit ?? Infinity) ? (
@@ -323,10 +317,7 @@ export function Workspace({
         {data.allowance &&
           data.accessActive !== false &&
           pathname !== "/settings" && (
-            <p
-              role="status"
-              className="mb-6 text-[13px] leading-5 text-muted-foreground"
-            >
+            <p role="status" className="mb-6 text-small text-muted-foreground">
               {data.allowance.used} / {data.allowance.limit} emails checked
               {data.allowance.trial ? " during your trial" : " this month"}.
               {data.allowance.exhausted ? " New filtering is paused." : ""}{" "}
@@ -378,9 +369,18 @@ function PageTitle({
     </div>
   );
 }
-function SectionLabel({ children }: { children: ReactNode }) {
+export function SectionLabel({
+  id,
+  children,
+}: {
+  id?: string;
+  children: ReactNode;
+}) {
   return (
-    <h2 className="mb-3 text-[13px] leading-[18px] font-medium text-muted-foreground">
+    <h2
+      id={id}
+      className="mb-3 text-sm leading-5 font-medium text-muted-foreground"
+    >
       {children}
     </h2>
   );
@@ -448,7 +448,7 @@ function Status({ account }: { account: Account }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 text-[13px] whitespace-nowrap",
+        "inline-flex items-center gap-1.5 text-small whitespace-nowrap",
         tone,
       )}
     >
@@ -461,7 +461,7 @@ function Empty({ title, detail }: { title: string; detail: string }) {
   return (
     <div className="px-4 py-12 text-center">
       <p className="font-medium">{title}</p>
-      <p className="mx-auto mt-1 max-w-[44ch] text-[13px] leading-[18px] text-muted-foreground">
+      <p className="mx-auto mt-1 max-w-[44ch] text-small text-muted-foreground">
         {detail}
       </p>
     </div>
@@ -503,7 +503,7 @@ function Onboarding() {
       />
       <ConnectButton />
       {!data.configured ? (
-        <p className="mt-3 text-[13px] text-warning">
+        <p className="mt-3 text-small text-warning">
           The Google connection is still being configured.
         </p>
       ) : null}
@@ -513,7 +513,7 @@ function Onboarding() {
 function InlineError() {
   const { error } = useWorkspace();
   return error ? (
-    <p role="alert" className="text-[13px] leading-[18px] text-destructive">
+    <p role="alert" className="text-small text-destructive">
       {error}
     </p>
   ) : null;
@@ -576,7 +576,7 @@ export function ReviewPage() {
           ))}
       </List>
       <div
-        className="mt-10 mb-4 flex gap-5 border-b"
+        className="mt-12 mb-4 flex gap-3 border-b"
         role="group"
         aria-label="Filter decisions"
       >
@@ -593,7 +593,7 @@ export function ReviewPage() {
             aria-pressed={filter === tab.key}
             onClick={() => setFilter(tab.key)}
             className={cn(
-              "relative -mb-px flex h-9 items-center gap-2 border-b text-[13px] transition-colors duration-[120ms]",
+              "relative -mb-px flex h-9 items-center gap-2 border-b text-small transition-colors duration-[120ms]",
               filter === tab.key
                 ? "border-foreground text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -614,13 +614,13 @@ export function ReviewPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedId(d.id)}
-                  className="flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors duration-[120ms] hover:bg-gray-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                  className="flex w-full items-center gap-4 px-4 py-4 text-left transition-colors duration-[120ms] hover:bg-gray-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate leading-5 font-medium">
                       {d.subject}
                     </p>
-                    <p className="mt-0.5 truncate text-[13px] leading-[18px] text-muted-foreground">
+                    <p className="mt-1 truncate text-small text-muted-foreground">
                       <span className="mono">{d.sender}</span>
                       {accountId === "all" ? (
                         <>
@@ -679,7 +679,7 @@ export function ReviewPage() {
               </SheetHeader>
               <div className="space-y-6 px-6 pb-6">
                 <div>
-                  <p className="text-[13px] text-muted-foreground">
+                  <p className="text-small text-muted-foreground">
                     {categoryLabels[selected.category]}
                     <span aria-hidden="true"> · </span>
                     <span className="mono">{selectedAccount?.email}</span>
@@ -721,7 +721,7 @@ export function ReviewPage() {
                         Keep in inbox
                       </Button>
                       {!selectedWritesEnabled ? (
-                        <p className="text-[13px] text-warning">
+                        <p className="text-small text-warning">
                           Moving emails is disabled for this account.
                         </p>
                       ) : null}
@@ -743,7 +743,7 @@ export function ReviewPage() {
                       Return to inbox
                     </Button>
                   ) : (
-                    <p className="text-[13px] text-muted-foreground">
+                    <p className="text-small text-muted-foreground">
                       {["moving", "restoring"].includes(selected.state)
                         ? "Processing…"
                         : "This email stays in Gmail."}
@@ -891,7 +891,7 @@ function atAccountLimit(data: Dashboard) {
 }
 function PlanLimitNote({ limit }: { limit: number }) {
   return (
-    <p className="text-[13px] leading-[18px] text-muted-foreground">
+    <p className="text-small text-muted-foreground">
       Your plan covers {limit} Gmail account{limit === 1 ? "" : "s"}.{" "}
       <Link
         href="/pricing"
@@ -915,7 +915,7 @@ function AccountRow({
     <div className="px-4 py-4">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
-          <p className="mono truncate text-[13px]">{account.email}</p>
+          <p className="mono truncate text-small">{account.email}</p>
           <div className="mt-1">
             <Status account={account} />
           </div>
@@ -929,14 +929,14 @@ function AccountRow({
         )}
       </div>
       {account.connected && !account.writesEnabled && !data.demo ? (
-        <p className="mt-3 text-[13px] text-warning">
+        <p className="mt-3 text-small text-warning">
           Moving emails is disabled for this account.
         </p>
       ) : null}
       {account.lastError ? (
         <div
           role="alert"
-          className="mt-3 flex flex-wrap items-center gap-3 text-[13px] text-destructive"
+          className="mt-3 flex flex-wrap items-center gap-3 text-small text-destructive"
         >
           <p>{account.lastError}</p>
           {account.connected && account.mode !== "paused" ? (
@@ -969,6 +969,10 @@ export function AccountsPage() {
   } | null>(null);
   const [confirmEmail, setConfirmEmail] = useState("");
   const confirmEmailId = useId();
+  const lastConfirm = useRef<typeof confirm>(null);
+  if (confirm) lastConfirm.current = confirm;
+  // The dialog animates out with the account it showed, never "undefined".
+  const shown = confirm ?? lastConfirm.current;
   if (!data.accounts.length) return <Onboarding />;
   return (
     <>
@@ -976,7 +980,7 @@ export function AccountsPage() {
       <List label="Gmail accounts">
         {data.accounts.map((account) => (
           <AccountRow key={account.id} account={account}>
-            <details className="mt-3 text-[13px] text-muted-foreground">
+            <details className="mt-3 text-small text-muted-foreground">
               <summary className="flex h-9 w-fit list-none items-center rounded-sm hover:text-foreground [&::-webkit-details-marker]:hidden">
                 Options
               </summary>
@@ -1048,7 +1052,7 @@ export function AccountsPage() {
           </AccountRow>
         ))}
       </List>
-      <div className="mt-10">
+      <div className="mt-12">
         {atAccountLimit(data) ? (
           <PlanLimitNote limit={data.accountLimit!} />
         ) : (
@@ -1070,20 +1074,20 @@ export function AccountsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirm?.action === "deleteGmailData"
+              {shown?.action === "deleteGmailData"
                 ? "Delete Gmail data"
                 : "Disconnect this account"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirm?.action === "deleteGmailData"
-                ? `Sotto will delete its connection, credentials, preferences and processing history for ${confirm.account.email}. Emails and labels stay in Gmail, but these moves can no longer be undone from Sotto. This deletion cannot be undone.`
-                : `Sotto will stop processing ${confirm?.account.email} and remove its saved credential. Emails and labels stay in Gmail; decision history stays in Sotto.`}
+              {shown?.action === "deleteGmailData"
+                ? `Sotto will delete its connection, credentials, preferences and processing history for ${shown.account.email}. Emails and labels stay in Gmail, but these moves can no longer be undone from Sotto. This deletion cannot be undone.`
+                : `Sotto will stop processing ${shown?.account.email} and remove its saved credential. Emails and labels stay in Gmail; decision history stays in Sotto.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {confirm?.action === "deleteGmailData" ? (
+          {shown?.action === "deleteGmailData" ? (
             <div className="space-y-2">
               <Label htmlFor={confirmEmailId}>
-                Type {confirm.account.email} to confirm
+                Type {shown.account.email} to confirm
               </Label>
               <Input
                 id={confirmEmailId}
@@ -1132,7 +1136,7 @@ export function AccountsPage() {
                   setConfirm(null);
               }}
             >
-              {confirm?.action === "deleteGmailData"
+              {shown?.action === "deleteGmailData"
                 ? "Delete Gmail data"
                 : "Disconnect"}
             </AlertDialogAction>
@@ -1169,10 +1173,10 @@ export function RulesPage() {
         {data.rules.length ? (
           <ul className="hairline">
             {data.rules.map((rule) => (
-              <li key={rule.id} className="flex items-center gap-4 px-4 py-3">
+              <li key={rule.id} className="flex items-center gap-4 px-4 py-4">
                 <div className="min-w-0 flex-1">
-                  <p className="mono truncate text-[13px]">{rule.sender}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="mono truncate text-small">{rule.sender}</p>
+                  <p className="mt-1 text-small text-muted-foreground">
                     {data.accounts.find((a) => a.id === rule.accountId)?.name}
                   </p>
                 </div>
@@ -1203,7 +1207,7 @@ export function RulesPage() {
             </SheetDescription>
           </SheetHeader>
           <form
-            className="space-y-5 px-6"
+            className="space-y-6 px-6"
             onSubmit={async (e) => {
               e.preventDefault();
               if (
@@ -1353,7 +1357,7 @@ export function SettingsPage({ subscription }: { subscription?: ReactNode }) {
         />
       </List>
       {account && <PreferencesEditor key={account.id} account={account} />}
-      <div className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t pt-6 text-[13px] text-muted-foreground">
+      <div className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t pt-6 text-small text-muted-foreground">
         <Link
           href="/privacy"
           className="transition-colors duration-[120ms] hover:text-foreground"
@@ -1380,7 +1384,7 @@ function PreferencesEditor({ account }: { account: Account }) {
   const dirty = instructions !== (account.policy.instructions || "");
   return (
     <form
-      className="mt-10 space-y-3"
+      className="mt-12 space-y-3"
       onSubmit={async (event) => {
         event.preventDefault();
         await act(
@@ -1399,7 +1403,7 @@ function PreferencesEditor({ account }: { account: Account }) {
         <Label htmlFor="ai-preferences">Preferences</Label>
         <p
           id="ai-preferences-help"
-          className="mt-1 text-[13px] leading-[18px] text-muted-foreground"
+          className="mt-1 text-small text-muted-foreground"
         >
           What you do and which emails matter. The AI reads this before
           deciding.
@@ -1449,13 +1453,8 @@ function SettingRow({
   return (
     <div className="flex items-center justify-between gap-6 px-4 py-4">
       <div>
-        <Label htmlFor={id} className="text-sm leading-5">
-          {title}
-        </Label>
-        <p
-          id={`${id}-help`}
-          className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground"
-        >
+        <Label htmlFor={id}>{title}</Label>
+        <p id={`${id}-help`} className="mt-1 text-small text-muted-foreground">
           {description}
         </p>
       </div>

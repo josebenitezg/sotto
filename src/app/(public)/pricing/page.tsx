@@ -71,7 +71,7 @@ export default async function PlansPage({
             <Check size={20} aria-hidden="true" />
           </div>
         )}
-        <h1 className="text-3xl leading-10 font-semibold">Thank you</h1>
+        <h1 className="text-2xl leading-8 font-semibold">Thank you</h1>
         {subscriptionActive && (
           <p className="mt-3 text-muted-foreground">
             {workspace.subscription_status === "trialing"
@@ -98,7 +98,7 @@ export default async function PlansPage({
       {workspace || isDemo() ? (
         <Link
           href="/review"
-          className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
+          className="mb-6 inline-flex items-center gap-1.5 text-small text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft size={14} aria-hidden="true" /> Back to Sotto
         </Link>
@@ -114,7 +114,7 @@ export default async function PlansPage({
               : "Try Sotto free for 3 days. Cancel anytime."}
       </p>
       {overLimit && (
-        <p role="alert" className="mt-4 text-[13px] text-destructive">
+        <p role="alert" className="mt-4 text-small text-destructive">
           Your plan covers {mailboxLimit(workspace.billing_plan)} Gmail account.
           Disconnect an extra account or switch to Duo to resume filtering.
         </p>
@@ -140,21 +140,16 @@ export default async function PlansPage({
                 <h2 id={`plan-${plan.id}`} className="text-sm font-medium">
                   {plan.name}
                 </h2>
-                {isCurrent && (
-                  <span className="rounded-full bg-foreground px-2 py-1 text-[11px] font-medium text-background">
-                    Current plan
-                  </span>
-                )}
               </div>
               <p className="mt-3 flex items-baseline gap-2">
                 <span className="mono text-4xl leading-10 font-medium tracking-[-0.02em]">
                   ${plan.priceCents / 100}
                 </span>
-                <span className="text-[13px] text-muted-foreground">
+                <span className="text-small text-muted-foreground">
                   / month
                 </span>
               </p>
-              <ul className="my-6 space-y-3 text-[13px] leading-[18px]">
+              <ul className="my-6 space-y-3 text-small">
                 {[
                   `${plan.mailboxes} Gmail account${plan.mailboxes === 1 ? "" : "s"}`,
                   `${plan.emails} emails checked / month`,
@@ -195,9 +190,11 @@ export default async function PlansPage({
                 </form>
               ) : active || overLimit ? (
                 <BillingAction action="portal" secondary>
-                  {workspace.billing_plan === plan.id
-                    ? "Manage plan"
-                    : `Switch to ${plan.name}`}
+                  {isCurrent
+                    ? "Current plan"
+                    : workspace.billing_plan === plan.id
+                      ? "Manage plan"
+                      : `Switch to ${plan.name}`}
                 </BillingAction>
               ) : (
                 <BillingAction action="checkout" plan={plan.id}>
@@ -216,8 +213,10 @@ export default async function PlansPage({
           <h2 id="plan-enterprise" className="text-sm font-medium">
             Enterprise
           </h2>
-          <p className="mt-3 text-2xl leading-10 font-medium">Let's talk.</p>
-          <p className="my-6 text-[13px] leading-6 text-muted-foreground">
+          <p className="mt-3 text-4xl leading-10 font-medium tracking-[-0.02em]">
+            Let's talk.
+          </p>
+          <p className="my-6 text-small text-muted-foreground">
             More accounts or a busier team? Tell us what you need and we'll work
             out a plan.
           </p>
@@ -254,7 +253,7 @@ export default async function PlansPage({
         limit, new processing pauses until the next paid period; messages stay
         in Gmail and there are no overage charges.
       </p>
-      <p className="mt-8 text-[13px] text-muted-foreground">
+      <p className="mt-8 text-small text-muted-foreground">
         Sotto is open source. Self-hosting needs no subscription.{" "}
         <a
           href="https://github.com/josebenitezg/sotto"

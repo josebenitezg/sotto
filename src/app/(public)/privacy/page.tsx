@@ -2,7 +2,7 @@ export default function PrivacyPage() {
   return (
     <main
       id="content"
-      className="mx-auto w-full max-w-[680px] space-y-5 px-6 py-16 text-[15px] leading-6 md:py-24 [&_h2]:pt-6 [&_h2]:text-base [&_h2]:leading-6 [&_h2]:font-medium [&_h2]:text-foreground [&_a]:text-foreground"
+      className="mx-auto w-full max-w-[680px] space-y-6 px-6 py-16 text-[15px] leading-6 md:py-24 [&_h2]:pt-6 [&_h2]:text-base [&_h2]:leading-6 [&_h2]:font-medium [&_h2]:text-foreground [&_a]:text-foreground"
     >
       <h1 className="text-2xl leading-8 font-semibold">Privacy</h1>
       <p className="text-muted-foreground">
@@ -198,7 +198,7 @@ export default function PrivacyPage() {
         . Disconnecting does not delete emails, labels, or Sotto's decision
         history.
       </p>
-      <p className="text-[13px] leading-5 text-muted-foreground">
+      <p className="text-small text-muted-foreground">
         <strong>Delete Gmail data.</strong> In Accounts, this action asks you to
         confirm the address and removes that account's connection, credential,
         preferences, allowed senders, decisions, jobs, events, and AI usage
@@ -212,7 +212,7 @@ export default function PrivacyPage() {
         again. This action does not request deletion of records that providers
         may retain under their own policies.
       </p>
-      <p className="text-[13px] leading-5 text-muted-foreground">
+      <p className="text-small text-muted-foreground">
         For support, privacy questions, or requests to delete sotto.email data,
         contact{" "}
         <a
@@ -223,7 +223,7 @@ export default function PrivacyPage() {
         </a>
         .
       </p>
-      <p className="text-[13px] leading-5 text-muted-foreground">
+      <p className="text-small text-muted-foreground">
         Last updated: September 11, 2026. Each installation's operator is
         responsible for its configuration and data processing.
       </p>

@@ -10,10 +10,7 @@ export default async function Page({
   return (
     <>
       {params.connection_error ? (
-        <p
-          role="alert"
-          className="mb-6 rounded-sm border border-destructive/40 px-3 py-2.5 text-[13px] leading-[18px] text-destructive"
-        >
+        <p role="alert" className="mb-6 text-small text-destructive">
           {connectionErrorMessage(params.connection_error)}
         </p>
       ) : null}

@@ -179,19 +179,19 @@ Every surface designs all of these before shipping:
 
 **Login.** Centered 360px column: mark, title Sign in, one sentence, Connect with Google, the data notice, privacy link. Connection errors appear above the button.
 
-**Pricing.** Title, one sentence, a single bordered block with the price in display mono, three bullets, the billing action, and the required trial terms. One line about self-hosting.
+**Pricing.** A catalog, never an account panel. Title Pricing, one sentence, one bordered card per plan with the price in display mono, bullets, and one action: Start trial, Choose, Current plan, or Switch. The required trial and billing terms follow. One line about self-hosting. Subscription state (trial dates, usage, cancel, refresh) lives in Settings, not here.
 
 **Privacy.** Reading width. Title, then headings and paragraphs. Content is a legal record; restyle only.
 
-**Workspace shell.** 56px header: wordmark left, Demo label or nothing right. Tab row: Inbox, Accounts, Allowlist, Settings, Plan. Content max 880px. The only global text is an error banner when an action fails.
+**Workspace shell.** 56px header: wordmark left, Sign out or Demo right. Tab row: Inbox, Accounts, Allowlist, Settings. Pricing is reached from Settings, never from a tab. Content max 880px. Global text is limited to an error banner when an action fails, a paused-plan notice, and one allowance line.
 
 **Inbox.** Title Inbox with account picker. One hairline list of accounts with status and controls. Filter row: Moved, Kept, Suggested with mono counts. Decision list, two lines per row, chevron. Row opens a sheet with the reason and the actions.
 
-**Accounts.** Title Accounts. Hairline list, one row per account: address in mono, status, controls, a collapsed Options row with Check now, Only suggest, Disconnect, Delete Gmail data, and the last check time. Add account below.
+**Accounts.** Title Accounts. Hairline list, one row per account: address in mono, status, controls, a collapsed Options row with Check now, Only suggest, Disconnect, Delete Gmail data, and the last check time. Add account below, only while the plan has room for another mailbox. At the limit, one sentence names the limit and links to Change plan. Never show a Connect button the server will reject.
 
 **Allowlist.** Title Allowlist, Allow sender button. List of addresses in mono with a remove button. Empty state explains what an allowed sender does.
 
-**Settings.** Title Settings with account picker. One hairline list of three switches. Preferences textarea with Save. Footer row: Privacy link, Sign out.
+**Settings.** Title Settings with account picker. Subscription first: plan and price, one status sentence, one mono usage line, an over-limit alert when relevant, Manage subscription and Refresh status, and a Change plan link to Pricing. Then one hairline list of three switches, the preferences textarea with Save, and a footer row with Privacy and GitHub.
 
 ## Accessibility
 

@@ -62,7 +62,6 @@ const nav = [
   { href: "/accounts", label: "Accounts" },
   { href: "/allowlist", label: "Allowlist" },
   { href: "/settings", label: "Settings" },
-  { href: "/pricing", label: "Plan" },
 ];
 const modeLabels = {
   review: "Review mode",
@@ -316,8 +315,8 @@ export function Workspace({
             {data.allowance.exhausted
               ? " New filtering is paused. No extra charges."
               : ""}{" "}
-            <Link href="/pricing" className="underline underline-offset-2">
-              View allowance
+            <Link href="/settings" className="underline underline-offset-2">
+              Subscription
             </Link>
           </p>
         )}
@@ -932,6 +931,9 @@ export function AccountsPage() {
   } | null>(null);
   const [confirmEmail, setConfirmEmail] = useState("");
   const confirmEmailId = useId();
+  const connectedCount = data.accounts.filter((a) => a.connected).length;
+  const atAccountLimit =
+    data.accountLimit != null && connectedCount >= data.accountLimit;
   if (!data.accounts.length) return <Onboarding />;
   return (
     <>
@@ -1012,8 +1014,24 @@ export function AccountsPage() {
         ))}
       </List>
       <div className="mt-10">
-        <SectionLabel>Add account</SectionLabel>
-        <ConnectButton outline />
+        {atAccountLimit ? (
+          <p className="text-[13px] leading-[18px] text-muted-foreground">
+            Your plan covers {data.accountLimit} Gmail account
+            {data.accountLimit === 1 ? "" : "s"}.{" "}
+            <Link
+              href="/pricing"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              Change plan
+            </Link>{" "}
+            to add another.
+          </p>
+        ) : (
+          <>
+            <SectionLabel>Add account</SectionLabel>
+            <ConnectButton outline />
+          </>
+        )}
       </div>
       <AlertDialog
         open={!!confirm}

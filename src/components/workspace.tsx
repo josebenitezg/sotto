@@ -247,6 +247,12 @@ export function Workspace({
             <span className="text-xs text-muted-foreground">
               Demo · nothing touches Gmail
             </span>
+          ) : data.authenticated ? (
+            <form action="/api/logout" method="post">
+              <Button type="submit" variant="ghost" size="sm">
+                Sign out
+              </Button>
+            </form>
           ) : null}
         </div>
         <nav
@@ -1243,7 +1249,7 @@ export function RulesPage() {
   );
 }
 
-export function SettingsPage() {
+export function SettingsPage({ subscription }: { subscription?: ReactNode }) {
   const { data, act, busy } = useWorkspace();
   const [accountId, setAccountId] = useState(data.accounts[0]?.id ?? "");
   const account = data.accounts.find((a) => a.id === accountId);
@@ -1257,6 +1263,7 @@ export function SettingsPage() {
           ) : undefined
         }
       />
+      {subscription}
       <SectionLabel>Move out of the inbox</SectionLabel>
       <List label="Categories">
         <SettingRow
@@ -1310,22 +1317,14 @@ export function SettingsPage() {
         >
           Privacy
         </Link>
-        {data.authenticated ? (
-          <form action="/api/logout" method="post">
-            <Button type="submit" variant="ghost" size="sm">
-              Sign out
-            </Button>
-          </form>
-        ) : (
-          <a
-            href="https://github.com/josebenitezg/sotto"
-            target="_blank"
-            rel="noreferrer"
-            className="transition-colors duration-[120ms] hover:text-foreground"
-          >
-            GitHub
-          </a>
-        )}
+        <a
+          href="https://github.com/josebenitezg/sotto"
+          target="_blank"
+          rel="noreferrer"
+          className="transition-colors duration-[120ms] hover:text-foreground"
+        >
+          GitHub
+        </a>
       </div>
     </>
   );

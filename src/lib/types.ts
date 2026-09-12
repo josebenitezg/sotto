@@ -72,6 +72,8 @@ export type MailAllowance = {
 export type Dashboard = {
   allowance?: MailAllowance | null;
   accessActive?: boolean;
+  /** Connected Gmail accounts the plan covers. Null when unlimited. */
+  accountLimit?: number | null;
   accounts: Account[];
   decisions: Decision[];
   rules: Rule[];

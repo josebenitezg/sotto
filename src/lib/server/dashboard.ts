@@ -1,7 +1,8 @@
 import type { Account, Dashboard, Decision, Rule } from "../types";
 import { demoDashboard } from "../demo";
 import { sessionWorkspace } from "./auth";
-import { configured, isDemo, writesEnabled } from "./config";
+import { configured, hosted, isDemo, writesEnabled } from "./config";
+import { mailboxLimit } from "../plans";
 import { query } from "./db";
 import { processingAllowed } from "./entitlements";
 import { workspaceAllowance } from "./allowances";
@@ -21,7 +22,7 @@ export async function dashboard(): Promise<Dashboard> {
     writesEnabled: false,
   };
   if (!loggedIn) return empty;
-  const [rawAccounts, rawDecisions, rawRules, accessActive, allowance] =
+  const [rawAccounts, rawDecisions, rawRules, accessActive, allowance, [plan]] =
     await Promise.all([
       query(
         `SELECT a.id,a.email,a.name,a.mode,a.policy,a.connected,a.last_sync,a.watch_expires,a.last_error,a.reviewed_at,a.start_at,a.history_id,
@@ -50,7 +51,17 @@ export async function dashboard(): Promise<Dashboard> {
       ),
       processingAllowed(workspaceId),
       workspaceAllowance(workspaceId),
+      hosted()
+        ? query(
+            "SELECT internal,sotto_full_access(email) AS full_access,billing_plan FROM workspaces WHERE id=$1",
+            [workspaceId],
+          )
+        : Promise.resolve([]),
     ]);
+  const accountLimit =
+    hosted() && plan && !plan.internal && !plan.full_access
+      ? mailboxLimit(plan.billing_plan)
+      : null;
   const accounts = rawAccounts.map((a) => ({
     id: a.id,
     email: a.email,
@@ -98,6 +109,7 @@ export async function dashboard(): Promise<Dashboard> {
     ...empty,
     accessActive,
     allowance,
+    accountLimit,
     accounts,
     decisions,
     rules,

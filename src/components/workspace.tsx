@@ -62,7 +62,6 @@ const nav = [
   { href: "/accounts", label: "Accounts" },
   { href: "/allowlist", label: "Allowlist" },
   { href: "/settings", label: "Settings" },
-  { href: "/pricing", label: "Plan" },
 ];
 const modeLabels = {
   review: "Review mode",
@@ -316,8 +315,8 @@ export function Workspace({
             {data.allowance.exhausted
               ? " New filtering is paused. No extra charges."
               : ""}{" "}
-            <Link href="/pricing" className="underline underline-offset-2">
-              View allowance
+            <Link href="/settings" className="underline underline-offset-2">
+              Subscription
             </Link>
           </p>
         )}
@@ -868,6 +867,26 @@ function FilteringControls({ account }: { account: Account }) {
   );
 }
 
+function atAccountLimit(data: Dashboard) {
+  return (
+    data.accountLimit != null &&
+    data.accounts.filter((a) => a.connected).length >= data.accountLimit
+  );
+}
+function PlanLimitNote({ limit }: { limit: number }) {
+  return (
+    <p className="text-[13px] leading-[18px] text-muted-foreground">
+      Your plan covers {limit} Gmail account{limit === 1 ? "" : "s"}.{" "}
+      <Link
+        href="/pricing"
+        className="underline underline-offset-2 hover:text-foreground"
+      >
+        Change plan
+      </Link>{" "}
+      to add another.
+    </p>
+  );
+}
 function AccountRow({
   account,
   children,
@@ -887,6 +906,8 @@ function AccountRow({
         </div>
         {account.connected ? (
           <FilteringControls account={account} />
+        ) : atAccountLimit(data) ? (
+          <PlanLimitNote limit={data.accountLimit!} />
         ) : (
           <ConnectButton outline />
         )}
@@ -1012,8 +1033,14 @@ export function AccountsPage() {
         ))}
       </List>
       <div className="mt-10">
-        <SectionLabel>Add account</SectionLabel>
-        <ConnectButton outline />
+        {atAccountLimit(data) ? (
+          <PlanLimitNote limit={data.accountLimit!} />
+        ) : (
+          <>
+            <SectionLabel>Add account</SectionLabel>
+            <ConnectButton outline />
+          </>
+        )}
       </div>
       <AlertDialog
         open={!!confirm}

@@ -11,7 +11,6 @@ import { billingReady, trialRequiresCard } from "@/lib/server/billing";
 import { query } from "@/lib/server/db";
 import { configured, hosted, isDemo } from "@/lib/server/config";
 import { hasAccess } from "@/lib/server/entitlements";
-import { workspaceAllowance } from "@/lib/server/allowances";
 import { GoogleDataNotice } from "@/components/google-data-notice";
 import { isPlanId, mailboxLimit, plans } from "@/lib/plans";
 import { cn } from "@/lib/utils";
@@ -91,13 +90,6 @@ export default async function PlansPage({
       </main>
     );
   }
-  const allowance = workspaceId ? await workspaceAllowance(workspaceId) : null;
-  const date = (value: Date) =>
-    new Intl.DateTimeFormat("en-US", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: "UTC",
-    }).format(value) + " UTC";
   return (
     <main
       id="content"
@@ -111,90 +103,22 @@ export default async function PlansPage({
           <ArrowLeft size={14} aria-hidden="true" /> Back to Sotto
         </Link>
       ) : null}
-      <h1 className="text-2xl leading-8 font-semibold">
-        {subscriptionActive ? "Your plan" : "A quieter inbox. A simple plan."}
-      </h1>
+      <h1 className="text-2xl leading-8 font-semibold">Pricing</h1>
       <p className="mt-2 text-muted-foreground">
-        {workspace?.full_access
-          ? "Your full access is enabled. No trial is needed."
+        {workspace?.internal || workspace?.full_access
+          ? "Full access is enabled. No subscription is needed."
           : subscriptionActive && currentPlan
-            ? `Sotto ${currentPlan.name} is your current plan.`
+            ? `Sotto ${currentPlan.name} is your current plan. Manage it in Settings.`
             : workspace?.trial_used
               ? "Choose the plan that fits your inbox. Cancel anytime."
               : "Try Sotto free for 3 days. Cancel anytime."}
       </p>
-      {workspace?.full_access && (
-        <p className="mt-6 text-sm text-muted-foreground">
-          Full access. All mailboxes and email checks are included, with no
-          Sotto subscription required.
-          {workspace.stripe_subscription_id &&
-            !workspace.cancel_at_period_end &&
-            " An existing Stripe subscription still renews until canceled below."}
+      {overLimit && (
+        <p role="alert" className="mt-4 text-[13px] text-destructive">
+          Your plan covers {mailboxLimit(workspace.billing_plan)} Gmail account.
+          Disconnect an extra account or switch to Duo to resume filtering.
         </p>
       )}
-      {workspace?.internal ? (
-        <p className="mt-6 text-sm text-muted-foreground">
-          Your installation already has access.
-        </p>
-      ) : workspace?.stripe_customer_id ? (
-        <section
-          aria-label="Your subscription"
-          className="mt-6 space-y-3 rounded-md border p-5"
-        >
-          <p className="text-sm">
-            {currentPlan ? `Sotto ${currentPlan.name}. ` : ""}
-            {workspace.subscription_status === "trialing"
-              ? workspace.cancel_at_period_end
-                ? `Trial canceled. Access until ${date(workspace.trial_end)}. You will not be charged.`
-                : `Trial ends ${date(workspace.trial_end)}. Then $${(currentPlan?.priceCents ?? 0) / 100}/month.`
-              : workspace.cancel_at_period_end && workspace.paid_until
-                ? `Canceled. Access until ${date(workspace.paid_until)}.`
-                : workspace.full_access
-                  ? "Full access is enabled. Manage any existing Stripe subscription below."
-                  : active
-                    ? "Subscription active."
-                    : "Processing is paused. Your history, undo and disconnect remain available."}
-          </p>
-          {overLimit && (
-            <p role="alert" className="text-sm text-destructive">
-              Your plan covers {mailboxLimit(workspace.billing_plan)} Gmail
-              account. Disconnect an extra account or upgrade to resume
-              filtering.
-            </p>
-          )}
-          {allowance && (
-            <p className="text-sm text-muted-foreground">
-              {allowance.used} / {allowance.limit} emails checked
-              {allowance.trial ? " during your trial" : " this billing month"}.
-              {allowance.resetsAt && (
-                <>
-                  {" "}
-                  {workspace.cancel_at_period_end
-                    ? "Included usage ends"
-                    : allowance.trial
-                      ? "Trial allowance ends"
-                      : "Renews"}{" "}
-                  {date(new Date(allowance.resetsAt))}.
-                </>
-              )}
-              {allowance.exhausted &&
-                " New filtering is paused; there are no extra charges."}
-            </p>
-          )}
-          <div className="flex flex-wrap gap-3">
-            <BillingAction action="portal" secondary>
-              Manage subscription
-            </BillingAction>
-            <BillingAction action="refresh" secondary>
-              Refresh status
-            </BillingAction>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Switch plans or cancel in Stripe. Disconnect your second account
-            before moving to Solo.
-          </p>
-        </section>
-      ) : null}
       {params.checkout === "canceled" && (
         <p role="status" className="mt-4 text-sm text-muted-foreground">
           Checkout was canceled. No new subscription was started.
@@ -329,13 +253,6 @@ export default async function PlansPage({
         <p className="mt-3 text-xs text-muted-foreground">
           Payments are not open yet. Your trial has not started.
         </p>
-      )}
-      {hosted() && active && (
-        <div className="mt-6">
-          <Button asChild>
-            <Link href="/review">Open Sotto</Link>
-          </Button>
-        </div>
       )}
       <p className="mt-8 text-[13px] text-muted-foreground">
         Sotto is open source. Self-hosting needs no subscription.{" "}

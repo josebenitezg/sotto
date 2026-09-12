@@ -78,6 +78,7 @@ beforeAll(async () => {
     "007_plans.sql",
     "008_mail_allowances.sql",
     "009_global_config.sql",
+    "010_identity_profile.sql",
   ])
     await h.db.exec(
       await readFile(new URL(`../db/${f}`, import.meta.url), "utf8"),
@@ -667,6 +668,8 @@ it("purges every Gmail record even with a damaged credential, isolating other ac
     id: "gmail-a",
     workspace_id: "a",
     gmail_deleted_at: expect.any(Date),
+    name: null,
+    picture: null,
   });
   expect(h.enqueue).not.toHaveBeenCalled();
 });

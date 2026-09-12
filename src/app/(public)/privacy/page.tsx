@@ -30,12 +30,14 @@ export default function PrivacyPage() {
       <p className="text-muted-foreground">
         Connection identifiers, encrypted credentials for direct Google
         connections, rules, message identifiers, sender, subject, and decision
-        history. We also store the AI model and input, cached-input and output
-        token counts linked to the account to measure service usage and cost. We
-        record checked-message identifiers and a per-period usage total to
-        enforce plan allowances. These usage records contain no message text.
-        Sotto does not store full message bodies. You can delete a Gmail
-        connection's data from Accounts, as explained below.
+        history. We also store the name and profile picture of the Google
+        account you sign in with, only to show who is signed in. We also store
+        the AI model and input, cached-input and output token counts linked to
+        the account to measure service usage and cost. We record checked-message
+        identifiers and a per-period usage total to enforce plan allowances.
+        These usage records contain no message text. Sotto does not store full
+        message bodies. You can delete a Gmail connection's data from Accounts,
+        as explained below.
       </p>
       <h2 id="data-protection">How we protect Google user data</h2>
       <p className="text-muted-foreground">
@@ -173,9 +175,10 @@ export default function PrivacyPage() {
       <h2>The Google permission we request</h2>
       <p className="text-muted-foreground">
         Direct Google connections request gmail.modify, which includes reading,
-        modifying, and sending email. A managed Composio connection may request
-        full Gmail access, which also permits permanent deletion; the Google
-        consent screen shows the permission being granted. Sotto only uses fixed
+        modifying, and sending email, plus your basic profile (name and picture)
+        to show who is signed in. A managed Composio connection may request full
+        Gmail access, which also permits permanent deletion; the Google consent
+        screen shows the permission being granted. Sotto only uses fixed
         operations for reading, labeling, and restoring messages. It does not
         implement sending, deleting, or marking messages as read.
       </p>

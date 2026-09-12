@@ -58,11 +58,15 @@ const COUNT = rows.length;
 const STAGGER_MS = 520;
 const coldIndexes = rows.flatMap((row, index) => (row.cold ? [index] : []));
 
-// Deterministic pseudo-random in [0, 1) so SSR and hydration agree.
+// Deterministic pseudo-random in [0, 1). Integer math only: Math.sin differs
+// in its last bits between Node and browsers, which breaks hydration.
 function noise(seed: number) {
-  const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
-  return x - Math.floor(x);
+  let h = (seed * 0x9e3779b1) | 0;
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
+const round = (value: number) => Math.round(value * 10) / 10;
 
 /* Each letter is its own element so it can leave on its own path. */
 function Scatter({
@@ -82,9 +86,9 @@ function Scatter({
         const n = seed * 1000 + index;
         const progress = index / Math.max(1, letters.length - 1);
         const style = {
-          "--dx": `${28 + noise(n) * 72}px`,
-          "--dy": `${-36 + noise(n + 1) * 44}px`,
-          "--r": `${-18 + noise(n + 2) * 36}deg`,
+          "--dx": `${round(28 + noise(n) * 72)}px`,
+          "--dy": `${round(-36 + noise(n + 1) * 44)}px`,
+          "--r": `${round(-18 + noise(n + 2) * 36)}deg`,
           "--d": `${Math.round(progress * 260 + noise(n + 3) * 140)}ms`,
         } as React.CSSProperties;
         return (

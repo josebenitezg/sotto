@@ -1,129 +1,139 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 /*
-  A fictional inbox that filters itself, in the app's own list surface.
-  A reading line sweeps down once the list is on screen. Each cold email
-  it passes dissolves out of the inbox through a 4px dot grid and
-  re-materializes under Sotto/Cold with its reason, while the rows below
-  close the gap. With a mouse the line follows the cursor; moving back up
-  brings the emails back. That is the undo, shown instead of explained.
+  A fictional inbox. Once it is on screen, each cold email disintegrates:
+  its letters drift out to the right, the avatar dissolves through a dot
+  grid, and the rows below close the gap. What matters stays. Replay
+  reassembles the letters and runs it again. Every random offset comes
+  from a seeded hash so the server and the client render the same markup.
 */
 const rows = [
   {
     id: "ana",
+    from: "Ana Martínez",
     subject: "Our next step, together",
-    sender: "ana@martinez.example",
-    preview: "Loved our conversation. Shall we pick it up tomorrow?",
+    snippet: "Loved our conversation. Same time tomorrow?",
+    time: "10:42",
     cold: false,
   },
   {
     id: "growth",
-    subject: "Quick question about your growth",
-    sender: "hello@growthpartners.example",
-    preview: "We help companies like yours book more meetings…",
-    reason: "A pitch for a lead generation service. No prior conversation.",
+    from: "Growth Partners",
+    subject: "Quick question",
+    snippet: "We help teams like yours book 3x more meetings",
+    time: "10:31",
     cold: true,
   },
   {
-    id: "team",
+    id: "tomas",
+    from: "Tomás Rey",
     subject: "Ready for your review",
-    sender: "team@studio.example",
-    preview: "Here is the first version of the project.",
+    snippet: "First version of the project is up.",
+    time: "10:18",
     cold: false,
   },
   {
     id: "pipeline",
+    from: "Pipeline Studio",
     subject: "15 minutes this week?",
-    sender: "marcos@pipeline.example",
-    preview: "Just following up on my previous email…",
-    reason: "A vendor's second follow-up. You never wrote back.",
+    snippet: "Just following up on my previous email…",
+    time: "9:56",
     cold: true,
   },
   {
     id: "sofia",
-    subject: "We would like to try your product",
-    sender: "sofia@north.example",
-    preview: "Could we start with twenty seats next month?",
+    from: "Sofía North",
+    subject: "Trying your product",
+    snippet: "Could we start with twenty seats next month?",
+    time: "9:40",
     cold: false,
   },
 ];
 const ROW = 56;
-const GROUP = 40;
 const COUNT = rows.length;
-const HEIGHT = COUNT * ROW + GROUP;
-const SWEEP_MS = 1600;
-const HYSTERESIS = 8;
-const easeInOut = (t: number) =>
-  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-const coldRank = rows.reduce<Record<string, number>>((acc, row, index) => {
-  if (row.cold) acc[row.id] = rows.slice(0, index).filter((r) => r.cold).length;
-  return acc;
-}, {});
+const STAGGER_MS = 520;
+const coldIndexes = rows.flatMap((row, index) => (row.cold ? [index] : []));
 
-// A row is read once the line passes 60% of its height, with an 8px band
-// so a cursor resting on the threshold does not flicker.
-function readSet(lineY: number, previous: boolean[]) {
-  return rows.map((row, index) => {
-    if (!row.cold) return false;
-    const enter = (index + 0.6) * ROW;
-    return previous[index] ? lineY >= enter - HYSTERESIS : lineY >= enter;
-  });
+// Deterministic pseudo-random in [0, 1) so SSR and hydration agree.
+function noise(seed: number) {
+  const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/* Each letter is its own element so it can leave on its own path. */
+function Scatter({
+  text,
+  seed,
+  className,
+}: {
+  text: string;
+  seed: number;
+  className?: string;
+}) {
+  const letters = [...text];
+  return (
+    <span className={className}>
+      <span className="sr-only">{text}</span>
+      {letters.map((letter, index) => {
+        const n = seed * 1000 + index;
+        const progress = index / Math.max(1, letters.length - 1);
+        const style = {
+          "--dx": `${28 + noise(n) * 72}px`,
+          "--dy": `${-36 + noise(n + 1) * 44}px`,
+          "--r": `${-18 + noise(n + 2) * 36}deg`,
+          "--d": `${Math.round(progress * 260 + noise(n + 3) * 140)}ms`,
+        } as React.CSSProperties;
+        return (
+          <span
+            key={index}
+            className="demo-char"
+            style={style}
+            aria-hidden="true"
+          >
+            {letter === " " ? " " : letter}
+          </span>
+        );
+      })}
+    </span>
+  );
 }
 
 export function InboxDemo() {
   const [gone, setGone] = useState<boolean[]>(() => rows.map(() => false));
+  const [done, setDone] = useState(false);
   const [reduced, setReduced] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const section = useRef<HTMLElement>(null);
-  const list = useRef<HTMLUListElement>(null);
-  const goneRef = useRef(gone);
-  const frame = useRef(0);
-  const sweeping = useRef(false);
+  const timers = useRef<number[]>([]);
   const userActed = useRef(false);
-  const announceTimer = useRef(0);
-  goneRef.current = gone;
 
-  const place = useCallback((lineY: number) => {
-    const el = list.current;
-    if (!el) return;
-    el.style.setProperty("--scan", `${lineY}px`);
-    const next = readSet(lineY, goneRef.current);
-    if (next.some((value, index) => value !== goneRef.current[index]))
-      setGone(next);
+  const clear = () => {
+    timers.current.forEach((id) => clearTimeout(id));
+    timers.current = [];
+  };
+  const later = (fn: () => void, ms: number) => {
+    timers.current.push(window.setTimeout(fn, ms));
+  };
+
+  const run = useCallback((delay = 0) => {
+    clear();
+    setDone(false);
+    setGone(rows.map(() => false));
+    coldIndexes.forEach((index, order) =>
+      later(
+        () =>
+          setGone((current) =>
+            current.map((value, i) => (i === index ? true : value)),
+          ),
+        delay + order * STAGGER_MS,
+      ),
+    );
+    later(() => setDone(true), delay + coldIndexes.length * STAGGER_MS + 900);
   }, []);
-
-  const sweep = useCallback(
-    (delay = 0) => {
-      cancelAnimationFrame(frame.current);
-      const el = list.current;
-      if (!el) return;
-      sweeping.current = true;
-      el.dataset.sweeping = "true";
-      el.dataset.line = "true";
-      place(0);
-      let start: number | null = null;
-      let last = 0;
-      const tick = (now: number) => {
-        if (start === null) start = now + delay;
-        // A hidden tab pauses frames; resume where the line was, do not jump.
-        if (last && now - last > 250) start += now - last - 16;
-        last = now;
-        const p = Math.min(1, Math.max(0, (now - start) / SWEEP_MS));
-        place(easeInOut(p) * COUNT * ROW);
-        if (p < 1) frame.current = requestAnimationFrame(tick);
-        else {
-          sweeping.current = false;
-          delete el.dataset.sweeping;
-          delete el.dataset.line;
-        }
-      };
-      frame.current = requestAnimationFrame(tick);
-    },
-    [place],
-  );
 
   useEffect(() => {
     const el = section.current;
@@ -132,13 +142,12 @@ export function InboxDemo() {
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setReduced(true);
       setGone(rows.map((row) => row.cold));
+      setDone(true);
       return;
     }
-    let timer = 0;
-    // Play once, when the list is on screen and the tab is actually visible.
-    const start = () => {
-      timer = window.setTimeout(() => sweep(), 500);
-    };
+    // Once, when the list is on screen, the tab is visible and fonts are in.
+    const start = () =>
+      document.fonts.ready.then(() => run(900)).catch(() => run(900));
     const whenVisible = () => {
       if (document.visibilityState === "visible") return start();
       document.addEventListener("visibilitychange", whenVisible, {
@@ -157,26 +166,18 @@ export function InboxDemo() {
     return () => {
       observer.disconnect();
       document.removeEventListener("visibilitychange", whenVisible);
-      clearTimeout(timer);
-      cancelAnimationFrame(frame.current);
+      clear();
     };
-  }, [sweep]);
+  }, [run]);
 
   const moved = gone.filter(Boolean).length;
 
-  // One sentence for assistive tech, after the person acts and the list settles.
   useEffect(() => {
-    if (!userActed.current) return;
-    clearTimeout(announceTimer.current);
-    announceTimer.current = window.setTimeout(
-      () =>
-        setAnnouncement(
-          `${COUNT - moved} in the inbox, ${moved} moved to Sotto/Cold.`,
-        ),
-      600,
+    if (!userActed.current || !done) return;
+    setAnnouncement(
+      `${COUNT - moved} in the inbox, ${moved} moved to Sotto/Cold.`,
     );
-    return () => clearTimeout(announceTimer.current);
-  }, [moved]);
+  }, [done, moved]);
 
   const replay = () => {
     userActed.current = true;
@@ -186,7 +187,8 @@ export function InboxDemo() {
       );
       return;
     }
-    sweep(moved ? 400 : 0);
+    // Letters fly back first, then the inbox is read again.
+    run(moved ? 900 : 0);
   };
 
   const shiftFor = (index: number) =>
@@ -195,118 +197,95 @@ export function InboxDemo() {
   return (
     <section
       ref={section}
-      aria-label="Demo of five sample emails"
+      aria-label="Sample inbox with fictional emails"
       className="demo w-full overflow-hidden rounded-md border"
     >
       <div className="flex h-11 items-center justify-between border-b pr-2 pl-4 text-small">
-        <span>Inbox</span>
-        <span className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Demo</span>
-          <Button
-            variant="ghost"
-            onClick={replay}
-            className="[@media(pointer:coarse)]:h-11"
-          >
-            Replay
-          </Button>
-        </span>
+        <span className="font-medium">Inbox</span>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Replay"
+          onClick={replay}
+          className={done ? "opacity-100" : "pointer-events-none opacity-0"}
+        >
+          <RotateCcw />
+        </Button>
       </div>
       <ul
-        ref={list}
         className="demo-list relative list-none"
-        style={
-          {
-            height: HEIGHT,
-            "--demo-height": `${HEIGHT}px`,
-          } as React.CSSProperties
-        }
-        onPointerMove={(event) => {
-          if (event.pointerType === "touch" || sweeping.current || reduced)
-            return;
-          if (!matchMedia("(hover: hover) and (pointer: fine)").matches) return;
-          const el = list.current;
-          if (!el) return;
-          userActed.current = true;
-          el.dataset.line = "true";
-          const box = el.getBoundingClientRect();
-          const y = Math.min(COUNT * ROW, Math.max(0, event.clientY - box.top));
-          place(y);
-        }}
-        onPointerLeave={() => {
-          if (!sweeping.current && list.current)
-            delete list.current.dataset.line;
-        }}
+        style={{ height: COUNT * ROW }}
       >
         {rows.map((row, index) => {
           const out = gone[index];
           return (
             <li
               key={row.id}
-              className="demo-row flex items-center border-b px-4"
-              data-out={out}
+              className="demo-row flex items-center gap-3 border-b px-4"
+              data-gone={out}
               aria-hidden={out}
               style={{
                 top: index * ROW,
                 transform: `translateY(${-shiftFor(index) * ROW}px)`,
               }}
             >
-              <div className="min-w-0 flex-1">
-                <p className="truncate leading-5 font-medium">{row.subject}</p>
-                <p className="mt-0.5 truncate text-small text-muted-foreground">
-                  <span className="mono">{row.sender}</span>
-                  <span aria-hidden="true"> · </span>
-                  {row.preview}
+              <span
+                className="demo-avatar grid size-7 shrink-0 place-items-center rounded-full bg-gray-100 text-[11px] font-medium"
+                aria-hidden="true"
+              >
+                {row.from.slice(0, 1)}
+              </span>
+              <div className="min-w-0 flex-1 whitespace-nowrap">
+                <div className="flex items-baseline justify-between gap-3">
+                  {row.cold ? (
+                    <Scatter
+                      text={row.from}
+                      seed={index * 7 + 1}
+                      className="text-small font-medium"
+                    />
+                  ) : (
+                    <span className="text-small font-medium">{row.from}</span>
+                  )}
+                  {row.cold ? (
+                    <Scatter
+                      text={row.time}
+                      seed={index * 7 + 2}
+                      className="mono text-xs text-muted-foreground"
+                    />
+                  ) : (
+                    <span className="mono text-xs text-muted-foreground">
+                      {row.time}
+                    </span>
+                  )}
+                </div>
+                <p className="text-small text-muted-foreground">
+                  {row.cold ? (
+                    <>
+                      <Scatter
+                        text={row.subject}
+                        seed={index * 7 + 3}
+                        className="text-foreground"
+                      />
+                      <Scatter text=" · " seed={index * 7 + 4} />
+                      <Scatter text={row.snippet} seed={index * 7 + 5} />
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-foreground">{row.subject}</span>
+                      <span aria-hidden="true"> · </span>
+                      {row.snippet}
+                    </>
+                  )}
                 </p>
               </div>
             </li>
           );
         })}
-        <li
-          className="demo-group flex items-center justify-between border-b px-4 text-small text-muted-foreground"
-          style={{
-            top: COUNT * ROW,
-            transform: `translateY(${-moved * ROW}px)`,
-          }}
-        >
-          <span className="flex items-center gap-2">
-            Sotto/Cold
-            <span className="mono text-xs">{moved}</span>
-          </span>
-        </li>
-        {rows
-          .filter((row) => row.cold)
-          .map((row) => {
-            const index = rows.indexOf(row);
-            const shown = gone[index];
-            return (
-              <li
-                key={`${row.id}-moved`}
-                className="demo-row flex items-center border-b px-4"
-                data-in={shown}
-                aria-hidden={!shown}
-                style={{
-                  top: COUNT * ROW + GROUP + coldRank[row.id] * ROW,
-                  transform: `translateY(${-moved * ROW}px)`,
-                }}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate leading-5 font-medium">
-                    {row.subject}
-                  </p>
-                  <p className="mt-0.5 truncate text-small text-muted-foreground">
-                    <span className="mono">{row.sender}</span>
-                    <span aria-hidden="true"> · </span>
-                    {row.reason}
-                  </p>
-                </div>
-              </li>
-            );
-          })}
-        <li
-          aria-hidden="true"
-          className="demo-line pointer-events-none absolute inset-x-0 top-0 h-px bg-gray-600"
-        />
       </ul>
+      <div className="flex h-10 items-center justify-between border-t px-4 text-small text-muted-foreground">
+        <span>Sotto/Cold</span>
+        <span className="mono text-xs">{moved}</span>
+      </div>
       <p role="status" className="sr-only">
         {announcement}
       </p>

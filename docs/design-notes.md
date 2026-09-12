@@ -23,5 +23,5 @@ The 2026-09 redesign moved Sotto to a single dark theme, one typeface family, an
 
 - The Google data notice next to every Connect button and the full privacy page. These are disclosures for Google's verification; they were restyled, not shortened.
 - The billing terms on the pricing page.
-- The landing demo. The first pass had a toggle; a panel on 2026-09-12 replaced it with a static list; the owner found that rigid, so the demo became a self-filtering inbox the same day: a reading line, cold rows kicked right through a dot-grid dissolve, mouse scrubbing that doubles as undo. It stays labeled Demo and plays once.
+- The landing demo. The first pass had a toggle; a panel on 2026-09-12 replaced it with a static list; the owner found that rigid, so it became a self-filtering inbox with a reading line, then, on the owner's brief ("text dispersion, Avengers style, no click, more inbox-like, no Demo word"), a disintegration: cold rows scatter letter by letter, avatars dither out, survivors close the gap. It plays once when in view, reassembles on replay, and renders its final state under reduced motion.
 - The `Start filtering` label and the "Moving emails is disabled for this account." message, which the write-gate test asserts.

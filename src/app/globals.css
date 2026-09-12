@@ -196,24 +196,34 @@
 /*
   Landing demo. The one choreographed motion in the product. Rows are
   absolutely positioned so survivors slide with transforms only. A cold
-  row leaves its inbox slot by dissolving through a 4px dot grid (--dot is
-  the visible dot radius: 3px covers a cell, 0px is gone) and a second copy
-  dissolves in under the Sotto/Cold group. The mask colors are alpha, not
-  palette.
+  row disintegrates: every letter drifts out on its own path (--dx, --dy,
+  --r, delayed by --d, set inline from a seeded hash) and the avatar
+  dissolves through a 4px dot grid (--dot is the visible dot radius). The
+  mask colors are alpha, not palette.
 */
 @property --dot {
   syntax: "<length>";
   inherits: false;
   initial-value: 3px;
 }
-.demo-row,
-.demo-group {
+.demo-row {
   position: absolute;
   inset-inline: 0;
-  cursor: default;
-}
-.demo-row {
   height: 56px;
+  overflow: hidden;
+  cursor: default;
+  transition:
+    transform 360ms var(--ease-in-out) 520ms,
+    visibility 0s linear 0s;
+}
+.demo-row[data-gone="true"] {
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 360ms var(--ease-in-out) 520ms,
+    visibility 0s linear 900ms;
+}
+.demo-avatar {
   --dot: 3px;
   -webkit-mask-image: radial-gradient(
     circle,
@@ -223,67 +233,36 @@
   mask-image: radial-gradient(circle, #000 var(--dot), transparent var(--dot));
   -webkit-mask-size: 4px 4px;
   mask-size: 4px 4px;
-  transition:
-    transform 320ms var(--ease-in-out) 160ms,
-    --dot 200ms var(--ease-out) 80ms,
-    visibility 0s linear 0s;
+  transition: --dot 360ms var(--ease-out) 120ms;
 }
-.demo-group {
-  height: 40px;
-  transition: transform 320ms var(--ease-in-out) 160ms;
-}
-/* Out of the inbox: the dissolve is the exit, 120ms after the line arrives. */
-.demo-row[data-out="true"] {
+.demo-row[data-gone="true"] .demo-avatar {
   --dot: 0px;
-  visibility: hidden;
-  pointer-events: none;
-  transition:
-    transform 320ms var(--ease-in-out) 160ms,
-    --dot 240ms var(--ease-out) 120ms,
-    visibility 0s linear 360ms;
+  transition: --dot 480ms var(--ease-out) 160ms;
 }
-/* The copy under Sotto/Cold: hidden until its inbox row has left. */
-.demo-row[data-in] {
-  --dot: 0px;
-  visibility: hidden;
-  pointer-events: none;
+.demo-char {
+  display: inline-block;
+  will-change: transform, opacity;
   transition:
-    transform 320ms var(--ease-in-out) 160ms,
-    --dot 200ms var(--ease-out),
-    visibility 0s linear 200ms;
+    transform 360ms var(--ease-out),
+    opacity 240ms var(--ease-out),
+    filter 240ms var(--ease-out);
 }
-.demo-row[data-in="true"] {
-  --dot: 3px;
-  visibility: visible;
-  transition:
-    transform 320ms var(--ease-in-out) 160ms,
-    --dot 320ms var(--ease-out) 320ms,
-    visibility 0s linear 320ms;
-}
-.demo-line {
-  transform: translateY(var(--scan, 0px));
+.demo-row[data-gone="true"] .demo-char {
+  transform: translate(var(--dx), var(--dy)) rotate(var(--r));
   opacity: 0;
+  filter: blur(1.5px);
   transition:
-    transform 120ms var(--ease-out),
-    opacity 160ms var(--ease-out);
+    transform 720ms var(--ease-out) var(--d),
+    opacity 520ms var(--ease-out) calc(var(--d) + 160ms),
+    filter 400ms var(--ease-out) var(--d);
 }
-.demo-list[data-line="true"] .demo-line {
-  opacity: 1;
-}
-.demo-list[data-sweeping="true"] .demo-line {
-  transition-property: opacity;
-}
-/* Engines without registered properties get a plain fade instead of dots. */
-.demo[data-no-dither="true"] .demo-row {
+/* Engines without registered properties fade the avatar instead of dithering. */
+.demo[data-no-dither="true"] .demo-avatar {
   -webkit-mask-image: none;
   mask-image: none;
-  transition:
-    transform 320ms var(--ease-in-out) 160ms,
-    opacity 200ms var(--ease-out),
-    visibility 0s linear 200ms;
+  transition: opacity 360ms var(--ease-out) 120ms;
 }
-.demo[data-no-dither="true"] .demo-row[data-out="true"],
-.demo[data-no-dither="true"] .demo-row[data-in="false"] {
+.demo[data-no-dither="true"] .demo-row[data-gone="true"] .demo-avatar {
   opacity: 0;
 }
 
@@ -300,25 +279,27 @@
   .pressable:active {
     transform: none;
   }
-  /* Reduced motion: rows jump into place; only opacity changes over time. */
+  /* Reduced motion: rows jump into place; letters stay put; only opacity fades. */
   .demo-row,
-  .demo-row[data-out="true"],
-  .demo-row[data-in],
-  .demo-row[data-in="true"] {
-    -webkit-mask-image: none;
-    mask-image: none;
+  .demo-row[data-gone="true"] {
     transition:
       opacity 160ms var(--ease-out),
       visibility 0s linear 160ms;
   }
-  .demo-group {
-    transition: none;
-  }
-  .demo-row[data-out="true"],
-  .demo-row[data-in="false"] {
+  .demo-row[data-gone="true"] {
     opacity: 0;
   }
-  .demo-line {
-    display: none;
+  .demo-char,
+  .demo-row[data-gone="true"] .demo-char {
+    transition: none;
+    transform: none;
+    opacity: 1;
+    filter: none;
+  }
+  .demo-avatar,
+  .demo-row[data-gone="true"] .demo-avatar {
+    -webkit-mask-image: none;
+    mask-image: none;
+    transition: none;
   }
 }

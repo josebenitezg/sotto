@@ -153,17 +153,17 @@ All controls are shadcn/Radix from `src/components/ui`. Variants are fixed; do n
 
 Default to stillness. Only `transform`, `opacity`, and `clip-path` animate. Never `transition: all`. Never animate anything triggered by a keyboard shortcut or a page navigation.
 
-| What                      | Duration | Easing                                                                     |
-| ------------------------- | -------- | -------------------------------------------------------------------------- |
-| Press feedback            | 160ms    | `--ease-out` `cubic-bezier(0.23, 1, 0.32, 1)`                              |
-| Hover color               | 120ms    | `ease`                                                                     |
-| Select menu, popover      | 150ms    | `--ease-out`, origin at trigger                                            |
-| Sheet, dialog enter       | 200ms    | `--ease-out`                                                               |
-| Sheet, dialog exit        | 160ms    | `--ease-out`                                                               |
-| Demo row out of the inbox | 240ms    | `--ease-out`, 120ms after the line passes; dot radius 3px to 0, no opacity |
-| Demo row into Sotto/Cold  | 320ms    | `--ease-out`, starts as the inbox copy finishes; dot radius 0 to 3px       |
-| Demo rows closing the gap | 320ms    | `--ease-in-out`, starts 160ms after the row leaves                         |
-| Demo reading line sweep   | 1600ms   | ease-in-out in JS; plays once when the demo is 60% in view                 |
+| What                      | Duration    | Easing                                                                                 |
+| ------------------------- | ----------- | -------------------------------------------------------------------------------------- |
+| Press feedback            | 160ms       | `--ease-out` `cubic-bezier(0.23, 1, 0.32, 1)`                                          |
+| Hover color               | 120ms       | `ease`                                                                                 |
+| Select menu, popover      | 150ms       | `--ease-out`, origin at trigger                                                        |
+| Sheet, dialog enter       | 200ms       | `--ease-out`                                                                           |
+| Sheet, dialog exit        | 160ms       | `--ease-out`                                                                           |
+| Demo letters leaving      | 720ms       | `--ease-out`, each letter delayed 0 to 400ms across the row; opacity 520ms, blur 400ms |
+| Demo avatar dissolve      | 480ms       | `--ease-out`, dot radius 3px to 0, 160ms after the row is read                         |
+| Demo rows closing the gap | 360ms       | `--ease-in-out`, 520ms after the row is read                                           |
+| Demo sequence             | 520ms apart | starts 900ms after the list is in view; plays once                                     |
 
 Enter from `scale(0.97)` and `opacity: 0`, never from `scale(0)`. Exits are faster than enters. Hover motion is gated behind `@media (hover: hover) and (pointer: fine)`. Under `prefers-reduced-motion`, keep opacity and color changes and remove every transform. The landing demo is the one exception to stillness: it plays once, it is labeled Demo, and under reduced motion it renders its final state with opacity only.
 
@@ -180,7 +180,7 @@ Every surface designs all of these before shipping:
 
 ## Page compositions
 
-**Landing.** One screen. Header (wordmark, Pricing, Sign in). Two columns above 1024px, stacked below. Left: display headline in one color, "Cold sales emails, out of your inbox.", one sentence, Connect with Google (Open Sotto when signed in), a readiness line only when sign-in is off, the data notice. Right: the demo, five fictional emails in the app's own list surface with a Sotto/Cold group at the bottom, labeled Demo, that filters itself: once the list is on screen a reading line sweeps down; each cold row it passes dissolves out of the inbox through a 4px dot grid and dissolves back in under Sotto/Cold with its reason, while the rows below close the gap. With a mouse the line follows the cursor and moving back up restores the rows, which is the undo. Replay in the header for touch and keyboard. Rows show subject, mono sender and a preview; no timestamps, no counts except the Sotto/Cold total. Footer with Terms, Privacy, GitHub. Nothing else.
+**Landing.** One screen. Header (wordmark, Pricing, Sign in). Two columns above 1024px, stacked below. Left: display headline in one color, "Cold sales emails, out of your inbox.", one sentence, Connect with Google (Open Sotto when signed in), a readiness line only when sign-in is off, the data notice. Right: a fictional inbox in the app's list surface, five rows with avatar initial, sender, time, subject and snippet, and a Sotto/Cold count in the footer. Once it is 60% on screen and the tab is visible, the cold rows disintegrate one after another: every letter drifts right and up on its own seeded path with a slight turn and blur, the avatar dissolves through the 4px dot grid, and the rows below close the gap. What matters stays. A replay icon appears in the header when it is over. No visible Demo label: the fiction is carried by invented names and the section's accessible name. Footer with Terms, Privacy, GitHub. Nothing else.
 
 **Login.** Centered 360px column: mark, title Sign in, one sentence saying which account to use, Connect with Google, the data notice. Connection errors appear above the button. The wordmark is the way back.
 

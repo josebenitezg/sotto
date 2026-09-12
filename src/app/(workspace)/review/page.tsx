@@ -1,5 +1,6 @@
 import { ReviewPage } from "@/components/workspace";
 import { connectionErrorMessage } from "@/lib/connection-errors";
+export const metadata = { title: "Inbox · Sotto" };
 export default async function Page({
   searchParams,
 }: {

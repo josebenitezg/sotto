@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { GoogleMark, SottoMark } from "@/components/brand";
 import { GoogleDataNotice } from "@/components/google-data-notice";
@@ -31,7 +30,7 @@ export default async function LoginPage({
       <SottoMark className="size-8" />
       <h1 className="mt-6 text-2xl leading-8 font-semibold">Sign in</h1>
       <p className="mt-2 text-muted-foreground">
-        Connect Gmail. Sotto takes it from there.
+        Use the Google account Sotto should filter.
       </p>
       {error && (
         <p
@@ -60,19 +59,15 @@ export default async function LoginPage({
             role="status"
             className="mt-3 text-xs text-muted-foreground"
           >
-            Google sign-in is coming soon.
+            {isDemo()
+              ? "Sign-in is off in the demo."
+              : "Google sign-in is not set up yet."}
           </p>
         )}
         <div className="mt-4">
           <GoogleDataNotice id="google-permission" />
         </div>
       </form>
-      <Link
-        href="/"
-        className="mt-10 text-xs text-muted-foreground hover:text-foreground"
-      >
-        Back to home
-      </Link>
     </main>
   );
 }

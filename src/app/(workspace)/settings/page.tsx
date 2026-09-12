@@ -18,6 +18,7 @@ const date = (value: Date | string | null) =>
       }).format(new Date(value)) + " UTC"
     : "soon";
 
+export const metadata = { title: "Settings · Sotto" };
 export default async function Page() {
   const workspaceId = hosted() && !isDemo() ? await sessionWorkspace() : null;
   const [[workspace], allowance] = workspaceId

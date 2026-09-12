@@ -175,15 +175,15 @@ Every surface designs all of these before shipping:
 
 ## Page compositions
 
-**Landing.** Header (wordmark, Pricing, Sign in). Hero in two columns above 1024px: left, display headline, one sentence, Connect with Google, the data notice, one footnote line; right, the demo. Below, three numbered steps as one hairline list, one sentence each. Then four questions as native `details`. Footer. Nothing else: no trust strip, manifesto, testimonials, logos, or plan card.
+**Landing.** One screen. Header (wordmark, Pricing, Sign in). Left: display headline, one sentence, Connect with Google (Open Sotto when signed in), the data notice, and a readiness line only when sign-in is off. Right: the demo, which is the how-it-works. Footer with Terms, Privacy, GitHub. Nothing else: no steps, no questions, no trust strip, no manifesto, no plan card. On a phone the demo sits below the button, one swipe down.
 
-**Login.** Centered 360px column: mark, title Sign in, one sentence, Connect with Google, the data notice, privacy link. Connection errors appear above the button.
+**Login.** Centered 360px column: mark, title Sign in, one sentence saying which account to use, Connect with Google, the data notice. Connection errors appear above the button. The wordmark is the way back.
 
 **Pricing.** A catalog, never an account panel. Title Pricing, one sentence, one bordered card per plan with the price in display mono, bullets, and one action: Start trial, Choose, Current plan, or Switch. The required trial and billing terms follow. One line about self-hosting. Subscription state (trial dates, usage, cancel, refresh) lives in Settings, not here.
 
 **Privacy.** Reading width. Title, then headings and paragraphs. Content is a legal record; restyle only.
 
-**Workspace shell.** 56px header: wordmark left, Sign out or Demo right. Tab row: Inbox, Accounts, Allowlist, Settings. Pricing is reached from Settings, never from a tab. Content max 880px. Global text is limited to an error banner when an action fails, a paused-plan notice, and one allowance line.
+**Workspace shell.** 56px header: wordmark left; right, the account control (28px avatar with the Google picture or the address initial, opening a menu with name, address, Inbox, Settings, Sign out) or the Demo label. The public header shows the same control next to Open Sotto when a session exists. Tab row: Inbox, Accounts, Allowlist, Settings. Pricing is reached from Settings, never from a tab. Content max 880px. Global text is limited to an error banner when an action fails, a paused-plan notice, and one allowance line.
 
 **Inbox.** Title Inbox with account picker. One hairline list of accounts with status and controls. Filter row: Moved, Kept, Suggested with mono counts. Decision list, two lines per row, chevron. Row opens a sheet with the reason and the actions.
 

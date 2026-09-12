@@ -180,7 +180,12 @@ export default async function PlansPage({
                     : "Included in your installation"}
                 </span>
               ) : !available ? (
-                <Button disabled>Coming soon</Button>
+                <div className="space-y-2">
+                  <Button disabled>Start 3-day trial</Button>
+                  <p className="text-xs text-muted-foreground">
+                    Payments are not open yet.
+                  </p>
+                </div>
               ) : !workspace ? (
                 <form action="/api/google/connect" method="post">
                   <input type="hidden" name="intent" value="filter" />
@@ -249,11 +254,6 @@ export default async function PlansPage({
         limit, new processing pauses until the next paid period; messages stay
         in Gmail and there are no overage charges.
       </p>
-      {!available && (
-        <p className="mt-3 text-xs text-muted-foreground">
-          Payments are not open yet. Your trial has not started.
-        </p>
-      )}
       <p className="mt-8 text-[13px] text-muted-foreground">
         Sotto is open source. Self-hosting needs no subscription.{" "}
         <a

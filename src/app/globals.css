@@ -155,7 +155,6 @@
   }
   progress::-webkit-progress-value {
     background: var(--gray-1000);
-    transition: width 200ms var(--ease-out);
   }
   progress::-moz-progress-bar {
     background: var(--gray-1000);
@@ -167,7 +166,9 @@
 
 @layer utilities {
   .pressable {
-    transition: transform 160ms var(--ease-out);
+    transition-property: color, background-color, border-color, transform;
+    transition-duration: 120ms, 120ms, 120ms, 160ms;
+    transition-timing-function: ease, ease, ease, var(--ease-out);
   }
   .pressable:active:not(:disabled) {
     transform: scale(0.97);

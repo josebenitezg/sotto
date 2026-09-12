@@ -216,7 +216,7 @@ export function Workspace({
           );
         setData(await fresh.json());
       }
-      toast.success(success);
+      if (success) toast.success(success);
       return true;
     } catch (error) {
       setError(
@@ -269,7 +269,7 @@ export function Workspace({
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex h-10 shrink-0 items-center px-2 text-[13px] transition-colors duration-[120ms] after:absolute after:inset-x-2 after:bottom-0 after:h-px after:bg-foreground after:opacity-0 after:content-['']",
+                  "relative flex h-10 shrink-0 items-center px-2 text-[13px] transition-colors duration-[120ms] focus-visible:-outline-offset-2 after:absolute after:inset-x-2 after:bottom-0 after:h-px after:bg-foreground after:opacity-0 after:content-['']",
                   active
                     ? "text-foreground after:opacity-100"
                     : "text-muted-foreground hover:text-foreground",
@@ -298,31 +298,43 @@ export function Workspace({
             role="status"
             className="mb-6 rounded-sm border px-3 py-2.5 text-[13px] leading-[18px]"
           >
-            Filtering is paused until your plan is active.{" "}
-            <Link href="/pricing" className="underline underline-offset-2">
-              View your plan
-            </Link>
-            . Your history and Undo are still available.
+            {atAccountLimit(data) &&
+            data.accounts.filter((a) => a.connected).length >
+              (data.accountLimit ?? Infinity) ? (
+              <>
+                Your plan covers {data.accountLimit} Gmail account
+                {data.accountLimit === 1 ? "" : "s"}. Disconnect one or{" "}
+                <Link href="/pricing" className="underline underline-offset-2">
+                  change plan
+                </Link>{" "}
+                to resume filtering.
+              </>
+            ) : (
+              <>
+                Filtering is paused until your plan is active.{" "}
+                <Link href="/pricing" className="underline underline-offset-2">
+                  View plans
+                </Link>
+                .
+              </>
+            )}
           </p>
         )}
-        {data.allowance && data.accessActive !== false && (
-          <p
-            role="status"
-            className="mb-6 text-[13px] leading-5 text-muted-foreground"
-          >
-            {data.allowance.used} / {data.allowance.limit} emails checked
-            {data.allowance.trial
-              ? " during your trial"
-              : " this billing month"}
-            .
-            {data.allowance.exhausted
-              ? " New filtering is paused. No extra charges."
-              : ""}{" "}
-            <Link href="/settings" className="underline underline-offset-2">
-              Subscription
-            </Link>
-          </p>
-        )}
+        {data.allowance &&
+          data.accessActive !== false &&
+          pathname !== "/settings" && (
+            <p
+              role="status"
+              className="mb-6 text-[13px] leading-5 text-muted-foreground"
+            >
+              {data.allowance.used} / {data.allowance.limit} emails checked
+              {data.allowance.trial ? " during your trial" : " this month"}.
+              {data.allowance.exhausted ? " New filtering is paused." : ""}{" "}
+              <Link href="/settings" className="underline underline-offset-2">
+                Subscription
+              </Link>
+            </p>
+          )}
         {children}
       </main>
       <Toaster
@@ -421,15 +433,13 @@ function Status({ account }: { account: Account }) {
   } = useWorkspace();
   const label = !account.connected
     ? "Disconnected"
-    : accessActive === false
-      ? "Plan paused"
-      : allowance?.exhausted
-        ? "Limit reached"
-        : account.lastError
-          ? "Needs attention"
-          : account.mode === "automatic" && !account.writesEnabled && !demo
-            ? "Filtering unavailable"
-            : modeLabels[account.mode];
+    : accessActive === false || allowance?.exhausted
+      ? "Filtering unavailable"
+      : account.lastError
+        ? "Needs attention"
+        : account.mode === "automatic" && !account.writesEnabled && !demo
+          ? "Filtering unavailable"
+          : modeLabels[account.mode];
   const tone = !account.connected
     ? "text-muted-foreground"
     : label === "Filtering on"
@@ -489,7 +499,7 @@ function Onboarding() {
     <>
       <PageTitle
         title="Connect Gmail"
-        description="Sotto filters cold outreach from the last 7 days, then new mail. Every move can be undone."
+        description="Sotto filters cold outreach from the last 7 days, then new mail."
       />
       <ConnectButton />
       {!data.configured ? (
@@ -532,7 +542,11 @@ export function ReviewPage() {
         ? ["moved", "moving", "restoring"].includes(d.state)
         : d.state === "suggested",
   );
-  const selected = data.decisions.find((d) => d.id === selectedId);
+  const lastSelected = useRef<Decision | undefined>(undefined);
+  const current = data.decisions.find((d) => d.id === selectedId);
+  if (current) lastSelected.current = current;
+  // The sheet animates out with the row it showed, not an empty panel.
+  const selected = selectedId ? current : lastSelected.current;
   const selectedAccount = data.accounts.find(
     (a) => a.id === selected?.accountId,
   );
@@ -649,7 +663,7 @@ export function ReviewPage() {
         )}
       </List>
       <Sheet
-        open={!!selected}
+        open={!!selectedId && !!current}
         onOpenChange={(open) => {
           if (!open) setSelectedId(null);
         }}
@@ -782,15 +796,14 @@ function SyncProgress({ account }: { account: Account }) {
   if (!account.sync) return null;
   const { total, done, pending, failed, retrying, scanning } = account.sync;
   const working = scanning || pending > 0;
+  if (!working && !retrying && !failed) return null;
   return (
     <div className="mt-3 space-y-2 text-xs text-muted-foreground" role="status">
-      <p className="mono">
-        {scanning
-          ? "Finding recent emails…"
-          : working
-            ? `${done} of ${total} checked`
-            : `${done} checked`}
-      </p>
+      {working ? (
+        <p className="mono">
+          {scanning ? "Finding recent emails…" : `${done} of ${total} checked`}
+        </p>
+      ) : null}
       {working ? (
         <progress
           className="w-full"
@@ -964,7 +977,7 @@ export function AccountsPage() {
         {data.accounts.map((account) => (
           <AccountRow key={account.id} account={account}>
             <details className="mt-3 text-[13px] text-muted-foreground">
-              <summary className="w-fit list-none rounded-sm py-1 hover:text-foreground [&::-webkit-details-marker]:hidden">
+              <summary className="flex h-9 w-fit list-none items-center rounded-sm hover:text-foreground [&::-webkit-details-marker]:hidden">
                 Options
               </summary>
               <div className="mt-2 flex flex-wrap items-center gap-1">
@@ -1119,11 +1132,9 @@ export function AccountsPage() {
                   setConfirm(null);
               }}
             >
-              {busy
-                ? "Saving…"
-                : confirm?.action === "deleteGmailData"
-                  ? "Delete Gmail data"
-                  : "Disconnect"}
+              {confirm?.action === "deleteGmailData"
+                ? "Delete Gmail data"
+                : "Disconnect"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1138,6 +1149,7 @@ export function RulesPage() {
     [email, setEmail] = useState("");
   const [accountId, setAccountId] = useState(data.accounts[0]?.id ?? "");
   const [removeId, setRemoveId] = useState<string | null>(null);
+  if (!data.accounts.length) return <Onboarding />;
   return (
     <>
       <PageTitle
@@ -1231,9 +1243,10 @@ export function RulesPage() {
             <Button
               type="submit"
               disabled={busy || !accountId}
+              aria-busy={busy}
               className="w-full"
             >
-              {busy ? "Saving…" : "Allow sender"}
+              Allow sender
             </Button>
           </form>
         </SheetContent>
@@ -1298,13 +1311,13 @@ export function SettingsPage({ subscription }: { subscription?: ReactNode }) {
       <List label="Categories">
         <SettingRow
           title="Cold outreach"
-          description="Sales pitches from people you have not spoken with. Goes to Sotto/Cold."
+          description="Sotto/Cold"
           checked
           disabled
         />
         <SettingRow
           title="Marketing"
-          description="Campaigns, promotions and offers. Goes to Sotto/Reading."
+          description="Sotto/Reading"
           checked={account?.policy.marketing ?? false}
           disabled={!account || busy}
           onChange={(value) =>
@@ -1316,13 +1329,13 @@ export function SettingsPage({ subscription }: { subscription?: ReactNode }) {
                 marketing: value,
                 newsletters: account.policy.newsletters,
               },
-              "Saved",
+              "",
             )
           }
         />
         <SettingRow
           title="Newsletters"
-          description="Editorial newsletters and digests. Goes to Sotto/Reading."
+          description="Sotto/Reading"
           checked={account?.policy.newsletters ?? false}
           disabled={!account || busy}
           onChange={(value) =>
@@ -1334,7 +1347,7 @@ export function SettingsPage({ subscription }: { subscription?: ReactNode }) {
                 marketing: account.policy.marketing,
                 newsletters: value,
               },
-              "Saved",
+              "",
             )
           }
         />
@@ -1406,8 +1419,9 @@ function PreferencesEditor({ account }: { account: Account }) {
         type="submit"
         variant={dirty ? "default" : "outline"}
         disabled={busy || !dirty}
+        aria-busy={busy}
       >
-        {busy ? "Saving…" : "Save"}
+        Save
       </Button>
     </form>
   );

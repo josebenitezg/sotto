@@ -18,7 +18,7 @@ export default async function PublicLayout({
         Skip to content
       </a>
       <PublicHeader inApp={inApp} viewer={viewer} />
-      <div className="flex-1">{children}</div>
+      <div className="flex flex-1 flex-col">{children}</div>
       <PublicFooter />
     </div>
   );

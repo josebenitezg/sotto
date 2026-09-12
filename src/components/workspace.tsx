@@ -867,6 +867,26 @@ function FilteringControls({ account }: { account: Account }) {
   );
 }
 
+function atAccountLimit(data: Dashboard) {
+  return (
+    data.accountLimit != null &&
+    data.accounts.filter((a) => a.connected).length >= data.accountLimit
+  );
+}
+function PlanLimitNote({ limit }: { limit: number }) {
+  return (
+    <p className="text-[13px] leading-[18px] text-muted-foreground">
+      Your plan covers {limit} Gmail account{limit === 1 ? "" : "s"}.{" "}
+      <Link
+        href="/pricing"
+        className="underline underline-offset-2 hover:text-foreground"
+      >
+        Change plan
+      </Link>{" "}
+      to add another.
+    </p>
+  );
+}
 function AccountRow({
   account,
   children,
@@ -886,6 +906,8 @@ function AccountRow({
         </div>
         {account.connected ? (
           <FilteringControls account={account} />
+        ) : atAccountLimit(data) ? (
+          <PlanLimitNote limit={data.accountLimit!} />
         ) : (
           <ConnectButton outline />
         )}
@@ -931,9 +953,6 @@ export function AccountsPage() {
   } | null>(null);
   const [confirmEmail, setConfirmEmail] = useState("");
   const confirmEmailId = useId();
-  const connectedCount = data.accounts.filter((a) => a.connected).length;
-  const atAccountLimit =
-    data.accountLimit != null && connectedCount >= data.accountLimit;
   if (!data.accounts.length) return <Onboarding />;
   return (
     <>
@@ -1014,18 +1033,8 @@ export function AccountsPage() {
         ))}
       </List>
       <div className="mt-10">
-        {atAccountLimit ? (
-          <p className="text-[13px] leading-[18px] text-muted-foreground">
-            Your plan covers {data.accountLimit} Gmail account
-            {data.accountLimit === 1 ? "" : "s"}.{" "}
-            <Link
-              href="/pricing"
-              className="underline underline-offset-2 hover:text-foreground"
-            >
-              Change plan
-            </Link>{" "}
-            to add another.
-          </p>
+        {atAccountLimit(data) ? (
+          <PlanLimitNote limit={data.accountLimit!} />
         ) : (
           <>
             <SectionLabel>Add account</SectionLabel>

@@ -90,7 +90,7 @@ export default async function Page() {
                   : "No subscription yet"}
             </p>
             <p className="max-w-[56ch] text-muted-foreground">{status}</p>
-            {allowance && (
+            {active && allowance && (
               <p className="mono text-xs text-muted-foreground">
                 {allowance.used} / {allowance.limit} emails checked
                 {allowance.trial ? " during your trial" : " this month"}

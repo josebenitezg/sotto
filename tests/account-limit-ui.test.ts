@@ -30,6 +30,12 @@ it("hides the add-account button once the plan's mailbox limit is reached", () =
   expect(html).toMatch(/href="\/pricing"[^>]*>Change plan</);
 });
 
+it("hides the reconnect button for a retained disconnected account at the limit", () => {
+  const html = render(1, 1);
+  expect(html).not.toContain("Connect with Google");
+  expect(html.match(/Change plan/g)).toHaveLength(2);
+});
+
 it("offers to add an account while the plan has room", () => {
   expect(render(2, 1)).toContain("Add account");
 });

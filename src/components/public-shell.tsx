@@ -1,4 +1,6 @@
 import Link from "next/link";
+import type { Viewer } from "@/lib/types";
+import { AccountMenu } from "./account-menu";
 import { SottoMark } from "./brand";
 
 export function Wordmark({ className = "" }: { className?: string }) {
@@ -16,23 +18,36 @@ export function Wordmark({ className = "" }: { className?: string }) {
   );
 }
 
-export function PublicHeader({ inApp = false }: { inApp?: boolean }) {
+export function PublicHeader({
+  inApp = false,
+  viewer = null,
+}: {
+  inApp?: boolean;
+  viewer?: Viewer | null;
+}) {
   return (
     <header className="mx-auto flex h-14 w-full max-w-[1120px] items-center justify-between px-6">
       <Wordmark />
       <nav aria-label="Main navigation" className="flex items-center gap-1">
-        <Link
-          href="/pricing"
-          className="flex h-8 items-center rounded-sm px-3 text-[13px] text-muted-foreground transition-colors duration-[120ms] hover:text-foreground"
-        >
-          {inApp ? "Plan" : "Pricing"}
-        </Link>
+        {inApp ? null : (
+          <Link
+            href="/pricing"
+            className="flex h-8 items-center rounded-sm px-3 text-[13px] text-muted-foreground transition-colors duration-[120ms] hover:text-foreground"
+          >
+            Pricing
+          </Link>
+        )}
         <Link
           href={inApp ? "/review" : "/login"}
           className="flex h-8 items-center rounded-sm border border-border px-3 text-[13px] text-foreground transition-colors duration-[120ms] hover:border-border-hover hover:bg-gray-100"
         >
           {inApp ? "Open Sotto" : "Sign in"}
         </Link>
+        {viewer ? (
+          <div className="ml-1">
+            <AccountMenu viewer={viewer} />
+          </div>
+        ) : null}
       </nav>
     </header>
   );

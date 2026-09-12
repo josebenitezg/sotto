@@ -1,12 +1,14 @@
 import { PublicFooter, PublicHeader } from "@/components/public-shell";
-import { sessionWorkspace } from "@/lib/server/auth";
+import { sessionViewer, sessionWorkspace } from "@/lib/server/auth";
 import { isDemo } from "@/lib/server/config";
 export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const inApp = isDemo() || !!(await sessionWorkspace());
+  const workspaceId = await sessionWorkspace();
+  const inApp = isDemo() || !!workspaceId;
+  const viewer = workspaceId ? await sessionViewer() : null;
   return (
     <div className="flex min-h-svh flex-col">
       <a
@@ -15,7 +17,7 @@ export default async function PublicLayout({
       >
         Skip to content
       </a>
-      <PublicHeader inApp={inApp} />
+      <PublicHeader inApp={inApp} viewer={viewer} />
       <div className="flex-1">{children}</div>
       <PublicFooter />
     </div>

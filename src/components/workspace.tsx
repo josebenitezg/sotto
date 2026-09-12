@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { GoogleMark } from "./brand";
 import { Wordmark } from "./public-shell";
+import { AccountMenu } from "./account-menu";
 import { GoogleDataNotice } from "./google-data-notice";
 import type { Account, Dashboard, Decision, Mode } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -246,6 +247,8 @@ export function Workspace({
             <span className="text-xs text-muted-foreground">
               Demo · nothing touches Gmail
             </span>
+          ) : data.viewer ? (
+            <AccountMenu viewer={data.viewer} />
           ) : data.authenticated ? (
             <form action="/api/logout" method="post">
               <Button type="submit" variant="ghost" size="sm">

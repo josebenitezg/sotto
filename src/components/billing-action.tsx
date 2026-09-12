@@ -72,10 +72,11 @@ export function BillingAction({
   );
 }
 
-export function RefreshAfterCheckout() {
+export function RefreshAfterCheckout({ confirmed }: { confirmed: boolean }) {
   const router = useRouter();
   const done = useRef(false);
   const [error, setError] = useState(false);
+  const [checking, setChecking] = useState(true);
   useEffect(() => {
     if (done.current) return;
     done.current = true;
@@ -87,13 +88,24 @@ export function RefreshAfterCheckout() {
         if (!response.ok) throw new Error();
         router.refresh();
       })
-      .catch(() => setError(true));
+      .catch(() => setError(true))
+      .finally(() => setChecking(false));
   }, [router]);
+  if (confirmed) return null;
   return (
-    <p role="status" className="text-sm text-muted-foreground">
-      {error
-        ? "Confirmation is pending. Use Refresh status to check again."
-        : "We check your subscription directly with Stripe."}
-    </p>
+    <div className="space-y-4">
+      <p role="status" className="text-sm text-muted-foreground">
+        {checking
+          ? "Confirming your subscription…"
+          : error
+            ? "We could not confirm your subscription yet. Please try again."
+            : "Your subscription confirmation is still pending. Check again in a moment."}
+      </p>
+      {!checking && (
+        <BillingAction action="refresh" secondary>
+          Check again
+        </BillingAction>
+      )}
+    </div>
   );
 }

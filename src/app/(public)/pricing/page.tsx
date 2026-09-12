@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft, Check } from "lucide-react";
 import {
   BillingAction,
@@ -13,6 +14,7 @@ import { hasAccess } from "@/lib/server/entitlements";
 import { workspaceAllowance } from "@/lib/server/allowances";
 import { GoogleDataNotice } from "@/components/google-data-notice";
 import { isPlanId, mailboxLimit, plans } from "@/lib/plans";
+import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Pricing · Sotto" };
 export default async function PlansPage({
@@ -30,7 +32,6 @@ export default async function PlansPage({
       )
     : [];
   const available = billingReady();
-  const allowance = workspaceId ? await workspaceAllowance(workspaceId) : null;
   const active =
     workspace &&
     hasAccess({
@@ -50,7 +51,47 @@ export default async function PlansPage({
   const currentPlan = isPlanId(workspace?.billing_plan)
     ? plans[workspace.billing_plan]
     : null;
+  // Plan ownership is independent of complimentary access and mailbox limits.
+  const subscriptionActive =
+    !!workspace?.stripe_subscription_id &&
+    hasAccess({
+      subscription_status: workspace.subscription_status,
+      trial_end: workspace.trial_end,
+      paid_until: workspace.paid_until,
+    });
   const params = await searchParams;
+  if (params.checkout === "success") {
+    if (!workspace) redirect("/login");
+    return (
+      <main
+        id="content"
+        className="mx-auto flex min-h-[65svh] w-full max-w-[560px] flex-col items-start justify-center px-6 py-16"
+      >
+        {subscriptionActive && (
+          <div className="mb-6 flex size-10 items-center justify-center rounded-full bg-foreground text-background">
+            <Check size={20} aria-hidden="true" />
+          </div>
+        )}
+        <h1 className="text-3xl leading-10 font-semibold">Thank you</h1>
+        {subscriptionActive && (
+          <p className="mt-3 text-muted-foreground">
+            {workspace.subscription_status === "trialing"
+              ? `Your ${currentPlan?.name ?? "Sotto"} trial is ready.`
+              : `Your ${currentPlan?.name ?? "Sotto"} plan is active.`}
+          </p>
+        )}
+        {available && (
+          <div className="mt-3">
+            <RefreshAfterCheckout confirmed={subscriptionActive} />
+          </div>
+        )}
+        <Button asChild size="lg" className="mt-8">
+          <Link href="/accounts">Manage my accounts</Link>
+        </Button>
+      </main>
+    );
+  }
+  const allowance = workspaceId ? await workspaceAllowance(workspaceId) : null;
   const date = (value: Date) =>
     new Intl.DateTimeFormat("en-US", {
       dateStyle: "medium",
@@ -71,14 +112,16 @@ export default async function PlansPage({
         </Link>
       ) : null}
       <h1 className="text-2xl leading-8 font-semibold">
-        A quieter inbox. A simple plan.
+        {subscriptionActive ? "Your plan" : "A quieter inbox. A simple plan."}
       </h1>
       <p className="mt-2 text-muted-foreground">
         {workspace?.full_access
           ? "Your full access is enabled. No trial is needed."
-          : workspace?.trial_used
-            ? "Choose the plan that fits your inbox. Cancel anytime."
-            : "Try Sotto free for 3 days. Cancel anytime."}
+          : subscriptionActive && currentPlan
+            ? `Sotto ${currentPlan.name} is your current plan.`
+            : workspace?.trial_used
+              ? "Choose the plan that fits your inbox. Cancel anytime."
+              : "Try Sotto free for 3 days. Cancel anytime."}
       </p>
       {workspace?.full_access && (
         <p className="mt-6 text-sm text-muted-foreground">
@@ -152,81 +195,91 @@ export default async function PlansPage({
           </p>
         </section>
       ) : null}
-      {params.checkout === "success" && workspace && available && (
-        <div className="mt-4">
-          <RefreshAfterCheckout />
-        </div>
-      )}
       {params.checkout === "canceled" && (
         <p role="status" className="mt-4 text-sm text-muted-foreground">
           Checkout was canceled. No new subscription was started.
         </p>
       )}
       <div className="mt-8 grid gap-4 md:grid-cols-3">
-        {Object.values(plans).map((plan) => (
-          <section
-            key={plan.id}
-            className="rounded-md border p-6"
-            aria-labelledby={`plan-${plan.id}`}
-          >
-            <h2 id={`plan-${plan.id}`} className="text-sm font-medium">
-              {plan.name}
-            </h2>
-            <p className="mt-3 flex items-baseline gap-2">
-              <span className="mono text-4xl leading-10 font-medium tracking-[-0.02em]">
-                ${plan.priceCents / 100}
-              </span>
-              <span className="text-[13px] text-muted-foreground">/ month</span>
-            </p>
-            <ul className="my-6 space-y-3 text-[13px] leading-[18px]">
-              {[
-                `${plan.mailboxes} Gmail account${plan.mailboxes === 1 ? "" : "s"}`,
-                `${plan.emails} emails checked / month`,
-                `${plan.trialEmails} emails in your 3-day trial`,
-                `Automatic checks every ${process.env.COMPOSIO_NOTIFICATION_MODE === "poll" ? 30 : 15} minutes`,
-                "A reason for every move",
-                "Undo anytime in Sotto",
-              ].map((line) => (
-                <li key={line} className="flex items-center gap-2">
-                  <Check
-                    size={14}
-                    className="shrink-0 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  {line}
-                </li>
-              ))}
-            </ul>
-            {workspace?.internal || workspace?.full_access ? (
-              <span className="text-xs text-muted-foreground">
-                {workspace?.full_access
-                  ? "Included in your full access"
-                  : "Included in your installation"}
-              </span>
-            ) : !available ? (
-              <Button disabled>Coming soon</Button>
-            ) : !workspace ? (
-              <form action="/api/google/connect" method="post">
-                <input type="hidden" name="intent" value="filter" />
-                <Button type="submit" disabled={!configured()}>
-                  Connect Google
-                </Button>
-              </form>
-            ) : active || overLimit ? (
-              <BillingAction action="portal" secondary>
-                {workspace.billing_plan === plan.id
-                  ? "Manage plan"
-                  : `Switch to ${plan.name}`}
-              </BillingAction>
-            ) : (
-              <BillingAction action="checkout" plan={plan.id}>
-                {workspace.trial_used
-                  ? `Choose ${plan.name}`
-                  : "Start 3-day trial"}
-              </BillingAction>
-            )}
-          </section>
-        ))}
+        {Object.values(plans).map((plan) => {
+          const isCurrent = subscriptionActive && currentPlan?.id === plan.id;
+          return (
+            <section
+              key={plan.id}
+              className={cn(
+                "rounded-md border p-6",
+                isCurrent && "border-foreground",
+              )}
+              aria-labelledby={`plan-${plan.id}`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 id={`plan-${plan.id}`} className="text-sm font-medium">
+                  {plan.name}
+                </h2>
+                {isCurrent && (
+                  <span className="rounded-full bg-foreground px-2 py-1 text-[11px] font-medium text-background">
+                    Current plan
+                  </span>
+                )}
+              </div>
+              <p className="mt-3 flex items-baseline gap-2">
+                <span className="mono text-4xl leading-10 font-medium tracking-[-0.02em]">
+                  ${plan.priceCents / 100}
+                </span>
+                <span className="text-[13px] text-muted-foreground">
+                  / month
+                </span>
+              </p>
+              <ul className="my-6 space-y-3 text-[13px] leading-[18px]">
+                {[
+                  `${plan.mailboxes} Gmail account${plan.mailboxes === 1 ? "" : "s"}`,
+                  `${plan.emails} emails checked / month`,
+                  `${plan.trialEmails} emails in your 3-day trial`,
+                  `Automatic checks every ${process.env.COMPOSIO_NOTIFICATION_MODE === "poll" ? 30 : 15} minutes`,
+                  "A reason for every move",
+                  "Undo anytime in Sotto",
+                ].map((line) => (
+                  <li key={line} className="flex items-center gap-2">
+                    <Check
+                      size={14}
+                      className="shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    {line}
+                  </li>
+                ))}
+              </ul>
+              {workspace?.internal || workspace?.full_access ? (
+                <span className="text-xs text-muted-foreground">
+                  {workspace?.full_access
+                    ? "Included in your full access"
+                    : "Included in your installation"}
+                </span>
+              ) : !available ? (
+                <Button disabled>Coming soon</Button>
+              ) : !workspace ? (
+                <form action="/api/google/connect" method="post">
+                  <input type="hidden" name="intent" value="filter" />
+                  <Button type="submit" disabled={!configured()}>
+                    Connect Google
+                  </Button>
+                </form>
+              ) : active || overLimit ? (
+                <BillingAction action="portal" secondary>
+                  {workspace.billing_plan === plan.id
+                    ? "Manage plan"
+                    : `Switch to ${plan.name}`}
+                </BillingAction>
+              ) : (
+                <BillingAction action="checkout" plan={plan.id}>
+                  {workspace.trial_used
+                    ? `Choose ${plan.name}`
+                    : "Start 3-day trial"}
+                </BillingAction>
+              )}
+            </section>
+          );
+        })}
         <section
           className="rounded-md border p-6"
           aria-labelledby="plan-enterprise"

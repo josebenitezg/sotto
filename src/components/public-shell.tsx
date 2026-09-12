@@ -25,7 +25,7 @@ export function PublicHeader({ inApp = false }: { inApp?: boolean }) {
           href="/pricing"
           className="flex h-8 items-center rounded-sm px-3 text-[13px] text-muted-foreground transition-colors duration-[120ms] hover:text-foreground"
         >
-          Pricing
+          {inApp ? "Plan" : "Pricing"}
         </Link>
         <Link
           href={inApp ? "/review" : "/login"}

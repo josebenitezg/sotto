@@ -10,7 +10,8 @@ export function Avatar({
   viewer: Pick<Viewer, "email" | "name" | "picture">;
   className?: string;
 }) {
-  const initial = (viewer.name || viewer.email || "").slice(0, 1);
+  // Array.from keeps an emoji or accented first character whole.
+  const initial = Array.from(viewer.name || viewer.email || "")[0] ?? "";
   return viewer.picture ? (
     // Google avatar URLs are not on an allowlisted next/image host; a plain
     // img with no referrer is what Google expects for these.

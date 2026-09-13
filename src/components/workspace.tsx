@@ -524,6 +524,8 @@ export function ReviewPage() {
   const [accountId, setAccountId] = useState("all");
   const [filter, setFilter] = useState<"suggested" | "kept" | "moved">("moved");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Hooks stay above the early return: the account count can change while mounted.
+  const lastSelected = useRef<Decision | undefined>(undefined);
   if (!data.accounts.length) return <Onboarding />;
   const scoped = data.decisions.filter(
     (d) => accountId === "all" || d.accountId === accountId,
@@ -542,7 +544,6 @@ export function ReviewPage() {
         ? ["moved", "moving", "restoring"].includes(d.state)
         : d.state === "suggested",
   );
-  const lastSelected = useRef<Decision | undefined>(undefined);
   const current = data.decisions.find((d) => d.id === selectedId);
   if (current) lastSelected.current = current;
   // The sheet animates out with the row it showed, not an empty panel.
@@ -1110,6 +1111,7 @@ export function AccountsPage() {
             <AlertDialogAction
               variant="destructive"
               data-filled="true"
+              aria-busy={busy}
               disabled={
                 busy ||
                 (confirm?.action === "deleteGmailData" &&

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /*
   A fictional inbox. Once it is on screen, each cold email disintegrates:
@@ -112,6 +113,7 @@ export function InboxDemo() {
   const [reduced, setReduced] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const section = useRef<HTMLElement>(null);
+  const replayButton = useRef<HTMLButtonElement>(null);
   const timers = useRef<number[]>([]);
   const userActed = useRef(false);
 
@@ -185,6 +187,9 @@ export function InboxDemo() {
 
   const replay = () => {
     userActed.current = true;
+    // The button hides while it runs; focus must not sit on a hidden node.
+    if (document.activeElement === replayButton.current)
+      section.current?.focus({ preventScroll: true });
     if (reduced) {
       setGone((current) =>
         current.some(Boolean) ? rows.map(() => false) : rows.map((r) => r.cold),
@@ -202,11 +207,13 @@ export function InboxDemo() {
     <section
       ref={section}
       aria-label="Sample inbox with fictional emails"
-      className="demo w-full overflow-hidden rounded-md border"
+      tabIndex={-1}
+      className="demo w-full overflow-hidden rounded-md border outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       <div className="flex h-11 items-center justify-between border-b pr-2 pl-4 text-small">
         <span className="font-medium">Inbox</span>
         <Button
+          ref={replayButton}
           variant="ghost"
           size="icon-sm"
           aria-label="Replay"
@@ -264,7 +271,12 @@ export function InboxDemo() {
                     </span>
                   )}
                 </div>
-                <p className="text-small text-muted-foreground">
+                <p
+                  className={cn(
+                    "text-small text-muted-foreground",
+                    row.cold ? "whitespace-nowrap" : "truncate",
+                  )}
+                >
                   {row.cold ? (
                     <>
                       <Scatter

@@ -5,6 +5,7 @@ import { appUrl, isDemo, publicSignup } from "@/lib/server/config";
 import { hash, unseal } from "@/lib/server/crypto";
 import { pilotAdmission } from "@/lib/server/global-config";
 import { connectIdentity } from "@/lib/server/workspaces";
+import { profileFromClaims } from "@/lib/server/profile";
 import { query } from "@/lib/server/db";
 import { enqueueAccount } from "@/lib/server/queue";
 import { processingAllowed } from "@/lib/server/entitlements";
@@ -76,7 +77,11 @@ export async function GET(request: Request) {
       throw new ConnectionError("permissions", 403);
     stage = "workspace";
     const workspaceId = await connectIdentity(
-      { sub: identity.sub, email: identity.email },
+      {
+        sub: identity.sub,
+        email: identity.email,
+        ...profileFromClaims(identity),
+      },
       tokens.refresh_token ?? undefined,
       pending.workspace_id,
       pending.created_at,
@@ -91,7 +96,7 @@ export async function GET(request: Request) {
       );
     }
     stage = "session";
-    const session = await createSession(workspaceId);
+    const session = await createSession(workspaceId, identity.sub);
     const response = NextResponse.redirect(
       `${appUrl()}/${(await processingAllowed(workspaceId)) ? "review" : "pricing"}?connected=1`,
     );

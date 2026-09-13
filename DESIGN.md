@@ -39,10 +39,10 @@ Dark only. `<html class="dark">`, `color-scheme: dark`, theme color `#000000`. D
 
 Canvas and surfaces:
 
-| Token            | Value     | Use                                        |
-| ---------------- | --------- | ------------------------------------------ |
-| `--background`   | `#000000` | Page canvas                                |
-| `--background-2` | `#0a0a0a` | Header, sheets, popovers, the landing demo |
+| Token            | Value     | Use                              |
+| ---------------- | --------- | -------------------------------- |
+| `--background`   | `#000000` | Page canvas                      |
+| `--background-2` | `#0a0a0a` | Sheets, dialogs, popovers, menus |
 
 Gray scale (component roles):
 
@@ -75,17 +75,17 @@ Rules:
 
 ## Typography
 
-Geist Sans for everything readable. Geist Mono for email addresses, timestamps, counts, and identifiers. Nothing else.
+Geist Sans for everything readable. Geist Mono for email addresses, timestamps, counts, and identifiers. Nothing else. The wordmark is the lowercase logotype "sotto"; prose always says Sotto.
 
-| Role    | Size/line                | Weight | Tracking | Use                                            |
-| ------- | ------------------------ | ------ | -------- | ---------------------------------------------- |
-| display | 48/52 to 64/64 (`clamp`) | 600    | -0.04em  | Landing headline only                          |
-| title   | 24/32                    | 600    | -0.02em  | Page title, one per page                       |
-| heading | 14/20                    | 500    | 0        | Section labels, sheet titles, row primary line |
-| body    | 14/20                    | 400    | 0        | Everything by default                          |
-| small   | 13/18                    | 400    | 0        | Secondary line in a row, notices               |
-| caption | 12/16                    | 400    | 0        | Footers, timestamps, tab counts                |
-| mono    | 13/18                    | 400    | 0        | Addresses, times, counts (`tabular-nums`)      |
+| Role    | Size/line                | Weight | Tracking | Use                                                                             |
+| ------- | ------------------------ | ------ | -------- | ------------------------------------------------------------------------------- |
+| display | 48/52 to 64/64 (`clamp`) | 600    | -0.04em  | Landing headline only                                                           |
+| title   | 24/32                    | 600    | -0.02em  | Page title, one per page                                                        |
+| heading | 14/20                    | 500    | 0        | Section labels, sheet titles, row primary line                                  |
+| body    | 14/20                    | 400    | 0        | Everything by default                                                           |
+| small   | 13/18                    | 400    | 0        | Secondary line in a row, notices. Utility `text-small`; never spell 13px inline |
+| caption | 12/16                    | 400    | 0        | Footers, timestamps, tab counts                                                 |
+| mono    | 13/18                    | 400    | 0        | Addresses, times, counts (`tabular-nums`)                                       |
 
 Headings use `text-wrap: balance`. Body uses `text-wrap: pretty`. Reading width is 60 to 68 characters; the privacy page is the only long-form surface.
 
@@ -103,7 +103,7 @@ Scale: 4, 8, 12, 16, 24, 32, 48, 64. Within a group use 4 to 12. Between groups 
 
 Header height is 56px on every surface. Workspace navigation is a horizontal tab row under the header, on every viewport. Tabs scroll horizontally on small screens with the scrollbar hidden. There is no sidebar and no bottom bar.
 
-Radius: 6px controls (`--radius-sm`), 8px surfaces (`--radius-md`), 12px large framed objects such as the landing demo (`--radius-lg`). A child's radius is never larger than its parent's.
+Radius: 6px controls (`--radius-sm`), 8px surfaces (`--radius-md`), 12px reserved for large framed objects (`--radius-lg`, currently unused). A child's radius is never larger than its parent's.
 
 ## Surfaces
 
@@ -111,7 +111,7 @@ The page is one continuous black canvas. Earn a surface only for:
 
 - A list. Lists are the primary composition: a single 1px border around the group, hairline dividers between rows, no card per row.
 - An overlay: sheet, dialog, select menu, toast.
-- The landing demo.
+- The landing demo, which reuses the list surface.
 
 Never nest a bordered box in a bordered box. Never place two bordered sections directly under each other without a heading or 24px between them. Never use a card to hold one paragraph.
 
@@ -143,6 +143,8 @@ All controls are shadcn/Radix from `src/components/ui`. Variants are fixed; do n
 
 **Toast.** Sonner, bottom right, `--background-2`, 1px border. 2 to 5 words, no description.
 
+**Error and notice text.** Plain text, 13/18, no box. Errors in `--destructive` next to the control that caused them, page-level ones above the content. Borders are for lists and overlays only.
+
 **Empty state.** Inside the list surface. Title 14/20 medium, one sentence 13/18 `--gray-900`. No icon tile.
 
 **Progress.** 2px track `--gray-300`, fill `--gray-1000`. One line of mono text above it.
@@ -151,16 +153,19 @@ All controls are shadcn/Radix from `src/components/ui`. Variants are fixed; do n
 
 Default to stillness. Only `transform`, `opacity`, and `clip-path` animate. Never `transition: all`. Never animate anything triggered by a keyboard shortcut or a page navigation.
 
-| What                 | Duration | Easing                                            |
-| -------------------- | -------- | ------------------------------------------------- |
-| Press feedback       | 160ms    | `--ease-out` `cubic-bezier(0.23, 1, 0.32, 1)`     |
-| Hover color          | 120ms    | `ease`                                            |
-| Select menu, popover | 150ms    | `--ease-out`, origin at trigger                   |
-| Sheet, dialog enter  | 200ms    | `--ease-out`                                      |
-| Sheet, dialog exit   | 160ms    | `--ease-out`                                      |
-| Landing demo rows    | 240ms    | `--ease-in-out` `cubic-bezier(0.77, 0, 0.175, 1)` |
+| What                      | Duration    | Easing                                                                                 |
+| ------------------------- | ----------- | -------------------------------------------------------------------------------------- |
+| Press feedback            | 160ms       | `--ease-out` `cubic-bezier(0.23, 1, 0.32, 1)`                                          |
+| Hover color               | 120ms       | `ease`                                                                                 |
+| Select menu, popover      | 150ms       | `--ease-out`, origin at trigger                                                        |
+| Sheet, dialog enter       | 200ms       | `--ease-out`                                                                           |
+| Sheet, dialog exit        | 160ms       | `--ease-out`                                                                           |
+| Demo letters leaving      | 720ms       | `--ease-out`, each letter delayed 0 to 400ms across the row; opacity 520ms, blur 400ms |
+| Demo avatar dissolve      | 480ms       | `--ease-out`, dot radius 3px to 0, 160ms after the row is read                         |
+| Demo rows closing the gap | 360ms       | `--ease-in-out`, 520ms after the row is read                                           |
+| Demo sequence             | 520ms apart | starts 900ms after the list is in view; plays once                                     |
 
-Enter from `scale(0.97)` and `opacity: 0`, never from `scale(0)`. Exits are faster than enters. Hover motion is gated behind `@media (hover: hover) and (pointer: fine)`. Under `prefers-reduced-motion`, keep opacity and color changes and remove every transform.
+Enter from `scale(0.97)` and `opacity: 0`, never from `scale(0)`. Exits are faster than enters. Hover motion is gated behind `@media (hover: hover) and (pointer: fine)`. Under `prefers-reduced-motion`, keep opacity and color changes and remove every transform. The landing demo is the one exception to stillness: it plays once, it is labeled Demo, and under reduced motion it renders its final state with opacity only.
 
 ## States
 
@@ -175,15 +180,15 @@ Every surface designs all of these before shipping:
 
 ## Page compositions
 
-**Landing.** Header (wordmark, Pricing, Sign in). Hero in two columns above 1024px: left, display headline, one sentence, Connect with Google, the data notice, one footnote line; right, the demo. Below, three numbered steps as one hairline list, one sentence each. Then four questions as native `details`. Footer. Nothing else: no trust strip, manifesto, testimonials, logos, or plan card.
+**Landing.** One screen. Header (wordmark, Pricing, Sign in). Two columns above 1024px, stacked below. Left: display headline in one color, "Cold sales emails, out of your inbox.", one sentence, Connect with Google (Open Sotto when signed in), a readiness line only when sign-in is off, the data notice. Right: a fictional inbox in the app's list surface, five rows with avatar initial, sender, time, subject and snippet, and a Sotto/Cold count in the footer. Once it is 60% on screen and the tab is visible, the cold rows disintegrate one after another: every letter drifts right and up on its own seeded path with a slight turn and blur, the avatar dissolves through the 4px dot grid, and the rows below close the gap. What matters stays. A replay icon appears in the header when it is over. No visible Demo label: the fiction is carried by invented names and the section's accessible name. Footer with Terms, Privacy, GitHub. Nothing else.
 
-**Login.** Centered 360px column: mark, title Sign in, one sentence, Connect with Google, the data notice, privacy link. Connection errors appear above the button.
+**Login.** Centered 360px column: mark, title Sign in, one sentence saying which account to use, Connect with Google, the data notice. Connection errors appear above the button. The wordmark is the way back.
 
 **Pricing.** A catalog, never an account panel. Title Pricing, one sentence, one bordered card per plan with the price in display mono, bullets, and one action: Start trial, Choose, Current plan, or Switch. The required trial and billing terms follow. One line about self-hosting. Subscription state (trial dates, usage, cancel, refresh) lives in Settings, not here.
 
 **Privacy.** Reading width. Title, then headings and paragraphs. Content is a legal record; restyle only.
 
-**Workspace shell.** 56px header: wordmark left, Sign out or Demo right. Tab row: Inbox, Accounts, Allowlist, Settings. Pricing is reached from Settings, never from a tab. Content max 880px. Global text is limited to an error banner when an action fails, a paused-plan notice, and one allowance line.
+**Workspace shell.** 56px header: wordmark left; right, the account control (28px avatar with the Google picture or the address initial, opening a menu with name, address, Inbox, Settings, Sign out) or the Demo label. The public header shows the same control next to Open Sotto when a session exists. Tab row: Inbox, Accounts, Allowlist, Settings. Pricing is reached from Settings, never from a tab. Content max 880px. Global text is limited to an error banner when an action fails, a paused-plan notice, and one allowance line.
 
 **Inbox.** Title Inbox with account picker. One hairline list of accounts with status and controls. Filter row: Moved, Kept, Suggested with mono counts. Decision list, two lines per row, chevron. Row opens a sheet with the reason and the actions.
 

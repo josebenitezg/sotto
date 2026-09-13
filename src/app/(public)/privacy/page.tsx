@@ -2,7 +2,7 @@ export default function PrivacyPage() {
   return (
     <main
       id="content"
-      className="mx-auto w-full max-w-[680px] space-y-5 px-6 py-16 text-[15px] leading-6 md:py-24 [&_h2]:pt-6 [&_h2]:text-base [&_h2]:leading-6 [&_h2]:font-medium [&_h2]:text-foreground [&_a]:text-foreground"
+      className="mx-auto w-full max-w-[680px] space-y-6 px-6 py-16 text-[15px] leading-6 md:py-24 [&_h2]:pt-6 [&_h2]:text-base [&_h2]:leading-6 [&_h2]:font-medium [&_h2]:text-foreground [&_a]:text-foreground"
     >
       <h1 className="text-2xl leading-8 font-semibold">Privacy</h1>
       <p className="text-muted-foreground">
@@ -30,12 +30,14 @@ export default function PrivacyPage() {
       <p className="text-muted-foreground">
         Connection identifiers, encrypted credentials for direct Google
         connections, rules, message identifiers, sender, subject, and decision
-        history. We also store the AI model and input, cached-input and output
-        token counts linked to the account to measure service usage and cost. We
-        record checked-message identifiers and a per-period usage total to
-        enforce plan allowances. These usage records contain no message text.
-        Sotto does not store full message bodies. You can delete a Gmail
-        connection's data from Accounts, as explained below.
+        history. We also store the name and profile picture of the Google
+        account you sign in with, only to show who is signed in. We also store
+        the AI model and input, cached-input and output token counts linked to
+        the account to measure service usage and cost. We record checked-message
+        identifiers and a per-period usage total to enforce plan allowances.
+        These usage records contain no message text. Sotto does not store full
+        message bodies. You can delete a Gmail connection's data from Accounts,
+        as explained below.
       </p>
       <h2 id="data-protection">How we protect Google user data</h2>
       <p className="text-muted-foreground">
@@ -173,9 +175,10 @@ export default function PrivacyPage() {
       <h2>The Google permission we request</h2>
       <p className="text-muted-foreground">
         Direct Google connections request gmail.modify, which includes reading,
-        modifying, and sending email. A managed Composio connection may request
-        full Gmail access, which also permits permanent deletion; the Google
-        consent screen shows the permission being granted. Sotto only uses fixed
+        modifying, and sending email, plus your basic profile (name and picture)
+        to show who is signed in. A managed Composio connection may request full
+        Gmail access, which also permits permanent deletion; the Google consent
+        screen shows the permission being granted. Sotto only uses fixed
         operations for reading, labeling, and restoring messages. It does not
         implement sending, deleting, or marking messages as read.
       </p>
@@ -195,7 +198,7 @@ export default function PrivacyPage() {
         . Disconnecting does not delete emails, labels, or Sotto's decision
         history.
       </p>
-      <p className="text-[13px] leading-5 text-muted-foreground">
+      <p className="text-small text-muted-foreground">
         <strong>Delete Gmail data.</strong> In Accounts, this action asks you to
         confirm the address and removes that account's connection, credential,
         preferences, allowed senders, decisions, jobs, events, and AI usage
@@ -209,7 +212,7 @@ export default function PrivacyPage() {
         again. This action does not request deletion of records that providers
         may retain under their own policies.
       </p>
-      <p className="text-[13px] leading-5 text-muted-foreground">
+      <p className="text-small text-muted-foreground">
         For support, privacy questions, or requests to delete sotto.email data,
         contact{" "}
         <a
@@ -220,7 +223,7 @@ export default function PrivacyPage() {
         </a>
         .
       </p>
-      <p className="text-[13px] leading-5 text-muted-foreground">
+      <p className="text-small text-muted-foreground">
         Last updated: September 11, 2026. Each installation's operator is
         responsible for its configuration and data processing.
       </p>

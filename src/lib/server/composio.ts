@@ -1,3 +1,4 @@
+import { profileFromClaims } from "./profile";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { required } from "./config";
@@ -135,6 +136,8 @@ export async function composioIdentity(connection: ComposioConnection) {
       id: identifier,
       email: z.email(),
       verified_email: z.literal(true),
+      name: z.string().optional(),
+      picture: z.string().optional(),
     })
     .parse(await composioProxy(connection, "/oauth2/v2/userinfo"));
   const profile = z
@@ -142,7 +145,11 @@ export async function composioIdentity(connection: ComposioConnection) {
     .parse(await composioProxy(connection, "/gmail/v1/users/me/profile"));
   if (identity.email.toLowerCase() !== profile.emailAddress.toLowerCase())
     throw new Error("Gmail identity mismatch");
-  return { sub: identity.id, email: identity.email.toLowerCase() };
+  return {
+    sub: identity.id,
+    email: identity.email.toLowerCase(),
+    ...profileFromClaims(identity),
+  };
 }
 
 export async function ensureComposioTrigger(connection: ComposioConnection) {

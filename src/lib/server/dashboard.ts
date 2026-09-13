@@ -1,6 +1,6 @@
 import type { Account, Dashboard, Decision, Rule } from "../types";
 import { demoDashboard } from "../demo";
-import { sessionWorkspace } from "./auth";
+import { sessionViewer, sessionWorkspace } from "./auth";
 import { configured, hosted, isDemo, writesEnabled } from "./config";
 import { mailboxLimit } from "../plans";
 import { query } from "./db";
@@ -22,10 +22,17 @@ export async function dashboard(): Promise<Dashboard> {
     writesEnabled: false,
   };
   if (!loggedIn) return empty;
-  const [rawAccounts, rawDecisions, rawRules, accessActive, allowance, [plan]] =
-    await Promise.all([
-      query(
-        `SELECT a.id,a.email,a.name,a.mode,a.policy,a.connected,a.last_sync,a.watch_expires,a.last_error,a.reviewed_at,a.start_at,a.history_id,
+  const [
+    rawAccounts,
+    rawDecisions,
+    rawRules,
+    accessActive,
+    allowance,
+    [plan],
+    viewer,
+  ] = await Promise.all([
+    query(
+      `SELECT a.id,a.email,a.name,a.mode,a.policy,a.connected,a.last_sync,a.watch_expires,a.last_error,a.reviewed_at,a.start_at,a.history_id,
         j.total,j.done,j.pending,j.failed,j.retrying
        FROM accounts a LEFT JOIN LATERAL (
          SELECT count(*)::int AS total,
@@ -36,28 +43,29 @@ export async function dashboard(): Promise<Dashboard> {
          FROM jobs WHERE account_id=a.id
        ) j ON true WHERE a.workspace_id=$1
        ORDER BY CASE WHEN a.name IN ('Trabajo','Work') THEN 0 ELSE 1 END,a.created_at`,
-        [workspaceId],
-      ),
-      query(
-        `SELECT d.*,a.email FROM accounts a JOIN LATERAL (
+      [workspaceId],
+    ),
+    query(
+      `SELECT d.*,a.email FROM accounts a JOIN LATERAL (
          SELECT * FROM decisions WHERE account_id=a.id
          ORDER BY updated_at DESC,created_at DESC,id DESC LIMIT 200
        ) d ON true WHERE a.workspace_id=$1 ORDER BY d.updated_at DESC,d.created_at DESC,d.id DESC`,
-        [workspaceId],
-      ),
-      query(
-        "SELECT r.* FROM sender_rules r JOIN accounts a ON a.id=r.account_id WHERE a.workspace_id=$1 ORDER BY r.created_at DESC",
-        [workspaceId],
-      ),
-      processingAllowed(workspaceId),
-      workspaceAllowance(workspaceId),
-      hosted()
-        ? query(
-            "SELECT internal,sotto_full_access(email) AS full_access,billing_plan FROM workspaces WHERE id=$1",
-            [workspaceId],
-          )
-        : Promise.resolve([]),
-    ]);
+      [workspaceId],
+    ),
+    query(
+      "SELECT r.* FROM sender_rules r JOIN accounts a ON a.id=r.account_id WHERE a.workspace_id=$1 ORDER BY r.created_at DESC",
+      [workspaceId],
+    ),
+    processingAllowed(workspaceId),
+    workspaceAllowance(workspaceId),
+    hosted()
+      ? query(
+          "SELECT internal,sotto_full_access(email) AS full_access,billing_plan FROM workspaces WHERE id=$1",
+          [workspaceId],
+        )
+      : Promise.resolve([]),
+    sessionViewer(),
+  ]);
   const accountLimit =
     hosted() && plan && !plan.internal && !plan.full_access
       ? mailboxLimit(plan.billing_plan)
@@ -110,6 +118,7 @@ export async function dashboard(): Promise<Dashboard> {
     accessActive,
     allowance,
     accountLimit,
+    viewer,
     accounts,
     decisions,
     rules,

@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       googleClient().generateAuthUrl({
         access_type: "offline",
         prompt: "consent select_account",
-        scope: ["openid", "email", gmailScope],
+        scope: ["openid", "email", "profile", gmailScope],
         state,
         code_challenge: createHash("sha256")
           .update(verifier)

@@ -69,8 +69,15 @@ export type MailAllowance = {
   resetsAt: string | null;
   exhausted: boolean;
 };
+export type Viewer = {
+  /** Null when the signed-in identity's Gmail data was deleted. */
+  email: string | null;
+  name: string | null;
+  picture: string | null;
+};
 export type Dashboard = {
   allowance?: MailAllowance | null;
+  viewer?: Viewer | null;
   accessActive?: boolean;
   /** Connected Gmail accounts the plan covers. Null when unlimited. */
   accountLimit?: number | null;

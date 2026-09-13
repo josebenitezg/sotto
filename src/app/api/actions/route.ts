@@ -220,7 +220,7 @@ export async function POST(request: Request) {
             const { rows: identities } = await db.query(
               `INSERT INTO workspace_identities(id,workspace_id,gmail_deleted_at)
                 VALUES($1,$2,clock_timestamp()) ON CONFLICT(id) DO UPDATE
-                SET gmail_deleted_at=excluded.gmail_deleted_at
+                SET gmail_deleted_at=excluded.gmail_deleted_at,name=NULL,picture=NULL
                 WHERE workspace_identities.workspace_id=excluded.workspace_id RETURNING id`,
               [accountId, workspaceId],
             );

@@ -11,7 +11,7 @@ import { mailboxLimit } from "../plans";
 // A verified Google identity can sign in to its existing workspace. Linking a
 // second inbox requires a browser-bound OAuth intent from that workspace.
 export async function connectIdentity(
-  identity: { sub: string; email: string },
+  identity: { sub: string; email: string; name?: string; picture?: string },
   refreshToken: string | undefined,
   linkedWorkspace: string | null,
   authorizationStartedAt?: Date | string,
@@ -76,6 +76,11 @@ export async function connectIdentity(
       "INSERT INTO workspace_identities(id,workspace_id) VALUES($1,$2) ON CONFLICT(id) DO NOTHING",
       [identity.sub, workspaceId],
     );
+    if (identity.name !== undefined || identity.picture !== undefined)
+      await db.query(
+        "UPDATE workspace_identities SET name=COALESCE($2,name),picture=COALESCE($3,picture) WHERE id=$1",
+        [identity.sub, identity.name ?? null, identity.picture ?? null],
+      );
     if (
       hosted() &&
       !workspace.internal &&

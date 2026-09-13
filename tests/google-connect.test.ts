@@ -132,6 +132,47 @@ it.each([true, false])(
     );
   },
 );
+it("requests the basic profile and forwards a Google-hosted picture", async () => {
+  await POST(
+    new Request("https://sotto.example/api/google/connect", {
+      method: "POST",
+      headers: { origin: "https://sotto.example" },
+      body: "intent=filter",
+    }),
+  );
+  expect(h.generate.mock.calls[0][0].scope).toContain("profile");
+  h.cookie = "browser";
+  h.pending = {
+    verifier_cipher: seal("verifier", `oauth:${hash("state")}`),
+    workspace_id: null,
+    created_at: new Date(),
+    start_filtering: true,
+  };
+  h.verify.mockResolvedValue({
+    getPayload: () => ({
+      sub: "account",
+      email: "owner@example.com",
+      email_verified: true,
+      name: "Owner",
+      picture: "https://lh3.googleusercontent.com/a/owner",
+    }),
+  });
+  await GET(
+    new Request(
+      "https://sotto.example/api/google/callback?code=code&state=state",
+    ),
+  );
+  expect(h.connect.mock.calls[0][0]).toEqual({
+    sub: "account",
+    email: "owner@example.com",
+    name: "Owner",
+    picture: "https://lh3.googleusercontent.com/a/owner",
+  });
+  const session = h.query.mock.calls.find(([sql]) =>
+    String(sql).startsWith("INSERT INTO sessions"),
+  );
+  expect(session?.[1][2]).toBe("account");
+});
 it("never connects or activates an expired OAuth attempt", async () => {
   h.cookie = "browser";
   const response = await GET(

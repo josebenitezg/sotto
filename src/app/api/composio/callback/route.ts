@@ -94,10 +94,14 @@ export async function GET(request: Request) {
     const response = NextResponse.redirect(
       `${appUrl()}/${(await processingAllowed(workspaceId)) ? "review" : "pricing"}?connected=1`,
     );
-    response.cookies.set(sessionCookie, await createSession(workspaceId), {
-      ...cookieOptions(),
-      maxAge: 7 * 86400,
-    });
+    response.cookies.set(
+      sessionCookie,
+      await createSession(workspaceId, identity.sub),
+      {
+        ...cookieOptions(),
+        maxAge: 7 * 86400,
+      },
+    );
     response.cookies.delete(composioCookie);
     console.info(
       JSON.stringify({

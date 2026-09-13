@@ -59,9 +59,10 @@ export function BillingAction({
         size="lg"
         variant={secondary ? "outline" : "default"}
         disabled={disabled || busy}
+        aria-busy={busy}
         type="submit"
       >
-        {busy ? "One moment…" : children}
+        {children}
       </Button>
       {error && (
         <p role="alert" className="mt-3 max-w-[55ch] text-sm text-destructive">

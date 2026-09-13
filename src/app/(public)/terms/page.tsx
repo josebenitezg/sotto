@@ -6,7 +6,7 @@ export default function TermsPage() {
       id="content"
       className="mx-auto max-w-[680px] space-y-6 px-6 py-16 text-sm leading-6"
     >
-      <h1 className="text-2xl font-semibold">Subscription terms</h1>
+      <h1 className="text-2xl leading-8 font-semibold">Subscription terms</h1>
       <p>
         Sotto is operated by Jose Maria Benitez Genes under the Sotto name.
         Contact{" "}

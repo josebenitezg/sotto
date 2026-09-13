@@ -211,6 +211,8 @@ export function InboxDemo() {
           size="icon-sm"
           aria-label="Replay"
           onClick={replay}
+          tabIndex={done ? 0 : -1}
+          aria-hidden={!done}
           className={done ? "opacity-100" : "pointer-events-none opacity-0"}
         >
           <RotateCcw />

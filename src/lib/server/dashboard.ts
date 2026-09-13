@@ -46,10 +46,11 @@ export async function dashboard(): Promise<Dashboard> {
       [workspaceId],
     ),
     query(
-      `SELECT d.*,a.email FROM accounts a JOIN LATERAL (
+      `SELECT d.*,a.email,f.decision_id AS correction_id,f.pattern,f.attempts FROM accounts a JOIN LATERAL (
          SELECT * FROM decisions WHERE account_id=a.id
          ORDER BY updated_at DESC,created_at DESC,id DESC LIMIT 200
-       ) d ON true WHERE a.workspace_id=$1 ORDER BY d.updated_at DESC,d.created_at DESC,d.id DESC`,
+       ) d ON true LEFT JOIN cold_feedback f ON f.decision_id=d.id
+       WHERE a.workspace_id=$1 ORDER BY d.updated_at DESC,d.created_at DESC,d.id DESC`,
       [workspaceId],
     ),
     query(
@@ -99,9 +100,22 @@ export async function dashboard(): Promise<Dashboard> {
     threadId: d.thread_id,
     sender: d.sender,
     subject: d.subject,
-    category: d.category,
-    reason:
-      d.reason_en_source === d.reason && d.reason_en ? d.reason_en : d.reason,
+    category: d.correction_id ? "cold" : d.category,
+    reason: d.correction_id
+      ? "You marked this email as cold."
+      : d.reason_en_source === d.reason && d.reason_en
+        ? d.reason_en
+        : d.reason,
+    learning: d.correction_id
+      ? {
+          status: d.pattern
+            ? "learned"
+            : d.attempts >= 3
+              ? "unavailable"
+              : "pending",
+          pattern: d.pattern ?? null,
+        }
+      : undefined,
     state: d.state,
     confidence: d.confidence,
     createdAt: iso(d.created_at),

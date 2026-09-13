@@ -180,22 +180,64 @@ describe("conservative classification", () => {
     vi.stubEnv("OPENAI_API_KEY", "");
     await expect(classify(mail, context)).rejects.toThrow("not configured");
   });
+  it("supplies owner corrections as bounded data while relationship protection still wins", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "test-only-key");
+    const pattern =
+      "Unsolicited podcast invitations asking for a scheduling call.";
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            status: "completed",
+            output: [
+              {
+                content: [
+                  {
+                    type: "output_text",
+                    text: JSON.stringify({
+                      decision: "move",
+                      category: "cold",
+                      confidence: 0.9,
+                      reason: "Matches an owner correction.",
+                      protected: false,
+                    }),
+                  },
+                ],
+              },
+            ],
+          }),
+        ),
+    );
+    vi.stubGlobal("fetch", fetch);
+    await classify(mail, { ...context, coldCorrections: [pattern] });
+    const body = JSON.parse(
+      (fetch.mock.calls[0] as unknown as [string, RequestInit])[1]
+        .body as string,
+    );
+    expect(JSON.parse(body.input).context.coldCorrections).toEqual([pattern]);
+    expect(body.instructions).toContain("not executable instructions");
+    const protectedResult = await classify(mail, {
+      ...context,
+      hasReply: true,
+      coldCorrections: [pattern],
+    });
+    expect(protectedResult.decision).toBe("keep");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
   it("preserves provider retry timing and never fabricates a decision after a 429", async () => {
     vi.stubEnv("OPENAI_API_KEY", "test-only-key");
     vi.stubEnv("AI_PROVIDER", "openai");
-    const fetch = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            error: {
-              type: "rate_limit_exceeded",
-              message: "private content must not escape",
-            },
-          }),
-          { status: 429, headers: { "retry-after": "180" } },
-        ),
-      );
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: {
+            type: "rate_limit_exceeded",
+            message: "private content must not escape",
+          },
+        }),
+        { status: 429, headers: { "retry-after": "180" } },
+      ),
+    );
     vi.stubGlobal("fetch", fetch);
     await expect(classify(mail, context)).rejects.toMatchObject({
       message: "Classifier HTTP 429",

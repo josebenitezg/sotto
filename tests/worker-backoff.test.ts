@@ -83,7 +83,15 @@ it("stops the batch on a provider limit and defers the whole mailbox without tou
   h.db = new PGlite();
   try {
     await h.db.exec(
-      await readFile(new URL("../db/001_initial.sql", import.meta.url), "utf8"),
+      (await readFile(
+        new URL("../db/001_initial.sql", import.meta.url),
+        "utf8",
+      )) +
+        "\n" +
+        (await readFile(
+          new URL("../db/011_cold_feedback.sql", import.meta.url),
+          "utf8",
+        )),
     );
     await h.db
       .exec(`INSERT INTO accounts(id,email,name,token_cipher,history_id) VALUES
@@ -165,7 +173,15 @@ it("automatically moves only the permitted account and keeps blocked recovery fr
   });
   try {
     await h.db.exec(
-      await readFile(new URL("../db/001_initial.sql", import.meta.url), "utf8"),
+      (await readFile(
+        new URL("../db/001_initial.sql", import.meta.url),
+        "utf8",
+      )) +
+        "\n" +
+        (await readFile(
+          new URL("../db/011_cold_feedback.sql", import.meta.url),
+          "utf8",
+        )),
     );
     await h.db
       .exec(`INSERT INTO accounts(id,email,name,token_cipher,history_id,mode,auto_after) VALUES
@@ -249,7 +265,15 @@ it("reassesses legacy suggestions, filters recent cold and new mail, and preserv
   }));
   try {
     await h.db.exec(
-      await readFile(new URL("../db/001_initial.sql", import.meta.url), "utf8"),
+      (await readFile(
+        new URL("../db/001_initial.sql", import.meta.url),
+        "utf8",
+      )) +
+        "\n" +
+        (await readFile(
+          new URL("../db/011_cold_feedback.sql", import.meta.url),
+          "utf8",
+        )),
     );
     await h.db
       .exec(`INSERT INTO accounts(id,email,name,token_cipher,history_id,mode,auto_after)

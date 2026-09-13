@@ -17,6 +17,7 @@ const h = vi.hoisted(() => ({
   enqueue: vi.fn(),
   restore: vi.fn(),
   move: vi.fn(),
+  markCold: vi.fn(),
   work: vi.fn(),
   lock: vi.fn(),
   verifyPush: vi.fn(),
@@ -47,6 +48,7 @@ vi.mock("../src/lib/server/engine", () => ({
   withAccountLock: h.lock,
   restoreDecision: h.restore,
   moveDecision: h.move,
+  markColdDecision: h.markCold,
   workAccount: h.work,
   AccountBusy: class extends Error {},
 }));
@@ -61,6 +63,7 @@ import { hash } from "../src/lib/server/crypto";
 import { dashboard } from "../src/lib/server/dashboard";
 import { connectIdentity } from "../src/lib/server/workspaces";
 import { POST as action } from "../src/app/api/actions/route";
+import { GET as memoryDownload } from "../src/app/api/memory/route";
 import { consumeMailbox } from "../src/lib/server/cloud-worker";
 import { AccountBusy } from "../src/lib/server/engine";
 import { POST as gmailEvent } from "../src/app/api/gmail/events/route";
@@ -79,6 +82,7 @@ beforeAll(async () => {
     "008_mail_allowances.sql",
     "009_global_config.sql",
     "010_identity_profile.sql",
+    "011_cold_feedback.sql",
   ])
     await h.db.exec(
       await readFile(new URL(`../db/${f}`, import.meta.url), "utf8"),
@@ -145,6 +149,62 @@ const request = (body: object) =>
     },
     body: JSON.stringify(body),
   });
+it("authorizes correction actions and private memory downloads only for the owning workspace", async () => {
+  await h.db.query("UPDATE workspaces SET internal=true WHERE id='a'");
+  await h.db.query("UPDATE decisions SET state='kept' WHERE id='d-a'");
+  h.markCold.mockImplementation(async (id: string) => {
+    await h.db.query("UPDATE decisions SET state='moved' WHERE id=$1", [id]);
+    await h.db.query(
+      "INSERT INTO cold_feedback(decision_id,pattern) VALUES($1,'Unsolicited guest prospecting.')",
+      [id],
+    );
+  });
+  expect(
+    (await action(request({ action: "markCold", decisionId: "d-b" }))).status,
+  ).toBe(404);
+  expect(h.markCold).not.toHaveBeenCalled();
+  expect(
+    (await action(request({ action: "markCold", decisionId: "d-a" }))).status,
+  ).toBe(200);
+  expect(h.enqueue).toHaveBeenCalledWith("gmail-a");
+  const download = await memoryDownload(
+    new Request("https://sotto.example/api/memory?accountId=gmail-a"),
+  );
+  expect(download.status).toBe(200);
+  expect(download.headers.get("cache-control")).toBe("private, no-store");
+  expect(await download.text()).toContain("Unsolicited guest prospecting.");
+  expect(
+    (
+      await memoryDownload(
+        new Request("https://sotto.example/api/memory?accountId=gmail-b"),
+      )
+    ).status,
+  ).toBe(404);
+  expect((await dashboard()).decisions[0].learning?.status).toBe("learned");
+  h.cookie = "";
+  expect(
+    (
+      await memoryDownload(
+        new Request("https://sotto.example/api/memory?accountId=gmail-a"),
+      )
+    ).status,
+  ).toBe(401);
+});
+it("schedules unfinished learning even after the checked-mail allowance is exhausted", async () => {
+  await h.db.query(
+    "UPDATE workspaces SET subscription_status='trialing',trial_end=now()+interval '1 day' WHERE id='a'",
+  );
+  await h.db.query("UPDATE decisions SET state='moved' WHERE id='d-a'");
+  await h.db.query(
+    "INSERT INTO cold_feedback(decision_id,available_at) VALUES('d-a',now()+interval '1 minute')",
+  );
+  await consumeMailbox({ accountId: "gmail-a" }, { messageId: "learn-only" });
+  expect(h.enqueue).toHaveBeenCalledWith(
+    "gmail-a",
+    "learn-only:next",
+    expect.any(Number),
+  );
+});
 it("loads only the signed-in workspace, including decisions and sender rules", async () => {
   const a = await dashboard();
   expect(a.accounts.map((x) => x.id)).toEqual(["gmail-a"]);
@@ -243,6 +303,7 @@ it("rejects foreign account, decision and rule IDs before any Gmail access", asy
     },
     { action: "sync", accountId: "gmail-b" },
     { action: "move", decisionId: "d-b" },
+    { action: "markCold", decisionId: "d-b" },
     { action: "restore", decisionId: "d-b" },
     { action: "removeRule", ruleId: "r-b" },
     {
@@ -432,6 +493,7 @@ it("expired users can keep or restore mail but cannot process or enable automati
   for (const body of [
     { action: "sync", accountId: "gmail-a" },
     { action: "move", decisionId: "d-a" },
+    { action: "markCold", decisionId: "d-a" },
     { action: "mode", accountId: "gmail-a", mode: "automatic" },
   ])
     expect((await action(request(body))).status).toBe(402);

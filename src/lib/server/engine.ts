@@ -18,6 +18,7 @@ import {
 } from "./allowances";
 import { usesComposioPolling } from "./polling";
 import { processingErrorCode, retryPlan } from "./processing-error";
+import { coldMemory, learnPendingCorrections } from "./cold-memory";
 import type { Classification, Policy } from "../types";
 
 export class AccountBusy extends Error {}
@@ -290,6 +291,7 @@ export async function classifyJob(
   )
     return;
   const context = await contextFor(accountId, gmail, mail);
+  context.coldCorrections = await coldMemory(accountId);
   const result = await classify(mail, context);
   const candidate = shouldMove(result, context.policy);
   const id = randomUUID();
@@ -335,6 +337,17 @@ export async function moveDecision(
     decisionId,
   ]);
   if (!decision || !["suggested", "moving"].includes(decision.state)) return;
+  if (
+    decision.state === "moving" &&
+    (
+      await query("SELECT 1 FROM cold_feedback WHERE decision_id=$1", [
+        decisionId,
+      ])
+    ).length
+  ) {
+    await markColdDecision(decisionId, gmail);
+    return;
+  }
   if (!writesEnabled(decision.account_id))
     throw new Error("Mailbox writes disabled");
   if (!(await accountProcessingAllowed(decision.account_id))) return;
@@ -397,6 +410,7 @@ export async function moveDecision(
     decision.state === "suggested" &&
     decision.policy_version !== CLASSIFIER_POLICY_VERSION
   ) {
+    ctx.coldCorrections = await coldMemory(decision.account_id);
     result = await classify(mail, ctx);
     await query(
       `UPDATE decisions SET category=$2,confidence=$3,reason=$4,ai_decision=$5,
@@ -432,6 +446,82 @@ export async function moveDecision(
     [decisionId],
   );
 }
+// Explicit owner correction for one message. It does not change the original
+// AI verdict or create a sender rule. Automatic moves still use all guards.
+export async function markColdDecision(decisionId: string, gmail: Gmail) {
+  const [decision] = await query("SELECT * FROM decisions WHERE id=$1", [
+    decisionId,
+  ]);
+  if (!decision) return;
+  if (!writesEnabled(decision.account_id))
+    throw new Error("Mailbox writes disabled");
+  if (!(await accountProcessingAllowed(decision.account_id))) return;
+  const [account] = await query(
+    "SELECT id FROM accounts WHERE id=$1 AND connected=true AND mode<>'paused'",
+    [decision.account_id],
+  );
+  if (!account) return;
+  const [feedback] = await query(
+    "SELECT decision_id FROM cold_feedback WHERE decision_id=$1",
+    [decisionId],
+  );
+  if (feedback && decision.state === "moved") {
+    await query(
+      "UPDATE cold_feedback SET attempts=0,available_at=now() WHERE decision_id=$1 AND pattern IS NULL AND attempts>=3",
+      [decisionId],
+    );
+    return;
+  }
+  if (
+    !["kept", "restored"].includes(decision.state) &&
+    !(feedback && decision.state === "moving")
+  )
+    return;
+  const mail = await gmail.message(decision.message_id);
+  if (mail.labels.some((l) => ["TRASH", "SPAM", "SENT", "DRAFT"].includes(l)))
+    throw new Error("This email moved elsewhere. Check it in Gmail.");
+  if (!mail.labels.includes("INBOX")) {
+    if (
+      feedback &&
+      decision.state === "moving" &&
+      mail.labels.includes(decision.label_added)
+    ) {
+      await query(
+        "UPDATE decisions SET state='moved',updated_at=now() WHERE id=$1",
+        [decisionId],
+      );
+      return;
+    }
+    throw new Error(
+      "This email is no longer in your inbox. Check it in Gmail.",
+    );
+  }
+  const label =
+    feedback && decision.state === "moving"
+      ? decision.label_added
+      : await gmail.ensureLabel("Sotto/Cold");
+  await transaction(async (db) => {
+    await db.query(
+      "INSERT INTO cold_feedback(decision_id) VALUES($1) ON CONFLICT DO NOTHING",
+      [decisionId],
+    );
+    await db.query(
+      "UPDATE decisions SET state='moving',label_added=$2,added_by_us=$3,inbox_removed=true,updated_at=now() WHERE id=$1",
+      [
+        decisionId,
+        label,
+        decision.state === "moving"
+          ? decision.added_by_us
+          : !mail.labels.includes(label),
+      ],
+    );
+  });
+  await gmail.modify(mail.id, [label], ["INBOX"]);
+  await query(
+    "UPDATE decisions SET state='moved',updated_at=now() WHERE id=$1",
+    [decisionId],
+  );
+}
 export async function restoreDecision(decisionId: string, gmail: Gmail) {
   const [decision] = await query("SELECT * FROM decisions WHERE id=$1", [
     decisionId,
@@ -443,10 +533,15 @@ export async function restoreDecision(decisionId: string, gmail: Gmail) {
   const mail = await gmail.message(decision.message_id);
   if (mail.labels.some((l) => ["TRASH", "SPAM"].includes(l)))
     throw new Error("Message moved elsewhere; restore it in Gmail");
-  await query(
-    "UPDATE decisions SET state='restoring',updated_at=now() WHERE id=$1",
-    [decisionId],
-  );
+  await transaction(async (db) => {
+    await db.query(
+      "UPDATE decisions SET state='restoring',updated_at=now() WHERE id=$1",
+      [decisionId],
+    );
+    await db.query("DELETE FROM cold_feedback WHERE decision_id=$1", [
+      decisionId,
+    ]);
+  });
   await gmail.modify(
     mail.id,
     decision.inbox_removed ? ["INBOX"] : [],
@@ -492,6 +587,7 @@ export async function workAccount(accountId: string, maxJobs = 30) {
         await restoreDecision(decision.id, gmail);
       else await moveDecision(decision.id, gmail, false);
     }
+    await learnPendingCorrections(accountId, gmail);
     // Holding the account lock means no other worker owns these jobs.
     await query(
       "UPDATE jobs SET state='pending' WHERE account_id=$1 AND state='running'",

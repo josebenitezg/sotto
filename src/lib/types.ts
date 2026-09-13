@@ -54,6 +54,10 @@ export type Decision = {
   createdAt: string;
   confidence: number;
   gmailUrl?: string;
+  learning?: {
+    status: "pending" | "learned" | "unavailable";
+    pattern: string | null;
+  };
 };
 export type Rule = {
   id: string;

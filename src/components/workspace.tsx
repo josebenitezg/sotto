@@ -122,6 +122,17 @@ function applyDemo(data: Dashboard, action: Action): Dashboard {
         : action.action === "restore"
           ? "restored"
           : "kept";
+  if (decision && action.action === "restore") delete decision.learning;
+  if (decision && action.action === "markCold") {
+    decision.state = "moved";
+    decision.category = "cold";
+    decision.reason = "You marked this email as cold.";
+    decision.learning = {
+      status: "learned",
+      pattern:
+        "Unsolicited outreach presenting a service and asking for an introductory sales call.",
+    };
+  }
   if (action.action === "allow") {
     if (
       !next.rules.some(
@@ -686,6 +697,49 @@ export function ReviewPage() {
                     <span className="mono">{selectedAccount?.email}</span>
                   </p>
                   <p className="mt-2 leading-5">{selected.reason}</p>
+                  {selected.learning ? (
+                    <div
+                      className="mt-3 space-y-2 text-small text-muted-foreground"
+                      aria-live="polite"
+                    >
+                      <p>
+                        {selected.state !== "moved"
+                          ? "Correction pending. Learning starts after the email is moved."
+                          : selected.learning.status === "learned"
+                            ? `Learned for this account: ${selected.learning.pattern}`
+                            : selected.learning.status === "unavailable"
+                              ? "Email moved. Learning is temporarily unavailable."
+                              : "Email moved. Sotto is learning from this correction…"}
+                      </p>
+                      {selected.learning.status === "unavailable" ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy || !selectedWritesEnabled}
+                          onClick={() =>
+                            act(
+                              { action: "markCold", decisionId: selected.id },
+                              "Learning queued",
+                            )
+                          }
+                        >
+                          Retry learning
+                        </Button>
+                      ) : null}
+                      <p>
+                        Return it to your inbox to undo this correction and
+                        remove its learning.
+                      </p>
+                      {!data.demo ? (
+                        <a
+                          className="underline underline-offset-4"
+                          href={`/api/memory?accountId=${encodeURIComponent(selected.accountId)}`}
+                        >
+                          Download account memory
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="space-y-2">
                   {selected.state === "suggested" ? (
@@ -743,6 +797,38 @@ export function ReviewPage() {
                     >
                       Return to inbox
                     </Button>
+                  ) : ["kept", "restored"].includes(selected.state) ? (
+                    <>
+                      <Button
+                        className="w-full"
+                        disabled={
+                          busy ||
+                          !selectedWritesEnabled ||
+                          selectedAccount?.mode === "paused" ||
+                          data.accessActive === false
+                        }
+                        onClick={async () => {
+                          if (
+                            await act(
+                              { action: "markCold", decisionId: selected.id },
+                              "Moved to Sotto/Cold",
+                            )
+                          )
+                            setFilter("moved");
+                        }}
+                      >
+                        Mark as cold
+                      </Button>
+                      <p className="text-small text-muted-foreground">
+                        Move this email and help Sotto recognize similar
+                        outreach. You can undo it anytime.
+                      </p>
+                      {selectedAccount?.mode === "paused" ? (
+                        <p className="text-small text-muted-foreground">
+                          Resume this account to make a correction.
+                        </p>
+                      ) : null}
+                    </>
                   ) : (
                     <p className="text-small text-muted-foreground">
                       {["moving", "restoring"].includes(selected.state)

@@ -26,11 +26,19 @@ import {
   syncMailbox,
   moveDecision,
   restoreDecision,
+  markColdDecision,
+  classifyJob,
 } from "../src/lib/server/engine";
 beforeEach(async () => {
   harness.db = new PGlite();
   await harness.db.exec(
     await readFile(new URL("../db/001_initial.sql", import.meta.url), "utf8"),
+  );
+  await harness.db.exec(
+    await readFile(
+      new URL("../db/011_cold_feedback.sql", import.meta.url),
+      "utf8",
+    ),
   );
   await harness.db.query(
     "INSERT INTO accounts(id,email,name,token_cipher,history_id) VALUES('work','owner@studio.example','Work','test','100'),('personal','owner@gmail.example','Personal','test','200')",
@@ -42,6 +50,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await harness.db.close();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 describe("durable mailbox synchronization", () => {
   it("deduplicates changes including manual Inbox additions", () => {
@@ -186,6 +195,86 @@ describe("reversible message-level operations", () => {
       (await harness.db.query("SELECT state FROM decisions WHERE id='d'")).rows,
     ).toEqual([{ state: "restored" }]);
   });
+  it("corrects a kept review once, preserves the original verdict and undoes learning", async () => {
+    const { gmail, getLabels } = await setup();
+    await harness.db.query(
+      "UPDATE decisions SET state='kept',ai_decision='review' WHERE id='d'",
+    );
+    await markColdDecision("d", gmail as unknown as Gmail);
+    await markColdDecision("d", gmail as unknown as Gmail);
+    expect(gmail.modify).toHaveBeenCalledTimes(1);
+    expect(getLabels()).toEqual(["UNREAD", "Label_Cold"]);
+    expect(
+      (
+        await harness.db.query(
+          "SELECT state,ai_decision FROM decisions WHERE id='d'",
+        )
+      ).rows,
+    ).toEqual([{ state: "moved", ai_decision: "review" }]);
+    expect(
+      (await harness.db.query("SELECT pattern FROM cold_feedback")).rows,
+    ).toEqual([{ pattern: null }]);
+    await restoreDecision("d", gmail as unknown as Gmail);
+    expect(getLabels()).toEqual(["UNREAD", "INBOX"]);
+    expect(
+      (await harness.db.query("SELECT * FROM cold_feedback")).rows,
+    ).toEqual([]);
+    await markColdDecision("d", gmail as unknown as Gmail);
+    expect(getLabels()).not.toContain("INBOX");
+  });
+  it("recovers an interrupted owner correction without applying automatic AI vetoes", async () => {
+    const { gmail, getLabels } = await setup();
+    await harness.db.query(
+      "UPDATE decisions SET state='kept',ai_decision='keep' WHERE id='d'",
+    );
+    gmail.hasWrittenTo.mockResolvedValue(true);
+    await markColdDecision("d", gmail as unknown as Gmail);
+    // Simulate Gmail success followed by a process stop before DB acknowledgement.
+    await harness.db.query("UPDATE decisions SET state='moving' WHERE id='d'");
+    await moveDecision("d", gmail as unknown as Gmail);
+    expect(gmail.modify).toHaveBeenCalledTimes(1);
+    expect(getLabels()).not.toContain("INBOX");
+    expect(
+      (await harness.db.query("SELECT state FROM decisions WHERE id='d'"))
+        .rows[0],
+    ).toEqual({ state: "moved" });
+  });
+  it("does not learn from a failed move and retries its durable owner intent", async () => {
+    const { gmail } = await setup();
+    await harness.db.query("UPDATE decisions SET state='kept' WHERE id='d'");
+    gmail.modify.mockRejectedValueOnce(new Error("network failed"));
+    await expect(
+      markColdDecision("d", gmail as unknown as Gmail),
+    ).rejects.toThrow("network failed");
+    const { coldMemory } = await import("../src/lib/server/cold-memory");
+    expect(await coldMemory("work")).toEqual([]);
+    await moveDecision("d", gmail as unknown as Gmail);
+    expect(
+      (await harness.db.query("SELECT state FROM decisions WHERE id='d'"))
+        .rows[0],
+    ).toEqual({ state: "moved" });
+  });
+  it("preserves an existing Cold label on undo and never marks trash or disconnected mail", async () => {
+    const { gmail, getLabels } = await setup();
+    await gmail.modify("m", ["Label_Cold"], []);
+    await harness.db.query("UPDATE decisions SET state='kept' WHERE id='d'");
+    await markColdDecision("d", gmail as unknown as Gmail);
+    await restoreDecision("d", gmail as unknown as Gmail);
+    expect(getLabels()).toContain("Label_Cold");
+    await gmail.modify("m", ["TRASH"], []);
+    await expect(
+      markColdDecision("d", gmail as unknown as Gmail),
+    ).rejects.toThrow("elsewhere");
+    expect(
+      (await harness.db.query("SELECT * FROM cold_feedback")).rows,
+    ).toEqual([]);
+    await harness.db.query(
+      "UPDATE accounts SET connected=false WHERE id='work'",
+    );
+    gmail.message.mockClear();
+    await markColdDecision("d", gmail as unknown as Gmail);
+    expect(gmail.message).not.toHaveBeenCalled();
+  });
   it("rechecks a sender rule added after classification", async () => {
     const { gmail } = await setup();
     await harness.db.query(
@@ -196,6 +285,66 @@ describe("reversible message-level operations", () => {
     expect(
       (await harness.db.query("SELECT state FROM decisions WHERE id='d'")).rows,
     ).toEqual([{ state: "kept" }]);
+  });
+  it("uses a learned correction when the next message is classified", async () => {
+    const { gmail } = await setup();
+    await harness.db.query(
+      "UPDATE decisions SET state='kept',ai_decision='review' WHERE id='d'",
+    );
+    await markColdDecision("d", gmail as unknown as Gmail);
+    const pattern =
+      "Unsolicited podcast guest invitations requesting a short call.";
+    await harness.db.query(
+      "UPDATE cold_feedback SET pattern=$1 WHERE decision_id='d'",
+      [pattern],
+    );
+    const current = await gmail.message();
+    gmail.message.mockResolvedValue({
+      ...current,
+      id: "future",
+      labels: ["INBOX"],
+      subject: "An invitation",
+    });
+    vi.stubEnv("OPENAI_API_KEY", "synthetic");
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            status: "completed",
+            output: [
+              {
+                content: [
+                  {
+                    type: "output_text",
+                    text: JSON.stringify({
+                      decision: "move",
+                      category: "cold",
+                      confidence: 0.9,
+                      reason: "Matches your previous correction.",
+                      protected: false,
+                    }),
+                  },
+                ],
+              },
+            ],
+          }),
+        ),
+    );
+    vi.stubGlobal("fetch", fetch);
+    await classifyJob("work", "future", gmail as unknown as Gmail);
+    const body = JSON.parse(
+      (fetch.mock.calls[0] as unknown as [string, RequestInit])[1]
+        .body as string,
+    );
+    expect(JSON.parse(body.input).context.coldCorrections).toEqual([pattern]);
+    expect(
+      (
+        await harness.db.query(
+          "SELECT state,ai_decision FROM decisions WHERE message_id='future'",
+        )
+      ).rows,
+    ).toEqual([{ state: "suggested", ai_decision: "move" }]);
+    expect(gmail.modify).toHaveBeenCalledTimes(1);
   });
   it("recovers a Gmail write that succeeded before the database update", async () => {
     const { gmail } = await setup();

@@ -37,8 +37,12 @@ export async function consumeMailbox(
   if (!(await accountProcessingAllowed(accountId))) return;
   const allowance = await accountAllowance(accountId);
   const [pending] = await query(
-    `SELECT (SELECT min(available_at) FROM jobs j WHERE j.account_id=$1 AND j.state IN ('pending','running')
-      AND ($2 OR EXISTS (SELECT 1 FROM message_allowances m WHERE m.account_id=j.account_id AND m.message_id=j.message_id))) AS next_at,
+    `SELECT (SELECT min(available_at) FROM (
+      SELECT available_at FROM jobs j WHERE j.account_id=$1 AND j.state IN ('pending','running')
+        AND ($2 OR EXISTS (SELECT 1 FROM message_allowances m WHERE m.account_id=j.account_id AND m.message_id=j.message_id))
+      UNION ALL SELECT f.available_at FROM cold_feedback f JOIN decisions d ON d.id=f.decision_id
+        WHERE d.account_id=$1 AND d.state='moved' AND f.pattern IS NULL AND f.attempts<3
+      ) pending_work) AS next_at,
       (SELECT sync_page_token IS NOT NULL FROM accounts WHERE id=$1) AS scan_pending`,
     [accountId, !allowance?.exhausted],
   );

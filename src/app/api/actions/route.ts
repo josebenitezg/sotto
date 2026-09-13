@@ -17,6 +17,7 @@ import { startFiltering } from "@/lib/server/filtering";
 import {
   withAccountLock,
   moveDecision,
+  markColdDecision,
   restoreDecision,
   AccountBusy,
 } from "@/lib/server/engine";
@@ -50,7 +51,7 @@ const actionSchema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("removeRule"), ruleId: z.string() }),
   z.object({
-    action: z.enum(["keep", "move", "restore"]),
+    action: z.enum(["keep", "move", "restore", "markCold"]),
     decisionId: z.string(),
   }),
 ]);
@@ -125,6 +126,7 @@ export async function POST(request: Request) {
       if (!account) throw new HttpError(404, "We could not find that account.");
       if (
         action.action === "move" ||
+        action.action === "markCold" ||
         action.action === "startFiltering" ||
         (action.action === "mode" && action.mode !== "paused")
       )
@@ -265,14 +267,20 @@ export async function POST(request: Request) {
           "UPDATE decisions SET state='kept',reason='You chose to keep this email.',updated_at=now() WHERE id=$1 AND state='suggested'",
           [action.decisionId],
         );
-      } else if (action.action === "move" || action.action === "restore") {
+      } else if (
+        action.action === "move" ||
+        action.action === "restore" ||
+        action.action === "markCold"
+      ) {
         if (!writesEnabled(accountId))
           throw new HttpError(
             409,
             "Moving emails is disabled for this account.",
           );
         const gmail = await Gmail.forAccount(accountId);
-        if (action.action === "move")
+        if (action.action === "markCold")
+          await markColdDecision(action.decisionId, gmail);
+        else if (action.action === "move")
           await moveDecision(action.decisionId, gmail);
         else await restoreDecision(action.decisionId, gmail);
       }
@@ -282,7 +290,7 @@ export async function POST(request: Request) {
           [action.decisionId],
         );
         const expected =
-          action.action === "move"
+          action.action === "move" || action.action === "markCold"
             ? "moved"
             : action.action === "restore"
               ? "restored"
@@ -296,6 +304,7 @@ export async function POST(request: Request) {
     });
     if (
       action.action === "startFiltering" ||
+      action.action === "markCold" ||
       (action.action === "mode" && action.mode !== "paused")
     )
       await enqueueAccount(accountId);

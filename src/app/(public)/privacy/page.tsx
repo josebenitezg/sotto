@@ -90,6 +90,18 @@ export default function PrivacyPage() {
       </p>
       <h2>Limited use of your data</h2>
       <p className="text-muted-foreground">
+        When you mark an email as cold, Sotto moves that specific message and
+        asks OpenAI to summarize its outreach pattern using the subject and up
+        to 6,000 characters of message text. We store the correction and a short
+        pattern summary, not the message body. Recent summaries are used only
+        when classifying future messages for that Gmail account. They are not
+        shared with other accounts or used to train model weights. You can view
+        the learned pattern and download the account memory from the corrected
+        email. Returning that email to the inbox in Sotto removes its learning;
+        deleting the account's Gmail data removes all its corrections and
+        memory.
+      </p>
+      <p className="text-muted-foreground">
         We use Google data only to connect your account, classify and organize
         the email you choose, show decisions, and let you correct them. Our use
         and transfer of information received from Google APIs comply with the{" "}

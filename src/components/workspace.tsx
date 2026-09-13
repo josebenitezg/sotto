@@ -44,6 +44,8 @@ import {
 import { GoogleMark } from "./brand";
 import { Wordmark } from "./public-shell";
 import { AccountMenu } from "./account-menu";
+import { AccountMemory } from "./account-memory";
+import { memoryMarkdown } from "@/lib/memory";
 import { GoogleDataNotice } from "./google-data-notice";
 import type { Account, Dashboard, Decision, Mode } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -1445,6 +1447,26 @@ export function SettingsPage({ subscription }: { subscription?: ReactNode }) {
         />
       </List>
       {account && <PreferencesEditor key={account.id} account={account} />}
+      {account ? (
+        <AccountMemory
+          key={`memory:${account.id}`}
+          accountId={account.id}
+          email={account.email}
+          demoMarkdown={
+            data.demo
+              ? memoryMarkdown(
+                  data.decisions.flatMap((d) =>
+                    d.accountId === account.id &&
+                    d.state === "moved" &&
+                    d.learning?.pattern
+                      ? [d.learning.pattern]
+                      : [],
+                  ),
+                )
+              : undefined
+          }
+        />
+      ) : null}
       <div className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t pt-6 text-small text-muted-foreground">
         <Link
           href="/privacy"

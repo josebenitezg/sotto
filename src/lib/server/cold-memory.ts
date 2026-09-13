@@ -4,6 +4,7 @@ import { aiConnection } from "./ai";
 import { recordAiUsage } from "./ai-usage";
 import type { Gmail } from "./google";
 import type { Mail } from "../types";
+export { memoryMarkdown } from "../memory";
 
 export const MEMORY_LIMIT = 20;
 export const MEMORY_CHARACTER_LIMIT = 6000;
@@ -112,18 +113,4 @@ export async function coldMemory(accountId: string): Promise<string[]> {
     remaining -= pattern.length;
     return [pattern];
   });
-}
-
-export function memoryMarkdown(patterns: string[]) {
-  return [
-    "# Sotto memory",
-    "",
-    "Private to this Gmail account. Recent owner corrections used as context, not sender blocks or model training.",
-    "Returning a corrected email to the inbox removes that example. Existing conversations, allowed senders and protected mail remain protected.",
-    "",
-    ...(patterns.length
-      ? patterns.map((p) => `- ${p.replace(/[\r\n]/g, " ")}`)
-      : ["No learned corrections yet."]),
-    "",
-  ].join("\n");
 }

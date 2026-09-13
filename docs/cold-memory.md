@@ -24,6 +24,12 @@ do not automatically reprocess old Kept emails.
 and retries remain reversible. It removes only labels Sotto itself added. Account
 deletion cascades to all feedback. `GET /api/memory?accountId=…` downloads the
 currently used context as private `memory.md`, with workspace ownership enforced.
+In **Settings → Memory**, choose the Gmail account and use **Open memory** to
+view that same Markdown in a live panel, or **Download memory.md** to save it.
+The open panel refreshes every five seconds and when the tab regains focus.
+Closing it stops the polling; switching accounts discards the previous view.
+Each new AI classification reads the account's current memory from the database;
+there is no cross-message memory cache and the UI polling does not call the LLM.
 This is durable database-backed inference context, not a server filesystem file,
 public GitHub data, fine-tuning, or shared model training.
 

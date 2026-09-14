@@ -773,10 +773,12 @@ export function ReviewPage() {
                             setSelectedId(null);
                         }}
                       >
-                        Move to{" "}
-                        {selected.category === "cold"
-                          ? coldLabelName(selectedAccount?.policy)
-                          : READING_LABEL}
+                        <span className="min-w-0 truncate">
+                          Move to{" "}
+                          {selected.category === "cold"
+                            ? coldLabelName(selectedAccount?.policy)
+                            : READING_LABEL}
+                        </span>
                       </Button>
                       <Button
                         variant="outline"
@@ -1652,9 +1654,12 @@ function SettingRow({
   const id = title.toLowerCase().replaceAll(" ", "-");
   return (
     <div className="flex items-center justify-between gap-6 px-4 py-4">
-      <div>
+      <div className="min-w-0">
         <Label htmlFor={id}>{title}</Label>
-        <p id={`${id}-help`} className="mt-1 text-small text-muted-foreground">
+        <p
+          id={`${id}-help`}
+          className="mt-1 text-small text-muted-foreground [overflow-wrap:anywhere]"
+        >
           {description}
         </p>
       </div>

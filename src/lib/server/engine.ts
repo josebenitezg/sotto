@@ -19,6 +19,7 @@ import {
 import { usesComposioPolling } from "./polling";
 import { processingErrorCode, retryPlan } from "./processing-error";
 import { coldMemory, learnPendingCorrections } from "./cold-memory";
+import { usesDesktop } from "./desktop-config";
 import type { Classification, Policy } from "../types";
 
 export class AccountBusy extends Error {}
@@ -226,7 +227,7 @@ async function syncBudgetedMailbox(
     );
   });
 }
-async function contextFor(
+export async function contextFor(
   accountId: string,
   gmail: Gmail,
   mail: Awaited<ReturnType<Gmail["message"]>>,
@@ -262,6 +263,7 @@ export async function classifyJob(
   messageId: string,
   gmail: Gmail,
 ) {
+  if (await usesDesktop(accountId)) return;
   const existing = await query(
     "SELECT id,state FROM decisions WHERE account_id=$1 AND message_id=$2",
     [accountId, messageId],
@@ -408,7 +410,8 @@ export async function moveDecision(
   if (
     automatic &&
     decision.state === "suggested" &&
-    decision.policy_version !== CLASSIFIER_POLICY_VERSION
+    decision.policy_version !== CLASSIFIER_POLICY_VERSION &&
+    !(await usesDesktop(decision.account_id))
   ) {
     ctx.coldCorrections = await coldMemory(decision.account_id);
     result = await classify(mail, ctx);
@@ -561,6 +564,7 @@ export async function workAccount(accountId: string, maxJobs = 30) {
       [accountId],
     );
     if (!account) return;
+    if (await usesDesktop(accountId)) return;
     if (!(await accountProcessingAllowed(accountId))) return;
     const gmail = await Gmail.forAccount(accountId);
     if (

@@ -9,6 +9,9 @@ export type Category =
 export type DecisionState =
   "suggested" | "kept" | "moving" | "moved" | "restoring" | "restored";
 export type Policy = {
+  processingLocation?: "cloud" | "desktop";
+  coldLabelName?: string;
+  coldLabelId?: string;
   marketing: boolean;
   newsletters: boolean;
   protectedDomains: string[];

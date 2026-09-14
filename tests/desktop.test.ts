@@ -63,9 +63,10 @@ import {
 import { distillColdPattern } from "../src/lib/server/cold-memory";
 import { POST as service } from "../src/app/api/desktop/service/route";
 import { POST as pairRoute } from "../src/app/api/desktop/pair/route";
+import { POST as accountAction } from "../src/app/api/actions/route";
 import { GmailError } from "../src/lib/server/google";
 import type { Gmail } from "../src/lib/server/google";
-import type { Mail } from "../src/lib/types";
+import type { Mail, Policy } from "../src/lib/types";
 const device = hash("device-a");
 const verdict = {
   decision: "move",
@@ -129,6 +130,10 @@ beforeEach(async () => {
     threadHasReply: vi.fn(async () => false),
     hasWrittenTo: vi.fn(async () => false),
     ensureLabel: vi.fn(async () => "Label_Cold"),
+    labels: vi.fn(async () => [
+      { id: "Label_Cold", name: "Sotto/Cold", type: "user" },
+    ]),
+    renameLabel: vi.fn(async (_id: string, _name: string) => ({})),
     modify: vi.fn(async (_id: string, add: string[], remove: string[]) => {
       labels = [
         ...new Set([...labels.filter((l) => !remove.includes(l)), ...add]),
@@ -141,6 +146,129 @@ beforeEach(async () => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+});
+const rename = (
+  name: string,
+  accountId = "mail-a",
+  origin = "https://sotto.example",
+) =>
+  accountAction(
+    new Request("https://sotto.example/api/actions", {
+      method: "POST",
+      headers: { origin, "content-type": "application/json" },
+      body: JSON.stringify({ action: "coldLabel", accountId, name }),
+    }),
+  );
+
+it("renames the existing label without changing moved message IDs or Undo", async () => {
+  const t = await task("automatic");
+  await completeDesktop("a", device, t.id!, verdict);
+  expect(labels).toContain("Label_Cold");
+  expect((await rename("Prospección / Ventas")).status).toBe(200);
+  expect(gmail.renameLabel).toHaveBeenCalledWith(
+    "Label_Cold",
+    "Prospección / Ventas",
+  );
+  const [account] = (
+    await h.db.query<{ policy: Policy }>(
+      "SELECT policy FROM accounts WHERE id='mail-a'",
+    )
+  ).rows;
+  expect(account.policy).toMatchObject({
+    coldLabelId: "Label_Cold",
+    coldLabelName: "Prospección / Ventas",
+    processingLocation: "desktop",
+  });
+  for (const key of [
+    "DATABASE_URL",
+    "ENCRYPTION_KEY",
+    "ALLOWED_GOOGLE_EMAILS",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+  ])
+    vi.stubEnv(key, "synthetic");
+  const overview = await service(request({ action: "overview" }));
+  expect(
+    (await overview.json()).dashboard.accounts[0].policy.coldLabelName,
+  ).toBe("Prospección / Ventas");
+  const [{ id }] = (
+    await h.db.query<{ id: string }>(
+      "SELECT id FROM decisions WHERE account_id='mail-a'",
+    )
+  ).rows;
+  await restoreDecision(id, gmail as Gmail);
+  expect(labels).toEqual(["UNREAD", "INBOX"]);
+});
+
+it("denies another workspace, invalid names, origin failures and disabled writes before changing labels", async () => {
+  expect((await rename("Sales", "mail-b")).status).toBe(404);
+  expect(
+    (await rename("Sales", "mail-a", "https://other.example")).status,
+  ).toBe(403);
+  for (const name of [
+    "",
+    "  ",
+    "INBOX",
+    "Spam",
+    "Sotto/Reading",
+    "bad\nlabel",
+    "x".repeat(226),
+  ])
+    expect((await rename(name)).status).toBe(400);
+  expect(h.gmail).not.toHaveBeenCalled();
+  vi.stubEnv("ENABLE_MAILBOX_WRITES", "false");
+  expect((await rename("Sales")).status).toBe(403);
+  expect(h.gmail).not.toHaveBeenCalled();
+});
+
+it("refuses to merge with another existing label and keeps the saved name", async () => {
+  gmail.labels.mockResolvedValue([
+    { id: "Label_Cold", name: "Sotto/Cold" },
+    { id: "Label_Another", name: "Sales" },
+  ]);
+  expect((await rename("sales")).status).toBe(409);
+  expect(gmail.renameLabel).not.toHaveBeenCalled();
+  expect(
+    (
+      await h.db.query<{ policy: Policy }>(
+        "SELECT policy FROM accounts WHERE id='mail-a'",
+      )
+    ).rows[0].policy,
+  ).not.toHaveProperty("coldLabelName");
+});
+
+it("recovers a rename whose Gmail response was lost using the retained label ID", async () => {
+  gmail.renameLabel.mockImplementationOnce(async () => {
+    gmail.labels.mockResolvedValue([{ id: "Label_Cold", name: "Sales" }]);
+    throw new GmailError(504);
+  });
+  expect((await rename("Sales")).status).toBeGreaterThanOrEqual(400);
+  expect(
+    (
+      await h.db.query<{ policy: Policy }>(
+        "SELECT policy FROM accounts WHERE id='mail-a'",
+      )
+    ).rows[0].policy,
+  ).toMatchObject({ coldLabelId: "Label_Cold" });
+  expect((await rename("Sales")).status).toBe(200);
+  expect(gmail.renameLabel).toHaveBeenCalledTimes(1);
+  expect(
+    (
+      await h.db.query<{ policy: Policy }>(
+        "SELECT policy FROM accounts WHERE id='mail-a'",
+      )
+    ).rows[0].policy,
+  ).toMatchObject({ coldLabelName: "Sales" });
+});
+
+it("saves the choice before the first move and uses it for local classification results", async () => {
+  gmail.labels.mockResolvedValue([]);
+  expect((await rename("  Sales  ")).status).toBe(200);
+  expect(gmail.renameLabel).not.toHaveBeenCalled();
+  expect(gmail.ensureLabel).not.toHaveBeenCalled();
+  const t = await task("automatic");
+  await completeDesktop("a", device, t.id!, verdict);
+  expect(gmail.ensureLabel).toHaveBeenCalledWith("Sales", undefined);
 });
 async function task(mode = "review") {
   await enableDesktop("a", device, "mail-a", mode);

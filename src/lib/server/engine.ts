@@ -20,6 +20,7 @@ import { usesComposioPolling } from "./polling";
 import { processingErrorCode, retryPlan } from "./processing-error";
 import { coldMemory, learnPendingCorrections } from "./cold-memory";
 import { usesDesktop } from "./desktop-config";
+import { coldLabelName, READING_LABEL } from "../labels";
 import type { Classification, Policy } from "../types";
 
 export class AccountBusy extends Error {}
@@ -433,7 +434,10 @@ export async function moveDecision(
   const label =
     decision.label_added ??
     (await gmail.ensureLabel(
-      result.category === "cold" ? "Sotto/Cold" : "Sotto/Reading",
+      result.category === "cold"
+        ? coldLabelName(account.policy)
+        : READING_LABEL,
+      result.category === "cold" ? account.policy.coldLabelId : undefined,
     ));
   const addedByUs =
     decision.state === "moving"
@@ -460,7 +464,7 @@ export async function markColdDecision(decisionId: string, gmail: Gmail) {
     throw new Error("Mailbox writes disabled");
   if (!(await accountProcessingAllowed(decision.account_id))) return;
   const [account] = await query(
-    "SELECT id FROM accounts WHERE id=$1 AND connected=true AND mode<>'paused'",
+    "SELECT id,policy FROM accounts WHERE id=$1 AND connected=true AND mode<>'paused'",
     [decision.account_id],
   );
   if (!account) return;
@@ -502,7 +506,10 @@ export async function markColdDecision(decisionId: string, gmail: Gmail) {
   const label =
     feedback && decision.state === "moving"
       ? decision.label_added
-      : await gmail.ensureLabel("Sotto/Cold");
+      : await gmail.ensureLabel(
+          coldLabelName(account.policy),
+          account.policy.coldLabelId,
+        );
   await transaction(async (db) => {
     await db.query(
       "INSERT INTO cold_feedback(decision_id) VALUES($1) ON CONFLICT DO NOTHING",

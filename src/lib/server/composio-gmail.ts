@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isUserLabelName } from "../labels";
 import {
   composioProxy,
   composioRequest,
@@ -104,7 +105,13 @@ export async function composioGmailRequest<T>(
   } else if (method === "GET" && route === "labels") {
     data = z
       .object({
-        labels: z.array(z.object({ id: z.string(), name: z.string() })),
+        labels: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            type: z.enum(["user", "system"]).optional(),
+          }),
+        ),
       })
       .parse(
         await execute(connection, "GMAIL_LIST_LABELS", {
@@ -113,13 +120,27 @@ export async function composioGmailRequest<T>(
       );
   } else if (method === "POST" && route === "labels") {
     const body = z
-      .object({ name: z.enum(["Sotto/Cold", "Sotto/Reading"]) })
+      .object({ name: z.string().refine(isUserLabelName) })
       .parse(JSON.parse(String(options.body)));
     data = await execute(connection, "GMAIL_CREATE_LABEL", {
       label_name: body.name,
       label_list_visibility: "labelShow",
       message_list_visibility: "show",
     });
+  } else if (
+    method === "PATCH" &&
+    /^labels\/Label_[a-zA-Z0-9_-]+$/.test(route)
+  ) {
+    const body = z
+      .object({ name: z.string().refine(isUserLabelName) })
+      .strict()
+      .parse(JSON.parse(String(options.body)));
+    data = await composioProxy(
+      connection,
+      `/gmail/v1/users/me/${route}`,
+      "PATCH",
+      body,
+    );
   } else if (
     method === "POST" &&
     /^messages\/[a-zA-Z0-9_-]+\/modify$/.test(route)

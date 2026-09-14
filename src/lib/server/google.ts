@@ -12,6 +12,7 @@ import {
 } from "./composio";
 import { composioGmailRequest } from "./composio-gmail";
 import { usesComposioPolling } from "./polling";
+import { isUserLabelName } from "../labels";
 
 export const gmailScope = "https://www.googleapis.com/auth/gmail.modify";
 export function googleClient() {
@@ -169,13 +170,30 @@ export class Gmail {
     );
     return !!result.messages?.length;
   }
-  async ensureLabel(name: "Sotto/Cold" | "Sotto/Reading") {
+  async labels() {
+    const { labels } = await this.request<{
+      labels: { id: string; name: string; type?: "user" | "system" }[];
+    }>("labels");
+    return labels;
+  }
+  async renameLabel(id: string, name: string) {
     if (!writesEnabled(this.accountId))
       throw new Error("Mailbox writes disabled");
-    const { labels } = await this.request<{
-      labels: { id: string; name: string }[];
-    }>("labels");
-    const existing = labels.find((l) => l.name === name);
+    if (!/^Label_[a-zA-Z0-9_-]+$/.test(id) || !isUserLabelName(name))
+      throw new Error("Invalid Gmail label");
+    return this.request<{ id: string; name: string }>(`labels/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    });
+  }
+  async ensureLabel(name: string, id?: string) {
+    if (!writesEnabled(this.accountId))
+      throw new Error("Mailbox writes disabled");
+    if (!isUserLabelName(name)) throw new Error("Invalid Gmail label");
+    const labels = await this.labels();
+    const existing =
+      labels.find((l) => l.id === id && l.type !== "system") ??
+      labels.find((l) => l.name === name && l.type !== "system");
     if (existing) return existing.id;
     return (
       await this.request<{ id: string }>("labels", {

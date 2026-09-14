@@ -360,6 +360,50 @@ it("keeps review suggestions, stores no body, and validates device output", asyn
   expect(gmail.modify).not.toHaveBeenCalled();
   expect(h.fetch).not.toHaveBeenCalled();
 });
+
+it("moves an owner's correction of a prior cloud review through the Mac action without cloud AI", async () => {
+  await enableDesktop("a", device, "mail-a", "automatic");
+  mail.receivedAt = Date.now() - 60_000;
+  await h.db.query(
+    "INSERT INTO decisions(id,account_id,message_id,thread_id,sender,subject,category,confidence,reason,state,ai_decision,policy_version) VALUES('prior-cloud','mail-a','m','t','sales@vendor.example','A service for your team','cold',0.74,'Ambiguous outreach','kept','review','v3-owner-corrections')",
+  );
+  const response = await accountAction(
+    new Request("https://sotto.example/api/actions", {
+      method: "POST",
+      headers: {
+        origin: "https://sotto.example",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ action: "markCold", decisionId: "prior-cloud" }),
+    }),
+  );
+  expect(response.status).toBe(200);
+  expect(labels).toEqual(["UNREAD", "Label_Cold"]);
+  expect(
+    (
+      await h.db.query(
+        "SELECT state,ai_decision FROM decisions WHERE id='prior-cloud'",
+      )
+    ).rows[0],
+  ).toEqual({ state: "moved", ai_decision: "review" });
+  expect(
+    (
+      await h.db.query(
+        "SELECT pattern FROM cold_feedback WHERE decision_id='prior-cloud'",
+      )
+    ).rows,
+  ).toEqual([{ pattern: null }]);
+  expect(h.fetch).not.toHaveBeenCalled();
+  await restoreDecision("prior-cloud", gmail as Gmail);
+  expect(labels).toEqual(["UNREAD", "INBOX"]);
+  expect(
+    (
+      await h.db.query(
+        "SELECT 1 FROM cold_feedback WHERE decision_id='prior-cloud'",
+      )
+    ).rows,
+  ).toEqual([]);
+});
 it("rechecks allowlists added during local inference", async () => {
   const t = await task("automatic");
   await h.db.query(

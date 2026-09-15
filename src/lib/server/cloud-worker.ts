@@ -14,7 +14,7 @@ export async function consumeMailbox(
     .object({ accountId: z.string().min(1).max(255) })
     .parse(payload);
   const [account] = await query(
-    "SELECT id FROM accounts WHERE id=$1 AND connected=true AND mode<>'paused'",
+    "SELECT id,policy->>'processingLocation' AS processing_location FROM accounts WHERE id=$1 AND connected=true AND mode<>'paused'",
     [accountId],
   );
   if (!account) {
@@ -23,6 +23,7 @@ export async function consumeMailbox(
     });
     return;
   }
+  if (account.processing_location === "desktop") return;
   if (!(await accountProcessingAllowed(accountId))) return;
   // Small batches stay within the function's execution window.
   try {

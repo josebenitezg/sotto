@@ -15,6 +15,10 @@ import { requireProcessingAccess } from "@/lib/server/entitlements";
 import { workspaceAllowance } from "@/lib/server/allowances";
 import { startFiltering } from "@/lib/server/filtering";
 import {
+  coldLabelNameSchema,
+  updateColdLabel,
+} from "@/lib/server/label-settings";
+import {
   withAccountLock,
   moveDecision,
   markColdDecision,
@@ -23,6 +27,11 @@ import {
 } from "@/lib/server/engine";
 
 const actionSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("coldLabel"),
+    accountId: z.string(),
+    name: coldLabelNameSchema,
+  }),
   z.object({ action: z.literal("startFiltering"), accountId: z.string() }),
   z.object({
     action: z.literal("mode"),
@@ -151,6 +160,20 @@ export async function POST(request: Request) {
         await query(
           "UPDATE accounts SET mode=$2,mode_changed_at=now(),auto_after=CASE WHEN $2='automatic' THEN now() ELSE auto_after END WHERE id=$1",
           [accountId, action.mode],
+        );
+      } else if (action.action === "coldLabel") {
+        if (!account.connected)
+          throw new HttpError(409, "Reconnect this account.");
+        if (!writesEnabled(accountId))
+          throw new HttpError(
+            403,
+            "Gmail label changes are disabled for this account.",
+          );
+        await updateColdLabel(
+          accountId,
+          account.policy,
+          action.name,
+          await Gmail.forAccount(accountId),
         );
       } else if (action.action === "policy") {
         await query(

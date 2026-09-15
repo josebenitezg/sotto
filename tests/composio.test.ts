@@ -12,6 +12,42 @@ const fetchMock = vi.fn();
 const connection = { id: "ca_test", userId: "sotto_owner" };
 const json = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value), { status });
+it("renames only a user label through the fixed authenticated Gmail proxy", async () => {
+  fetchMock.mockResolvedValueOnce(
+    json({ status: 200, data: { id: "Label_Cold", name: "Sales & Leads" } }),
+  );
+  const gmail = new Gmail("", "owner", connection);
+  await gmail.renameLabel("Label_Cold", "Sales & Leads");
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+    connected_account_id: "ca_test",
+    endpoint: "https://www.googleapis.com/gmail/v1/users/me/labels/Label_Cold",
+    method: "PATCH",
+    body: { name: "Sales & Leads" },
+  });
+  await expect(gmail.renameLabel("INBOX", "Sales")).rejects.toThrow();
+  await expect(gmail.renameLabel("Label_Cold", "TRASH")).rejects.toThrow();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+it("uses a stored label ID after a rename and supports custom label creation", async () => {
+  const gmail = new Gmail("", "owner", connection);
+  fetchMock.mockResolvedValueOnce(
+    json({
+      successful: true,
+      data: { labels: [{ id: "Label_Cold", name: "Already renamed" }] },
+    }),
+  );
+  expect(await gmail.ensureLabel("Sales", "Label_Cold")).toBe("Label_Cold");
+  fetchMock.mockResolvedValueOnce(
+    json({ successful: true, data: { labels: [] } }),
+  );
+  fetchMock.mockResolvedValueOnce(
+    json({ successful: true, data: { id: "Label_New" } }),
+  );
+  expect(await gmail.ensureLabel("Prospección / Ventas")).toBe("Label_New");
+  expect(JSON.parse(fetchMock.mock.calls[2][1].body).arguments.label_name).toBe(
+    "Prospección / Ventas",
+  );
+});
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);

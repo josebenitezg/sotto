@@ -19,6 +19,9 @@ import {
 import { usesComposioPolling } from "./polling";
 import { processingErrorCode, retryPlan } from "./processing-error";
 import { coldMemory, learnPendingCorrections } from "./cold-memory";
+import { usesDesktop } from "./desktop-config";
+import { coldLabelName, READING_LABEL } from "../labels";
+import { HttpError } from "./auth";
 import type { Classification, Policy } from "../types";
 
 export class AccountBusy extends Error {}
@@ -226,7 +229,7 @@ async function syncBudgetedMailbox(
     );
   });
 }
-async function contextFor(
+export async function contextFor(
   accountId: string,
   gmail: Gmail,
   mail: Awaited<ReturnType<Gmail["message"]>>,
@@ -262,6 +265,7 @@ export async function classifyJob(
   messageId: string,
   gmail: Gmail,
 ) {
+  if (await usesDesktop(accountId)) return;
   const existing = await query(
     "SELECT id,state FROM decisions WHERE account_id=$1 AND message_id=$2",
     [accountId, messageId],
@@ -408,7 +412,8 @@ export async function moveDecision(
   if (
     automatic &&
     decision.state === "suggested" &&
-    decision.policy_version !== CLASSIFIER_POLICY_VERSION
+    decision.policy_version !== CLASSIFIER_POLICY_VERSION &&
+    !(await usesDesktop(decision.account_id))
   ) {
     ctx.coldCorrections = await coldMemory(decision.account_id);
     result = await classify(mail, ctx);
@@ -430,7 +435,10 @@ export async function moveDecision(
   const label =
     decision.label_added ??
     (await gmail.ensureLabel(
-      result.category === "cold" ? "Sotto/Cold" : "Sotto/Reading",
+      result.category === "cold"
+        ? coldLabelName(account.policy)
+        : READING_LABEL,
+      result.category === "cold" ? account.policy.coldLabelId : undefined,
     ));
   const addedByUs =
     decision.state === "moving"
@@ -457,7 +465,7 @@ export async function markColdDecision(decisionId: string, gmail: Gmail) {
     throw new Error("Mailbox writes disabled");
   if (!(await accountProcessingAllowed(decision.account_id))) return;
   const [account] = await query(
-    "SELECT id FROM accounts WHERE id=$1 AND connected=true AND mode<>'paused'",
+    "SELECT id,policy FROM accounts WHERE id=$1 AND connected=true AND mode<>'paused'",
     [decision.account_id],
   );
   if (!account) return;
@@ -477,9 +485,19 @@ export async function markColdDecision(decisionId: string, gmail: Gmail) {
     !(feedback && decision.state === "moving")
   )
     return;
-  const mail = await gmail.message(decision.message_id);
+  let mail;
+  try {
+    mail = await gmail.message(decision.message_id);
+  } catch (error) {
+    if (error instanceof GmailError && error.status === 404)
+      throw new HttpError(
+        409,
+        "This email is no longer available in Gmail. Open Gmail to check its current state.",
+      );
+    throw error;
+  }
   if (mail.labels.some((l) => ["TRASH", "SPAM", "SENT", "DRAFT"].includes(l)))
-    throw new Error("This email moved elsewhere. Check it in Gmail.");
+    throw new HttpError(409, "This email moved elsewhere. Check it in Gmail.");
   if (!mail.labels.includes("INBOX")) {
     if (
       feedback &&
@@ -492,14 +510,18 @@ export async function markColdDecision(decisionId: string, gmail: Gmail) {
       );
       return;
     }
-    throw new Error(
-      "This email is no longer in your inbox. Check it in Gmail.",
+    throw new HttpError(
+      409,
+      "This email is no longer in your inbox. To mark it as cold, return it to your inbox in Gmail, then try again.",
     );
   }
   const label =
     feedback && decision.state === "moving"
       ? decision.label_added
-      : await gmail.ensureLabel("Sotto/Cold");
+      : await gmail.ensureLabel(
+          coldLabelName(account.policy),
+          account.policy.coldLabelId,
+        );
   await transaction(async (db) => {
     await db.query(
       "INSERT INTO cold_feedback(decision_id) VALUES($1) ON CONFLICT DO NOTHING",
@@ -561,6 +583,7 @@ export async function workAccount(accountId: string, maxJobs = 30) {
       [accountId],
     );
     if (!account) return;
+    if (await usesDesktop(accountId)) return;
     if (!(await accountProcessingAllowed(accountId))) return;
     const gmail = await Gmail.forAccount(accountId);
     if (

@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { googleClient, gmailScope } from "@/lib/server/google";
 import { configured, isDemo, composioEnabled } from "@/lib/server/config";
 import { startComposioConnection } from "@/lib/server/composio-connect";
+import {
+  desktopReturnCookie,
+  desktopReturnPath,
+} from "@/lib/server/desktop-config";
 import { opaque, hash, seal } from "@/lib/server/crypto";
 import { query } from "@/lib/server/db";
 import {
@@ -22,7 +26,18 @@ export async function POST(request: Request) {
     if (body.length > 1024)
       throw new HttpError(413, "The request is too large.");
     const startFiltering = new URLSearchParams(body).get("intent") === "filter";
-    if (composioEnabled()) return await startComposioConnection(startFiltering);
+    const desktopPairing =
+      new URLSearchParams(body).get("desktopPairing") ?? undefined;
+    if (composioEnabled()) {
+      const response = await startComposioConnection(startFiltering);
+      if (desktopReturnPath(desktopPairing))
+        response.cookies.set(desktopReturnCookie, desktopPairing!, {
+          ...cookieOptions(),
+          maxAge: 600,
+        });
+      else response.cookies.delete(desktopReturnCookie);
+      return response;
+    }
     const state = opaque(),
       browser = opaque(),
       verifier = opaque();

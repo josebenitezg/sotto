@@ -1,4 +1,8 @@
 import { cookies } from "next/headers";
+import {
+  desktopReturnCookie,
+  desktopReturnPath,
+} from "@/lib/server/desktop-config";
 import { NextResponse } from "next/server";
 import { appUrl, isDemo, publicSignup } from "@/lib/server/config";
 import { hash } from "@/lib/server/crypto";
@@ -91,9 +95,15 @@ export async function GET(request: Request) {
       );
     }
     stage = "session";
-    const response = NextResponse.redirect(
-      `${appUrl()}/${(await processingAllowed(workspaceId)) ? "review" : "pricing"}?connected=1`,
+    const desktopPath = desktopReturnPath(
+      (await cookies()).get(desktopReturnCookie)?.value,
     );
+    const response = NextResponse.redirect(
+      desktopPath
+        ? `${appUrl()}${desktopPath}`
+        : `${appUrl()}/${(await processingAllowed(workspaceId)) ? "review" : "pricing"}?connected=1`,
+    );
+    response.cookies.delete(desktopReturnCookie);
     response.cookies.set(
       sessionCookie,
       await createSession(workspaceId, identity.sub),

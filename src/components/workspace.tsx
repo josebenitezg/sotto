@@ -10,7 +10,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { ChevronRight, ExternalLink, Plus, X } from "lucide-react";
+import {
+  ChevronRight,
+  ExternalLink,
+  LaptopMinimal,
+  Plus,
+  X,
+} from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +51,12 @@ import { GoogleMark } from "./brand";
 import { Wordmark } from "./public-shell";
 import { AccountMenu } from "./account-menu";
 import { AccountMemory } from "./account-memory";
+import { MacDownload } from "./mac-download";
+import {
+  coldLabelName,
+  MAX_LABEL_NAME_LENGTH,
+  READING_LABEL,
+} from "@/lib/labels";
 import { memoryMarkdown } from "@/lib/memory";
 import { GoogleDataNotice } from "./google-data-notice";
 import type { Account, Dashboard, Decision, Mode } from "@/lib/types";
@@ -91,6 +103,8 @@ function applyDemo(data: Dashboard, action: Action): Dashboard {
   const account = next.accounts.find((a) => a.id === action.accountId);
   const decision = next.decisions.find((d) => d.id === action.decisionId);
   if (action.action === "mode" && account) account.mode = action.mode as Mode;
+  if (action.action === "coldLabel" && account)
+    account.policy.coldLabelName = String(action.name).trim();
   if (action.action === "startFiltering" && account) {
     account.mode = "automatic";
     next.decisions.forEach((d) => {
@@ -670,7 +684,7 @@ export function ReviewPage() {
               filter === "suggested"
                 ? "New suggestions appear here with a reason."
                 : filter === "moved"
-                  ? "Moved emails appear here and under Sotto/Cold in Gmail."
+                  ? "Moved emails appear here and under your Sotto labels in Gmail."
                   : "Emails you keep are recorded here."
             }
           />
@@ -759,7 +773,12 @@ export function ReviewPage() {
                             setSelectedId(null);
                         }}
                       >
-                        Move to Sotto/Cold
+                        <span className="min-w-0 truncate">
+                          Move to{" "}
+                          {selected.category === "cold"
+                            ? coldLabelName(selectedAccount?.policy)
+                            : READING_LABEL}
+                        </span>
                       </Button>
                       <Button
                         variant="outline"
@@ -813,7 +832,7 @@ export function ReviewPage() {
                           if (
                             await act(
                               { action: "markCold", decisionId: selected.id },
-                              "Moved to Sotto/Cold",
+                              `Moved to ${coldLabelName(selectedAccount?.policy)}`,
                             )
                           )
                             setFilter("moved");
@@ -919,12 +938,15 @@ function GmailFolderLink({ account }: { account: Account }) {
         href={
           data.demo
             ? "https://mail.google.com/"
-            : `https://mail.google.com/mail/u/?authuser=${encodeURIComponent(account.email)}#label/Sotto%2FCold`
+            : `https://mail.google.com/mail/u/?authuser=${encodeURIComponent(account.email)}#label/${encodeURIComponent(coldLabelName(account.policy))}`
         }
         target="_blank"
         rel="noreferrer"
       >
-        Sotto/Cold <ExternalLink />
+        <span className="max-w-[24ch] truncate">
+          {coldLabelName(account.policy)}
+        </span>{" "}
+        <ExternalLink />
       </a>
     </Button>
   );
@@ -1017,6 +1039,23 @@ function AccountRow({
           <ConnectButton outline />
         )}
       </div>
+      {account.policy.processingLocation === "desktop" ? (
+        <div className="mt-3 flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2.5 text-small">
+          <LaptopMinimal
+            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span className="font-medium">AI on your Mac</span>
+              <span className="text-muted-foreground">Cloud AI paused</span>
+            </p>
+            <p className="mt-0.5 text-muted-foreground">
+              If your Mac is off or paused, emails wait. Cloud AI stays paused.
+            </p>
+          </div>
+        </div>
+      ) : null}
       {account.connected && !account.writesEnabled && !data.demo ? (
         <p className="mt-3 text-small text-warning">
           Moving emails is disabled for this account.
@@ -1401,11 +1440,12 @@ export function SettingsPage({ subscription }: { subscription?: ReactNode }) {
         }
       />
       {subscription}
+      {account && <ColdLabelEditor key={account.id} account={account} />}
       <SectionLabel>Move out of the inbox</SectionLabel>
       <List label="Categories">
         <SettingRow
           title="Cold outreach"
-          description="Sotto/Cold"
+          description={coldLabelName(account?.policy)}
           checked
           disabled
         />
@@ -1467,6 +1507,10 @@ export function SettingsPage({ subscription }: { subscription?: ReactNode }) {
           }
         />
       ) : null}
+      <div className="mt-12">
+        <SectionLabel>Sotto Local</SectionLabel>
+        <MacDownload />
+      </div>
       <div className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t pt-6 text-small text-muted-foreground">
         <Link
           href="/privacy"
@@ -1484,6 +1528,54 @@ export function SettingsPage({ subscription }: { subscription?: ReactNode }) {
         </a>
       </div>
     </>
+  );
+}
+function ColdLabelEditor({ account }: { account: Account }) {
+  const { data, act, busy } = useWorkspace();
+  const id = useId();
+  const [draft, setDraft] = useState<string | null>(null);
+  const saved = coldLabelName(account.policy);
+  const name = draft ?? saved;
+  const disabled =
+    busy || (!data.demo && (!account.connected || !account.writesEnabled));
+  return (
+    <form
+      className="mb-10 space-y-3"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (
+          await act(
+            { action: "coldLabel", accountId: account.id, name },
+            "Gmail label updated",
+          )
+        )
+          setDraft(null);
+      }}
+    >
+      <Label htmlFor={id}>Cold email label</Label>
+      <div className="flex flex-wrap gap-2">
+        <Input
+          id={id}
+          value={name}
+          required
+          maxLength={MAX_LABEL_NAME_LENGTH}
+          disabled={disabled}
+          onChange={(event) => setDraft(event.target.value)}
+          aria-describedby={`${id}-help`}
+          className="min-w-0 flex-1 basis-48"
+        />
+        <Button
+          type="submit"
+          disabled={disabled || !name.trim() || name.trim() === saved}
+        >
+          Save label
+        </Button>
+      </div>
+      <p id={`${id}-help`} className="text-small text-muted-foreground">
+        Renames the label in Gmail, including emails already moved. The same
+        name is used on the web and your Mac.
+      </p>
+    </form>
   );
 }
 function PreferencesEditor({ account }: { account: Account }) {
@@ -1562,9 +1654,12 @@ function SettingRow({
   const id = title.toLowerCase().replaceAll(" ", "-");
   return (
     <div className="flex items-center justify-between gap-6 px-4 py-4">
-      <div>
+      <div className="min-w-0">
         <Label htmlFor={id}>{title}</Label>
-        <p id={`${id}-help`} className="mt-1 text-small text-muted-foreground">
+        <p
+          id={`${id}-help`}
+          className="mt-1 text-small text-muted-foreground [overflow-wrap:anywhere]"
+        >
           {description}
         </p>
       </div>

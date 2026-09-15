@@ -5,8 +5,9 @@ import { GoogleDataNotice } from "@/components/google-data-notice";
 import { configured, isDemo } from "@/lib/server/config";
 import { sessionWorkspace } from "@/lib/server/auth";
 import { InboxDemo } from "@/components/inbox-demo";
+import { MacDownload } from "@/components/mac-download";
 
-/* One screen: headline, one sentence, the button, the notice, and the demo. */
+/* Keep the web and local app entry points together. */
 export default async function LandingPage() {
   const ready = configured() && !isDemo();
   const signedIn = ready && !!(await sessionWorkspace());
@@ -59,6 +60,9 @@ export default async function LandingPage() {
               </div>
             </form>
           )}
+          <div className="mt-6">
+            <MacDownload />
+          </div>
         </div>
         <InboxDemo />
       </div>

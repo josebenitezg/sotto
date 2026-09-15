@@ -404,6 +404,45 @@ it("moves an owner's correction of a prior cloud review through the Mac action w
     ).rows,
   ).toEqual([]);
 });
+
+it.each(["archived", "trash", "spam", "missing"])(
+  "returns an actionable conflict when marking an email that is %s as cold",
+  async (state) => {
+    await h.db.query(
+      "INSERT INTO decisions(id,account_id,message_id,thread_id,sender,subject,category,confidence,reason,state,ai_decision,policy_version) VALUES('prior-kept','mail-a','m','t','sales@vendor.example','A service for your team','transactional',0.8,'Previous decision','kept','keep','v3-owner-corrections')",
+    );
+    labels =
+      state === "trash" ? ["TRASH"] : state === "spam" ? ["SPAM"] : ["UNREAD"];
+    if (state === "missing")
+      gmail.message.mockRejectedValueOnce(new GmailError(404));
+    const response = await accountAction(
+      new Request("https://sotto.example/api/actions", {
+        method: "POST",
+        headers: {
+          origin: "https://sotto.example",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ action: "markCold", decisionId: "prior-kept" }),
+      }),
+    );
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.error).toContain("Gmail");
+    if (state === "archived")
+      expect(body.error).toContain("return it to your inbox");
+    expect(body.error).not.toContain("We could not complete the change");
+    expect(gmail.ensureLabel).not.toHaveBeenCalled();
+    expect(gmail.modify).not.toHaveBeenCalled();
+    expect(
+      (
+        await h.db.query(
+          "SELECT state,label_added,inbox_removed FROM decisions WHERE id='prior-kept'",
+        )
+      ).rows,
+    ).toEqual([{ state: "kept", label_added: null, inbox_removed: false }]);
+    expect((await h.db.query("SELECT 1 FROM cold_feedback")).rows).toEqual([]);
+  },
+);
 it("rechecks allowlists added during local inference", async () => {
   const t = await task("automatic");
   await h.db.query(

@@ -30,6 +30,7 @@ import {
 import { writesEnabled } from "./config";
 import { retryPlan, processingErrorCode } from "./processing-error";
 import type { Classification } from "../types";
+import { GmailReconnectRequired } from "./gmail-connection";
 
 const accountKey = z.string().regex(/^[a-zA-Z0-9_-]{1,255}$/);
 export async function enableDesktop(
@@ -250,6 +251,13 @@ export async function claimDesktop(
       if (error instanceof GmailError && error.status === 404) {
         await query("UPDATE jobs SET state='done' WHERE id=$1", [job.id]);
         return {};
+      }
+      if (error instanceof GmailReconnectRequired) {
+        await query(
+          "UPDATE jobs SET state='pending',attempts=GREATEST(0,attempts-1),last_error='gmail_reconnect_required' WHERE id=$1",
+          [job.id],
+        );
+        throw error;
       }
       const retry = retryPlan(error, job.attempts + 1);
       await query(

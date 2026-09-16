@@ -35,7 +35,7 @@ async function execute(
     // Extract only a status, never surface the provider's potentially private body.
     const status =
       typeof result.error === "string"
-        ? /\b(400|401|403|404|409|429|500|502|503|504)\b/.exec(
+        ? /\b(400|401|403|404|409|410|429|500|502|503|504)\b/.exec(
             result.error,
           )?.[1]
         : undefined;

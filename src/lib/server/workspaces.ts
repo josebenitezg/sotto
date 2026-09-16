@@ -7,6 +7,7 @@ import { ConnectionError } from "./connection-error";
 import { seal } from "./crypto";
 import type { ComposioConnection } from "./composio";
 import { mailboxLimit } from "../plans";
+import { GMAIL_RECONNECT_MESSAGE } from "../gmail-connection";
 
 // A verified Google identity can sign in to its existing workspace. Linking a
 // second inbox requires a browser-bound OAuth intent from that workspace.
@@ -36,7 +37,7 @@ export async function connectIdentity(
     const {
       rows: [existing],
     } = await db.query(
-      "SELECT workspace_id,token_cipher,connected,mode_changed_at,mail_provider,composio_account_id FROM accounts WHERE id=$1",
+      "SELECT workspace_id,token_cipher,connected,mode_changed_at,mail_provider,composio_account_id,last_error FROM accounts WHERE id=$1",
       [identity.sub],
     );
     if (
@@ -142,6 +143,7 @@ export async function connectIdentity(
           new Date(existing.mode_changed_at).getTime());
     if (
       filteringRequested &&
+      existing?.last_error !== GMAIL_RECONNECT_MESSAGE &&
       intentIsCurrent &&
       writesEnabled(identity.sub) &&
       classifierConfigured()

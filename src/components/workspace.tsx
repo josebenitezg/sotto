@@ -430,7 +430,13 @@ function List({
     </section>
   );
 }
-function ConnectButton({ outline = false }: { outline?: boolean }) {
+function ConnectButton({
+  outline = false,
+  reconnect = false,
+}: {
+  outline?: boolean;
+  reconnect?: boolean;
+}) {
   const { data } = useWorkspace();
   const noticeId = useId();
   return (
@@ -439,7 +445,11 @@ function ConnectButton({ outline = false }: { outline?: boolean }) {
       method="post"
       className="w-full max-w-[420px] space-y-4"
     >
-      <input type="hidden" name="intent" value="filter" />
+      <input
+        type="hidden"
+        name="intent"
+        value={reconnect ? "reconnect" : "filter"}
+      />
       <Button
         type="submit"
         size="lg"
@@ -448,7 +458,7 @@ function ConnectButton({ outline = false }: { outline?: boolean }) {
         aria-describedby={noticeId}
       >
         <GoogleMark />
-        Connect with Google
+        {reconnect ? "Reconnect Gmail" : "Connect with Google"}
       </Button>
       <GoogleDataNotice id={noticeId} />
     </form>
@@ -458,20 +468,24 @@ function Status({ account }: { account: Account }) {
   const {
     data: { demo, accessActive, allowance },
   } = useWorkspace();
-  const label = !account.connected
-    ? "Disconnected"
-    : accessActive === false || allowance?.exhausted
-      ? "Filtering unavailable"
-      : account.lastError
-        ? "Needs attention"
-        : account.mode === "automatic" && !account.writesEnabled && !demo
-          ? "Filtering unavailable"
-          : modeLabels[account.mode];
-  const tone = !account.connected
-    ? "text-muted-foreground"
-    : label === "Filtering on"
-      ? "text-success"
-      : "text-warning";
+  const label = account.reconnectRequired
+    ? "Reconnect Gmail"
+    : !account.connected
+      ? "Disconnected"
+      : accessActive === false || allowance?.exhausted
+        ? "Filtering unavailable"
+        : account.lastError
+          ? "Needs attention"
+          : account.mode === "automatic" && !account.writesEnabled && !demo
+            ? "Filtering unavailable"
+            : modeLabels[account.mode];
+  const tone = account.reconnectRequired
+    ? "text-warning"
+    : !account.connected
+      ? "text-muted-foreground"
+      : label === "Filtering on"
+        ? "text-success"
+        : "text-warning";
   return (
     <span
       className={cn(
@@ -1031,7 +1045,9 @@ function AccountRow({
             <Status account={account} />
           </div>
         </div>
-        {account.connected ? (
+        {account.reconnectRequired ? (
+          <ConnectButton outline reconnect />
+        ) : account.connected ? (
           <FilteringControls account={account} />
         ) : atAccountLimit(data) ? (
           <PlanLimitNote limit={data.accountLimit!} />

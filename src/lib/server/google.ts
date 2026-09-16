@@ -13,6 +13,7 @@ import {
 import { composioGmailRequest } from "./composio-gmail";
 import { usesComposioPolling } from "./polling";
 import { isUserLabelName } from "../labels";
+import { checkGmailConnection } from "./gmail-connection";
 
 export const gmailScope = "https://www.googleapis.com/auth/gmail.modify";
 export function googleClient() {
@@ -123,6 +124,7 @@ export class Gmail {
       try {
         return await composioGmailRequest<T>(this.composio, path, options);
       } catch (error) {
+        await checkGmailConnection(error, this.accountId, this.composio);
         if (error instanceof ComposioError) throw new GmailError(error.status);
         throw error;
       }
@@ -232,6 +234,15 @@ export class Gmail {
     });
   }
   async ensureNotifications() {
+    try {
+      return await this.ensureNotificationsConnected();
+    } catch (error) {
+      if (this.composio)
+        await checkGmailConnection(error, this.accountId, this.composio);
+      throw error;
+    }
+  }
+  private async ensureNotificationsConnected() {
     if (this.composio && this.accountId) {
       if (await usesComposioPolling(this.accountId)) {
         await stopComposioTrigger(this.composio);

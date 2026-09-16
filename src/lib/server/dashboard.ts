@@ -6,6 +6,7 @@ import { mailboxLimit } from "../plans";
 import { query } from "./db";
 import { processingAllowed } from "./entitlements";
 import { workspaceAllowance } from "./allowances";
+import { GMAIL_RECONNECT_MESSAGE } from "../gmail-connection";
 const iso = (date: Date | null) => date?.toISOString() ?? null;
 export async function dashboard(): Promise<Dashboard> {
   if (isDemo()) return structuredClone(demoDashboard);
@@ -78,6 +79,7 @@ export async function dashboard(): Promise<Dashboard> {
     mode: a.mode,
     policy: a.policy,
     connected: a.connected,
+    reconnectRequired: !a.connected && a.last_error === GMAIL_RECONNECT_MESSAGE,
     writesEnabled: a.connected && writesEnabled(a.id),
     lastSync: iso(a.last_sync),
     watchExpires: iso(a.watch_expires),

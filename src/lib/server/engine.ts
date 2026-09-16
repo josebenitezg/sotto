@@ -23,6 +23,7 @@ import { usesDesktop } from "./desktop-config";
 import { coldLabelName, READING_LABEL } from "../labels";
 import { HttpError } from "./auth";
 import type { Classification, Policy } from "../types";
+import { GmailReconnectRequired } from "./gmail-connection";
 
 export class AccountBusy extends Error {}
 
@@ -651,6 +652,13 @@ export async function workAccount(accountId: string, maxJobs = 30) {
         if (error instanceof GmailError && error.status === 404) {
           await query("UPDATE jobs SET state='done' WHERE id=$1", [job.id]);
           continue;
+        }
+        if (error instanceof GmailReconnectRequired) {
+          await query(
+            "UPDATE jobs SET state='pending',attempts=GREATEST(0,attempts-1),last_error='gmail_reconnect_required' WHERE id=$1",
+            [job.id],
+          );
+          return;
         }
         failed = true;
         const code = processingErrorCode(error);

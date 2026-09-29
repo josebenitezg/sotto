@@ -30,6 +30,8 @@ import {
 import { checkout } from "../src/lib/server/billing";
 import { connectIdentity } from "../src/lib/server/workspaces";
 import { pilotAdmission } from "../src/lib/server/global-config";
+import { recoverInitialSync } from "../src/lib/server/initial-sync";
+import { enqueueAccount } from "../src/lib/server/queue";
 
 beforeAll(async () => {
   h.db = new PGlite();
@@ -40,6 +42,7 @@ beforeAll(async () => {
 });
 afterAll(async () => h.db.close());
 beforeEach(async () => {
+  vi.mocked(enqueueAccount).mockReset().mockResolvedValue(undefined);
   for (const [name, value] of Object.entries({
     BILLING_ENABLED: "true",
     CHECKOUT_ENABLED: "true",
@@ -57,6 +60,7 @@ beforeEach(async () => {
     STRIPE_WEBHOOK_SECRET: "whsec_synthetic",
     STRIPE_PORTAL_CONFIGURATION_ID: "bpc_synthetic",
     ENABLE_MAILBOX_WRITES: "false",
+    QUEUE_DRIVER: "vercel",
   }))
     vi.stubEnv(name, value);
   await h.db.exec(`TRUNCATE workspaces CASCADE;
@@ -70,6 +74,51 @@ const grant = (value: unknown) =>
     "UPDATE global_config SET value=$1 WHERE key='full_access_emails'",
     [JSON.stringify(value)],
   );
+
+it("automatically resumes an initial sync after access is granted and deduplicates dashboard refreshes", async () => {
+  await h.db.exec("UPDATE accounts SET created_at=now()-interval '1 minute'");
+  await recoverInitialSync("owner");
+  expect(enqueueAccount).not.toHaveBeenCalled();
+  await grant(["owner@example.com"]);
+  await recoverInitialSync("owner");
+  await recoverInitialSync("owner");
+  expect(enqueueAccount).toHaveBeenCalledTimes(1);
+  expect(enqueueAccount).toHaveBeenCalledWith(
+    "primary",
+    expect.stringContaining("initial-recovery:primary:"),
+  );
+  await h.db.exec("UPDATE accounts SET last_sync=now()");
+  await recoverInitialSync("owner");
+  expect(enqueueAccount).toHaveBeenCalledTimes(1);
+});
+
+it("never recovers another workspace, a paused or disconnected account, or a desktop account", async () => {
+  await grant(["owner@example.com", "other@example.com"]);
+  await h.db.exec("UPDATE accounts SET created_at=now()-interval '1 minute'");
+  await recoverInitialSync("other");
+  for (const change of [
+    "mode='paused'",
+    "mode='automatic',connected=false",
+    `connected=true,policy='{"processingLocation":"desktop"}'`,
+  ]) {
+    await h.db.exec(`UPDATE accounts SET ${change}`);
+    await recoverInitialSync("owner");
+  }
+  expect(enqueueAccount).not.toHaveBeenCalled();
+});
+
+it("releases the recovery claim when queue delivery fails so the next refresh can retry", async () => {
+  await grant(["owner@example.com"]);
+  await h.db.exec("UPDATE accounts SET created_at=now()-interval '1 minute'");
+  vi.mocked(enqueueAccount).mockRejectedValueOnce(
+    new Error("Queue unavailable"),
+  );
+  await expect(recoverInitialSync("owner")).rejects.toThrow(
+    "Queue unavailable",
+  );
+  await recoverInitialSync("owner");
+  expect(enqueueAccount).toHaveBeenCalledTimes(2);
+});
 
 it("grants full processing and all mailbox slots without creating a trial, checkout or permanent internal status", async () => {
   expect(await processingAllowed("owner")).toBe(false);

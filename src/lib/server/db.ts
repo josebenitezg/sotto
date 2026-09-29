@@ -1,4 +1,5 @@
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
+import { attachDatabasePool } from "@vercel/functions";
 import { required } from "./config";
 const globalDb = globalThis as unknown as { sottoPool?: Pool };
 export function pool() {
@@ -7,15 +8,19 @@ export function pool() {
   );
   if (url.searchParams.get("sslmode") === "require")
     url.searchParams.set("sslmode", "verify-full");
-  globalDb.sottoPool ??= new Pool({
-    // Account advisory locks require a session, not a transaction pooler.
-    connectionString: url.toString(),
-    max: 8,
-    idleTimeoutMillis: 20000,
-    allowExitOnIdle: true,
-    connectionTimeoutMillis: 8000,
-    statement_timeout: 15000,
-  });
+  if (!globalDb.sottoPool) {
+    globalDb.sottoPool = new Pool({
+      // Account advisory locks require a session, not a transaction pooler.
+      connectionString: url.toString(),
+      max: 3,
+      idleTimeoutMillis: 5000,
+      allowExitOnIdle: true,
+      connectionTimeoutMillis: 8000,
+      statement_timeout: 15000,
+    });
+    // Keep idle cleanup alive before Vercel suspends the function instance.
+    attachDatabasePool(globalDb.sottoPool);
+  }
   return globalDb.sottoPool;
 }
 export async function query<T extends QueryResultRow = QueryResultRow>(
